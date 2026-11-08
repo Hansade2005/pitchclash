@@ -575,6 +575,19 @@ export class Match {
       p.teamPress = !!inp.through;
     } else p.pressing = false;
 
+    // mouse "click an opponent": run them down and tackle
+    if (h.chase) {
+      const c = h.chase, t = c.t, st = Math.hypot(stick.x, stick.z);
+      if (has || !t || t.sentOff || this.phase !== 'play' || performance.now() > c.until || st > 0.6 || (c.carrier && this.ball.owner !== t)) h.chase = null;
+      else {
+        const d = this.dist(p, t), lead = Math.min(0.45, d / 14), tx = t.x + (t.vx || 0) * lead, tz = t.z + (t.vz || 0) * lead, dx = tx - p.x, dz = tz - p.z, dl = Math.hypot(dx, dz) || 1;
+        p.humanMove = { x: dx / dl, z: dz / dl, sprint: d > 2.2 };
+        if (!p.action && p.stun <= 0) {
+          if (d < 1.7) this.tryTackle(p, false);
+          else if (d < 3.0 && c.carrier && !c.slid && Math.random() < 0.04) { c.slid = true; p.face = Math.atan2(dx, dz); this.tryTackle(p, true); }
+        }
+      }
+    }
     if (has) {
       if (press('pass')) { const t = this.smartPass(p, stick); if (t) this.passTo(p, t.p); else this.kickBall(p, Math.sin(p.face) * 13, 0.3, Math.cos(p.face) * 13, 0, 'pass'); }
       else if (press('through')) { const t = this.smartPass(p, stick); if (t) this.throughBall(p, t.p); }
@@ -606,6 +619,24 @@ export class Match {
     for (let i = 0; i <= 36; i++) { const t = T * 1.12 * i / 36; pts.push([b.x + dx * t / T, Math.max(0.15, y0 + vy * t - 0.5 * g * t * t), b.z + dz * t / T]); }
     const over = Math.max(0, pw - 0.88);
     return { pts, end: [aim.x, aim.z], dist: d, over: over > 0, power: pw, aim };
+  }
+  // opponent under the pointer (the ball carrier gets priority), or null
+  pickOpponent(h, tx, tz) {
+    const me = h.player; if (!me) return null; const c = this.ball.owner;
+    if (c && c.team !== me.team && !c.isGK && hyp(c.x - tx, c.z - tz) < 4.5) return c;
+    let best = null, bd = 3.2;
+    for (const o of this.active(1 - me.team)) { if (o.isGK || o.sentOff) continue; const d = hyp(o.x - tx, o.z - tz); if (d < bd) { bd = d; best = o; } }
+    return best;
+  }
+  mouseTackle(h, tx, tz) {
+    let me = h.player; if (!me || me.stun > 0 || this.phase !== 'play' || this.ball.owner === me) return false;
+    const t = this.pickOpponent(h, tx, tz); if (!t) return false;
+    // if a teammate is clearly closer to that opponent, take control of him
+    const used = this.humans.filter(o => o !== h).map(o => o.player);
+    const mates = this.active(h.team).filter(q => !q.isGK && !used.includes(q) && q !== me).sort((a, c) => this.dist(a, t) - this.dist(c, t));
+    if (mates[0] && this.dist(mates[0], t) + 6 < this.dist(me, t)) { this.setHuman(h, mates[0]); h.switchCD = 1.2; }
+    h.chase = { t, until: performance.now() + 5000, carrier: this.ball.owner === t, slid: false };
+    return true;
   }
   mouseReady(h) {
     const p = h && h.player; if (!p || p.stun > 0 || p.sentOff) return false;

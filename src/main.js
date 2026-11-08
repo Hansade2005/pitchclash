@@ -491,7 +491,7 @@ function keyHelpHtml() {
     const d = h.device, k = a => `<b>${esc(Input.keyLabel(d, a))}</b>`;
     return `<div class="khrow"><span class="khp" style="background:${HUMAN_COLORS[h.id]}">P${h.id + 1}</span>
       MOVE <b>${moveLabel(d)}</b> <i>${settings.autoSprint && d.type !== 'pad' ? '(you sprint automatically)' : ''}</i> · PASS ${k('pass')} · SHOOT ${k('shoot')} <i>(hold = power)</i> · LOB / CROSS ${k('lob')} · THROUGH ${k('through')} · FEINT ${k('skill')} · SWITCH ${k('switch')}</div>
-      ${['kb1', 'kb2'].includes(d.type) && settings.mouseAim ? `<div class="khrow">🖱 <b>MOUSE / TOUCHPAD</b>: aim the dotted line · <b>click</b> = pass · <b>hold click</b> = shoot (release) · <b>right-click</b> = lob / cross / free-kick</div>` : ''}
+      ${['kb1', 'kb2'].includes(d.type) && settings.mouseAim ? `<div class="khrow">🖱 <b>MOUSE / TOUCHPAD</b>: <b>click an opponent</b> when defending = chase &amp; tackle · aim the dotted line · <b>click</b> = pass · <b>hold click</b> = shoot (release) · <b>right-click</b> = lob / cross / free-kick</div>` : ''}
       <div class="khrow dim">Defending: hold ${k('pass')} to chase the ball · ${k('shoot')} near the carrier = slide tackle · ${k('through')} = standing tackle · ${d.type === 'pad' ? 'Start' : 'Esc'} = pause</div>`;
   }).join('');
 }
@@ -1114,6 +1114,7 @@ function updatePassMarker(inputs) {
   if (M && run && !screen && !run.ceremony && !run.replay && !run.viewer && M.phase === 'play') {
     M.humans.forEach((h, i) => { const p = h.player; if (!target && p && M.ball.owner === p) { const t = M.smartPass(p, { x: inputs[i] ? inputs[i].mx || 0 : 0, z: inputs[i] ? inputs[i].my || 0 : 0 }); if (t) target = t.p; } });
   }
+  if (!target && aimActive() && M.phase === 'play' && !M.mouseReady(mouseHuman()) && performance.now() - mouse.moved < 4000) { const g = groundPoint(), o = g && M.pickOpponent(mouseHuman(), g.x, g.z); if (o) { target = o; document.body.style.cursor = 'pointer'; } }
   renderer.setPassMarker(target ? [target.x, target.z] : null);
 }
 function updateAim(dt) {
@@ -1141,6 +1142,7 @@ function mouseRelease(kind) {
 }
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.moved = performance.now(); });
 window.addEventListener('mousedown', e => {
+  if (e.button === 0 && aimActive() && !M.mouseReady(mouseHuman())) { const g = groundPoint(), h = mouseHuman(); if (g && h) M.mouseTackle(h, g.x, g.z); return; }
   if (!aimActive() || !M.mouseReady(mouseHuman())) return;
   if (e.button === 0) { mouse.left = true; mouse.leftT = 0; }
   if (e.button === 2) { mouse.right = true; }
