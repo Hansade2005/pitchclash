@@ -200,5 +200,80 @@
  "anthem": [
   "The players line up for the anthems.",
   "A proud moment as the anthems ring out."
+ ],
+ "chatter": [
+  "The tempo has really picked up here.",
+  "Both sides are looking for that opening.",
+  "Lovely bit of play down the right.",
+  "They are keeping the ball very well now.",
+  "Good pressure from the home side.",
+  "The atmosphere in this stadium is incredible.",
+  "A real battle in midfield.",
+  "Plenty of movement up front.",
+  "That was a lovely first touch.",
+  "They are stretching the play nicely.",
+  "The crowd are right behind their team.",
+  "Always dangerous when he gets on the ball.",
+  "Neat passing there, keeping it simple.",
+  "A bit of space opening up on the wing.",
+  "They want to get men forward quickly.",
+  "Solid defending there to clear the danger.",
+  "The keeper is keeping a close eye on things.",
+  "It is end to end stuff now.",
+  "Good composure on the ball.",
+  "That is a smart bit of defending.",
+  "Some nice interplay in the final third.",
+  "They are patient, looking for the right pass."
+ ],
+ "colour": [
+  "I like how they are pressing high up the pitch.",
+  "You can see the manager wants more width.",
+  "The shape out of possession has been really good.",
+  "They need to be careful not to lose the ball here.",
+  "It is all about that second ball in midfield.",
+  "That is the difference, the quality of the final pass.",
+  "I think they will look to exploit the space behind the full backs.",
+  "You can feel the tension building.",
+  "A little bit of patience is needed here.",
+  "Small margins decide matches like this.",
+  "Great movement off the ball.",
+  "They have got to keep their concentration.",
+  "That kind of touch makes it look easy.",
+  "The crowd will be lifting them now.",
+  "Fitness will be key in the final twenty minutes.",
+  "He is reading the game really well.",
+  "That is top level defending.",
+  "Watch the runs from deep, that is where the danger is."
+ ],
+ "colour_goal": [
+  "What a goal that was!",
+  "Absolutely brilliant, you cannot defend against that.",
+  "That is what the crowd came to see.",
+  "Fantastic finish, that.",
+  "Clinical. Just clinical."
+ ],
+ "colour_save": [
+  "That was a brilliant save.",
+  "The goalkeeper has been outstanding.",
+  "You have to credit the keeper for that one."
+ ],
+ "colour_foul": [
+  "That was a clear foul, no complaints.",
+  "He knew straight away he had gone through him."
+ ],
+ "colour_post": [
+  "So unlucky, inches away.",
+  "That is a let off for the keeper."
+ ],
+ "colour_halftime": [
+  "A lot for the managers to think about at the break.",
+  "It has been an entertaining first half."
+ ],
+ "colour_fulltime": [
+  "A deserved result in the end.",
+  "Well played by both sides tonight."
+ ],
+ "colour_var": [
+  "VAR will check every angle here."
  ]
 }

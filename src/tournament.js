@@ -125,9 +125,8 @@ function shootout(rng, hRating, aRating) {
  *   scorers: [{ team, player, name, minute, og, pen? }] ordered by minute
  *   hg/ag include extra-time goals; pens are shootout scores only.
  */
-export function simulateMatch(homeTeam, awayTeam, opts = {}) {
-  const home = resolveTeam(homeTeam), away = resolveTeam(awayTeam);
-  const rng = opts.rng || mulberry32(opts.seed ?? Math.floor(Math.random() * 2 ** 32));
+// expected goals for both sides (with the day-to-day form noise) — the one place the scoring model lives
+function goalRates(home, away, rng, neutral) {
   const hs = home.style || {}, as = away.style || {};
   const diff = (home.rating ?? 70) - (away.rating ?? 70);
   const form = () => Math.exp(gauss(rng) * 0.12); // day-to-day variance
@@ -135,7 +134,27 @@ export function simulateMatch(homeTeam, awayTeam, opts = {}) {
   let la = BASE_GOALS * Math.exp(-RATING_K * diff) * form();
   lh *= 1 + ((hs.attack ?? 60) - (as.defence ?? 60)) / 500;
   la *= 1 + ((as.attack ?? 60) - (hs.defence ?? 60)) / 500;
-  if (!opts.neutral) { lh *= HOME_MULT; la *= AWAY_MULT; }
+  if (!neutral) { lh *= HOME_MULT; la *= AWAY_MULT; }
+  return [lh, la];
+}
+
+// true outcome probabilities for betting (Monte-Carlo over the very same goal model that settles matches)
+export function matchProbabilities(homeTeam, awayTeam, opts = {}) {
+  const home = resolveTeam(homeTeam), away = resolveTeam(awayTeam), n = opts.n || 24000, rng = mulberry32(opts.seed ?? 12345);
+  let h = 0, x = 0, a = 0, over = 0, btts = 0, hh = 0, aa = 0; const cs = {};
+  for (let i = 0; i < n; i++) {
+    const [lh, la] = goalRates(home, away, rng, !!opts.neutral), g1 = poisson(rng, lh), g2 = poisson(rng, la);
+    if (g1 > g2) h++; else if (g1 < g2) a++; else x++;
+    if (g1 + g2 > 2) over++; if (g1 > 0 && g2 > 0) btts++; hh += g1; aa += g2;
+    const k = g1 + '-' + g2; cs[k] = (cs[k] || 0) + 1;
+  }
+  return { h: h / n, x: x / n, a: a / n, over25: over / n, btts: btts / n, xgH: hh / n, xgA: aa / n, cs: Object.fromEntries(Object.entries(cs).map(([k, v]) => [k, v / n])) };
+}
+
+export function simulateMatch(homeTeam, awayTeam, opts = {}) {
+  const home = resolveTeam(homeTeam), away = resolveTeam(awayTeam);
+  const rng = opts.rng || mulberry32(opts.seed ?? Math.floor(Math.random() * 2 ** 32));
+  const [lh, la] = goalRates(home, away, rng, !!opts.neutral);
 
   const hLine = teamLineup(home), aLine = teamLineup(away);
   const scorers = [];

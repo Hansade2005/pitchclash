@@ -4,5 +4,3 @@ src/bundle.js
 tmp-music-render/
 *.log
 .DS_Store
-assets/models/
-assets/dev/

@@ -14,6 +14,8 @@ const Input = (() => {
   };
   let KB = JSON.parse(JSON.stringify(DEFAULT_KB));
   try { const saved = JSON.parse(localStorage.getItem('pc_keys_v2') || 'null'); if (saved && saved.kb1 && saved.kb2) KB = saved; } catch (e) {}
+  const tapped = new Set();          // keys pressed (even if released again) since the last frame — a quick tap is never lost on a slow frame
+  window.addEventListener('keydown', e => { if (!e.repeat) tapped.add(e.code); });
   let merge = false;                 // one keyboard player: WASD *and* arrows both work
   let enterFlag = false;
   window.addEventListener('keydown', e => { if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat) enterFlag = true; });
@@ -41,19 +43,19 @@ const Input = (() => {
       out.back = btn(g, 1); out.confirm = btn(g, 0);
       out.lb = btn(g, 4); out.rb = btn(g, 5);
     } else {
-      const any = arr => arr.some(c => keys.has(c));
+      const any = arr => arr.some(c => keys.has(c) || tapped.has(c));
       const layouts = [dev.type]; if (merge) layouts.push(dev.type === 'kb1' ? 'kb2' : 'kb1');
       let mx = 0, my = 0;
       for (const L of layouts) {
         const k = KB[L];
-        mx += (keys.has(k.right) ? 1 : 0) - (keys.has(k.left) ? 1 : 0);
-        my += (keys.has(k.down) ? 1 : 0) - (keys.has(k.up) ? 1 : 0);
+        mx += (keys.has(k.right) || tapped.has(k.right) ? 1 : 0) - (keys.has(k.left) || tapped.has(k.left) ? 1 : 0);
+        my += (keys.has(k.down) || tapped.has(k.down) ? 1 : 0) - (keys.has(k.up) || tapped.has(k.up) ? 1 : 0);
         for (const a of ACTIONS) if (any(k[a])) out[a] = true;
       }
       mx = Math.max(-1, Math.min(1, mx)); my = Math.max(-1, Math.min(1, my));
       const m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; }
       out.mx = mx; out.my = my;
-      out.confirm = out.pass || keys.has('Enter') || keys.has('NumpadEnter');
+      out.confirm = out.pass || keys.has('Enter') || keys.has('NumpadEnter') || tapped.has('Enter');
       out.back = out.shoot;
       out.lb = out.switch; out.rb = out.skill;
     }
@@ -118,5 +120,5 @@ const Input = (() => {
     const list = (merge ? ['kb1', 'kb2'] : [dev.type]).flatMap(L => (KB[L][action] || []).filter(c => !/^Numpad/.test(c)).slice(0, 1));
     return list.map(niceKey).join(' / ');
   }
-  return { read, takeEnter: () => { const v = enterFlag; enterFlag = false; return v; }, setMerge: v => { merge = !!v; }, keyLabel, candidates, devId, deviceName, isPlayStation, rumble, padCount: () => pads().length, getKeymap, setKey, resetKeys, captureKey, keysDown: () => keys };
+  return { read, endFrame: () => tapped.clear(), takeEnter: () => { const v = enterFlag; enterFlag = false; return v; }, setMerge: v => { merge = !!v; }, keyLabel, candidates, devId, deviceName, isPlayStation, rumble, padCount: () => pads().length, getKeymap, setKey, resetKeys, captureKey, keysDown: () => keys };
 })();

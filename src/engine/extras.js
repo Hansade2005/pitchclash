@@ -59,6 +59,13 @@ export class Extras {
     // coaches in the technical areas (team 0 left dugout, team 1 right)
     const suit = c => ({ shirt: c, shorts: '#111827', socks: '#111827' });
     this.coaches = [0, 1].map(t => this.person(t ? 2 : 1, suit(t === 0 ? '#1f2937' : '#27272a'), (t === 0 ? -12 : 12) * (match.dir(0) > 0 ? 1 : 1), -HW - 3.4, 0));
+    // the two commentators in the booth above the main stand (lead + co-commentator)
+    this.casters = [];
+    const bp = this.R.boothPos;
+    if (bp) for (let i = 0; i < 2; i++) {
+      const ch = this.person(i ? 9 : 4, { shirt: i ? '#1d2a46' : '#2a2a30', shorts: '#15171d', socks: '#15171d' }, bp.x + (i ? 2.0 : -2.0), bp.z + 0.15, 0);
+      ch.holder.position.y = bp.y - 1.55; ch.bones = {}; ch.root.traverse(o => { if (o.isBone) ch.bones[o.name] = o; }); this.casters.push(ch);
+    }
     // warm-up substitutes in bibs
     const bib = t => ({ shirt: t === 0 ? '#ff8a00' : '#9dff00', shorts: kits[t].shorts, socks: kits[t].socks });
     this.warm = [];
@@ -133,9 +140,9 @@ export class Extras {
         col.set(fc[Math.floor(v * fc.length)]);
         if (Math.random() < 0.15) col.set('#ffffff');
       } else return;
-      R.crowd.setColorAt(i, col);
+      R.crowdBody.setColorAt(i, col);
     });
-    R.crowd.instanceColor.needsUpdate = true;
+    R.crowdBody.instanceColor.needsUpdate = true;
   }
 
   // --------------------------------------------------------------- effects
@@ -189,6 +196,18 @@ export class Extras {
       this.play(ch, celebrating ? 'Celebrate' : 'Idle'); ch.mixer.update(dt);
       const target = match.ball; ch.holder.rotation.y = lerp(ch.holder.rotation.y, Math.atan2(target.x - ch.holder.position.x, target.z - ch.holder.position.z), Math.min(1, dt * 2));
     });
+    // commentators: nod and gesture while their voice is playing, cheer on goals
+    { const spk = (typeof Sound !== 'undefined' && Sound.speaker) ? Sound.speaker() : null, tt = performance.now() / 1000, celeb = match.phase === 'goal';
+      this.casters.forEach((ch, i) => {
+        this.play(ch, celeb ? 'Celebrate' : 'Idle'); ch.mixer.update(dt);
+        const act = (i === 0 && spk === 'lead') || (i === 1 && spk === 'co'); ch.talk = lerp(ch.talk || 0, act ? 1 : 0, Math.min(1, dt * 6));
+        const a = ch.talk, B = ch.bones; if (celeb || !B) return;
+        const idle = 0.06 + a * 0.2;
+        if (B.head) { B.head.rotation.x += Math.sin(tt * 9 + i) * 0.05 * a; B.head.rotation.y += Math.sin(tt * 2.6 + i * 2) * idle; }
+        if (B.neck_01) B.neck_01.rotation.y += Math.sin(tt * 2.6 + i * 2) * idle * 0.4;
+        if (B.lowerarm_r) { B.lowerarm_r.rotation.z += (Math.sin(tt * 4.4 + i) * 0.45 - 0.3) * a; B.lowerarm_r.rotation.x += Math.sin(tt * 3.1) * 0.3 * a; }
+        if (B.upperarm_r) B.upperarm_r.rotation.z += -0.35 * a;
+      }); }
     // warm-up substitutes jog up and down the touchline
     this.warm.forEach(ch => {
       ch.holder.position.x += ch.dir * dt * 2.2;

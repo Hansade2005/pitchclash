@@ -20,23 +20,26 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 
 // ------------------------------------------------------------------ competition list
 const CATS = (COMPETITION_CATEGORIES && COMPETITION_CATEGORIES.length) ? COMPETITION_CATEGORIES : [['domestic', 'Domestic leagues & cups'], ['continental', 'Club continental cups'], ['international', 'Nations tournaments']];
-export function competitionsMenu(catIdx = 0) {
+let lastCat = 0;   // coming back to this menu keeps the category you were in
+export function competitionsMenu(start) {
+  let cat = start === undefined ? lastCat : start;
   const saved = hasSave();
+  const listFor = i => COMPETITIONS.filter(c => c.category === CATS[i][0]);
+  const icon = c => c.type === 'league' ? '📊' : c.type === 'super' ? '⭐' : c.type === 'knockout' ? '🏅' : '🏆';
   api.show({
-    render: () => {
-      const cat = CATS[catIdx][0];
-      const list = COMPETITIONS.filter(c => c.category === cat);
-      const icon = c => c.type === 'league' ? '📊' : c.type === 'super' ? '⭐' : c.type === 'knockout' ? '🏅' : '🏆';
-      return `<div class="panel wide"><div class="title">COMPETITIONS</div>
-        <div class="tabs">${CATS.map((c, i) => `<span class="${i === catIdx ? 'on' : ''}">${c[1]}</span>`).join('')}</div>
+    focus: CATS.length + (saved ? 1 : 0),          // start on the first competition
+    render: () => `<div class="panel wide"><div class="title">COMPETITIONS</div>
+        <div class="tabs">${CATS.map((c, i) => `<div class="tab nav ${i === cat ? 'on' : ''}" data-act="cat:${i}">${esc(c[1])}</div>`).join('')}</div>
         ${saved ? `<div class="opts" style="margin-bottom:12px"><div class="opt nav go" data-act="continue"><span>▶ Continue: ${esc(saved)}</span><span></span></div></div>` : ''}
-        <div class="complist">${list.map(c => `<div class="btn nav" data-act="comp:${c.id}">${icon(c)} ${esc(c.name)}<small>${esc(describe(c))}</small></div>`).join('')}</div>
-        <div class="hint"><span class="key">LB</span>/<span class="key">RB</span> or <span class="key">Tab</span> switch category · <span class="key">A</span> choose · <span class="key">B</span> back</div></div>`;
-    },
-    tab: d => competitionsMenu((catIdx + d + CATS.length) % CATS.length),
+        <div class="complist">${listFor(cat).map(c => `<div class="btn nav" data-act="comp:${c.id}">${icon(c)} ${esc(c.name)}<small>${esc(describe(c))}</small></div>`).join('')}</div>
+        <div class="actions"><div class="btn nav" data-act="back">← Back to menu</div></div>
+        <div class="hint">Click a category, or press <span class="key">Q</span>/<span class="key">E</span> · <span class="key">LB</span>/<span class="key">RB</span> · <span class="key">Tab</span> to switch · arrows move · <span class="key">Enter</span> choose · <span class="key">Esc</span> back</div></div>`,
+    tab: d => { cat = (cat + d + CATS.length) % CATS.length; lastCat = cat; api.renderScreen(); },
     action: act => {
+      if (act === 'back') return api.mainMenu();
       if (act === 'continue') return continueSaved();
-      if (act.startsWith('comp:')) chooseTeams(act.slice(5));
+      if (act.startsWith('cat:')) { cat = +act.slice(4); lastCat = cat; api.setFocus(cat); return; }
+      if (act.startsWith('comp:')) { lastCat = cat; chooseTeams(act.slice(5)); }
     },
     back: () => api.mainMenu(),
   });
@@ -54,35 +57,30 @@ function chooseTeams(compId) {
   try { state = T.createCompetition(compId, { seed: (Math.random() * 1e9) | 0 }); }
   catch (e) { console.error(e); return; }
   const teams = state.teams.slice().sort((a, b) => (getTeam(b)?.rating || 0) - (getTeam(a)?.rating || 0));
-  const st = { idx: 0, picks: [] };
+  const info = id => getTeam(id) || state.teamInfo[id];
+  const picks = [];
+  const ACT = 3;                                     // number of buttons before the team grid
+  const choose = id => {
+    if (picks.includes(id)) return;
+    picks.push(id); Sound.confirm();
+    if (picks.length === 2) return begin(state, picks);
+    api.renderScreen(); api.setFocus(ACT);
+  };
   api.show({
-    raw: true,
-    render: () => {
-      const t = getTeam(teams[st.idx]) || state.teamInfo[teams[st.idx]];
-      return `<div class="panel"><div class="title">${esc(state.name)}</div><div class="sub">${esc(state.season)} · ${teams.length} teams · ${st.picks.length === 0 ? 'Choose YOUR team' : 'Player 2: choose a rival team, or press B to play with one team'}</div>
-        <div class="teamcard active" style="margin:0 auto">
-          <div class="crest" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)"><span>${esc(t.short)}</span></div>
-          <div class="tname">◀ ${esc(t.name)} ▶</div>
-          <div class="stars">${api.stars(t.rating)} <small>${t.rating}</small></div>
-          ${t.style ? `<div class="attrs">ATT ${t.style.attack} · DEF ${t.style.defence} · PAC ${t.style.pace} · PAS ${t.style.passing}</div><div class="form">${esc(t.formation)}</div>` : ''}
-          <div class="form">${st.idx + 1} / ${teams.length}</div></div>
-        ${st.picks.length ? `<div class="sub">Player 1: <b>${esc(name(st.picks[0]))}</b></div>` : ''}
-        <div class="hint">◀▶ browse (hold to scroll fast) · <span class="key">A</span> select · <span class="key">B</span> ${st.picks.length ? 'single team — start' : 'back'} · <span class="key">Y</span> random team</div></div>`;
+    focus: ACT,
+    render: () => `<div class="panel wide"><div class="title">${esc(state.name)}</div>
+      <div class="sub">${esc(state.season)} · ${teams.length} teams · ${picks.length === 0 ? '<b>Click or press Enter on YOUR team</b>' : `Player 1: <b>${esc(name(picks[0]))}</b> — now pick a rival for Player 2, or start with one team`}</div>
+      <div class="actions"><div class="btn nav" data-act="back">← ${picks.length ? 'Undo' : 'Back'}</div><div class="btn nav" data-act="random">🎲 Random team</div>${picks.length ? '<div class="btn nav go" data-act="start1">▶ Start with one team</div>' : '<div class="btn" style="opacity:.0;pointer-events:none">.</div>'}</div>
+      <div class="teamgrid">${teams.map(id => { const t = info(id); return `<div class="btn nav ${picks.includes(id) ? 'picked' : ''}" data-act="t:${id}"><span class="tn">${api.kitSwatch(t, false)} ${esc(t.name)}</span><small>${api.stars(t.rating)} ${t.rating}${t.formation ? ' · ' + esc(t.formation) : ''}</small></div>`; }).join('')}</div>
+      <div class="hint">Arrows move · <span class="key">Enter</span> / click choose · <span class="key">Y</span> random · <span class="key">Esc</span> ${picks.length ? 'undo' : 'back to competitions'}</div></div>`,
+    action: act => {
+      if (act === 'back') { Sound.back(); if (picks.length) { picks.pop(); api.renderScreen(); api.setFocus(ACT); return; } return competitionsMenu(); }
+      if (act === 'random') { const free = teams.filter(id => !picks.includes(id)); return choose(free[Math.floor(Math.random() * free.length)]); }
+      if (act === 'start1') return begin(state, picks);
+      if (act.startsWith('t:')) choose(act.slice(2));
     },
-    tick: inputs => {
-      for (const { inp } of inputs) {
-        if (inp.navX) { st.idx = (st.idx + inp.navX + teams.length) % teams.length; Sound.menu(); api.renderScreen(); }
-        if (inp.throughPressed) { st.idx = Math.floor(Math.random() * teams.length); Sound.menu(); api.renderScreen(); }
-        if (inp.confirmPressed) {
-          const id = teams[st.idx];
-          if (st.picks.includes(id)) continue;
-          st.picks.push(id); Sound.confirm();
-          if (st.picks.length === 2) return begin(state, st.picks);
-          st.idx = (st.idx + 1) % teams.length; api.renderScreen();
-        }
-        if (inp.backPressed) { Sound.back(); if (st.picks.length) return begin(state, st.picks); return competitionsMenu(); }
-      }
-    },
+    back: () => { Sound.back(); if (picks.length) { picks.pop(); api.renderScreen(); api.setFocus(ACT); } else competitionsMenu(); },
+    tick: inputs => { for (const { inp } of inputs) if (inp.throughPressed) { const free = teams.filter(id => !picks.includes(id)); return choose(free[Math.floor(Math.random() * free.length)]); } },
   });
 }
 function begin(state, users) {
@@ -148,6 +146,7 @@ export function hubScreen() {
   const mine = userFixtures();
   const roundFx = T.nextFixtures(s);
   api.show({
+    focus: TABS.length,
     render: () => {
       let body = '';
       if (C.tab === 0) {
@@ -170,12 +169,13 @@ export function hubScreen() {
       else body = `<div class="card scroll">${scorersHtml()}</div>`;
       return `<div class="panel wide"><div class="title" style="font-size:36px">${esc(s.name)} <small style="font-size:18px;opacity:.7">${esc(s.season)}</small></div>
         <div class="sub" style="margin:4px 0 12px">${C.users.map(u => esc(name(u))).join(' vs ')}</div>
-        <div class="tabs">${TABS.map((t, i) => `<span class="${i === C.tab ? 'on' : ''}">${t}</span>`).join('')}</div>${body}
+        <div class="tabs">${TABS.map((t, i) => `<div class="tab nav ${i === C.tab ? 'on' : ''}" data-act="tab:${i}">${t}</div>`).join('')}</div>${body}
         <div class="opts" style="margin-top:12px"><div class="opt nav" data-act="quit"><span>Save & exit to menu</span><span></span></div></div>
         <div class="hint"><span class="key">LB</span>/<span class="key">RB</span> tabs · <span class="key">A</span> select · <span class="key">B</span> menu</div></div>`;
     },
-    tab: d => { C.tab = (C.tab + d + TABS.length) % TABS.length; api.renderScreen(); },
+    tab: d => { C.tab = (C.tab + d + TABS.length) % TABS.length; api.setFocus(C.tab); },
     action: act => {
+      if (act.startsWith('tab:')) { C.tab = +act.slice(4); api.setFocus(C.tab); return; }
       if (act === 'play') return playFixture(mine[0]);
       if (act === 'sim') { simulateUserFixture(mine[0]); return finishRoundIfReady(); }
       if (act === 'advance') { finishRoundIfReady(true); return; }
@@ -235,7 +235,7 @@ function outcome(s) {
 function championScreen() {
   const s = C.state;
   const won = C.users.includes(s.champion);
-  if (won && window.Music && Music.sting) Music.sting('victory');
+  if (won) Sound.victory();
   if (won) { Sound.roar(); Sound.say(`${name(s.champion)} are the champions!`, 3); }
   api.show({
     render: () => `<div class="panel wide"><div class="trophy">🏆</div><div class="title">${esc(name(s.champion))}</div>

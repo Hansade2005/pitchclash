@@ -202,6 +202,81 @@
   "anthem": [
    "anthem_0.mp3",
    "anthem_1.mp3"
+  ],
+  "chatter": [
+   "chatter_0.mp3",
+   "chatter_1.mp3",
+   "chatter_2.mp3",
+   "chatter_3.mp3",
+   "chatter_4.mp3",
+   "chatter_5.mp3",
+   "chatter_6.mp3",
+   "chatter_7.mp3",
+   "chatter_8.mp3",
+   "chatter_9.mp3",
+   "chatter_10.mp3",
+   "chatter_11.mp3",
+   "chatter_12.mp3",
+   "chatter_13.mp3",
+   "chatter_14.mp3",
+   "chatter_15.mp3",
+   "chatter_16.mp3",
+   "chatter_17.mp3",
+   "chatter_18.mp3",
+   "chatter_19.mp3",
+   "chatter_20.mp3",
+   "chatter_21.mp3"
+  ],
+  "colour": [
+   "colour_0.mp3",
+   "colour_1.mp3",
+   "colour_2.mp3",
+   "colour_3.mp3",
+   "colour_4.mp3",
+   "colour_5.mp3",
+   "colour_6.mp3",
+   "colour_7.mp3",
+   "colour_8.mp3",
+   "colour_9.mp3",
+   "colour_10.mp3",
+   "colour_11.mp3",
+   "colour_12.mp3",
+   "colour_13.mp3",
+   "colour_14.mp3",
+   "colour_15.mp3",
+   "colour_16.mp3",
+   "colour_17.mp3"
+  ],
+  "colour_goal": [
+   "colour_goal_0.mp3",
+   "colour_goal_1.mp3",
+   "colour_goal_2.mp3",
+   "colour_goal_3.mp3",
+   "colour_goal_4.mp3"
+  ],
+  "colour_save": [
+   "colour_save_0.mp3",
+   "colour_save_1.mp3",
+   "colour_save_2.mp3"
+  ],
+  "colour_foul": [
+   "colour_foul_0.mp3",
+   "colour_foul_1.mp3"
+  ],
+  "colour_post": [
+   "colour_post_0.mp3",
+   "colour_post_1.mp3"
+  ],
+  "colour_halftime": [
+   "colour_halftime_0.mp3",
+   "colour_halftime_1.mp3"
+  ],
+  "colour_fulltime": [
+   "colour_fulltime_0.mp3",
+   "colour_fulltime_1.mp3"
+  ],
+  "colour_var": [
+   "colour_var_0.mp3"
   ]
  },
  "teams": {

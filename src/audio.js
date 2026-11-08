@@ -24,7 +24,7 @@ const Sound = (() => {
       const windSrc = ctx.createBufferSource(); windSrc.buffer = noiseBuffer(4, true); windSrc.loop = true;
       windF = ctx.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 300; windF.Q.value = 1.5; windGain = ctx.createGain(); windGain.gain.value = 0;
       windSrc.connect(windF); windF.connect(windGain); windGain.connect(master); windSrc.start();
-      loadCommentary();
+      loadCommentary(); loadAssets();
       if (window.Music && Music.attach) { try { Music.attach(ctx, musicBus); } catch (e) { console.warn(e); } }
       const loop = (buf, freq, q, type = 'bandpass') => {
         const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
@@ -78,6 +78,10 @@ const Sound = (() => {
   let chantT = null;
   function chant(on) {
     clearInterval(chantT); chantT = null;
+    if (ctx && assets.chant_stomps) {                        // the real rhythmic stomps & claps recording
+      if (!stompLoop) stompLoop = loopOf(assets.chant_stomps, crowdBus);
+      stompLoop.g.gain.setTargetAtTime(on ? 0.75 : 0, t0(), 0.6); return;
+    }
     if (!on || !ctx) return;
     // rhythmic clap + "olé"-style tone pattern
     let beat = 0;
@@ -107,8 +111,25 @@ const Sound = (() => {
 
   // ---------------- recorded commentary (Kokoro voice clips bundled with the game)
   let manifest = null; const buffers = new Map(); let voiceQueue = [], voicePlaying = null, voicePri = -1, lastLine = {};
+  // ---------------- real recordings (uploaded assets): stadium ambience, crowd cheer, chant stomps, jingles, pro commentator calls
+  const assets = {}; let ambLoop = null, stompLoop = null;
+  function loopOf(buf, bus) { const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; const g = ctx.createGain(); g.gain.value = 0; src.connect(g); g.connect(bus); src.start(0, Math.random() * buf.duration * 0.7); return { src, g }; }
+  async function loadAssets() {
+    await Promise.all(['stadium_ambience', 'crowd_cheer', 'chant_stomps', 'jingle_kickoff', 'sting_decisive', 'crowd_goal', 'crowd_nearmiss', 'crowd_nearmiss_fk', 'goal_horn'].map(async n => {
+      try { const r = await fetch(`../assets/audio/${n}.mp3`); if (r.ok) assets[n] = await ctx.decodeAudioData(await r.arrayBuffer()); } catch (e) {}
+    }));
+    if (assets.stadium_ambience && ctx && !ambLoop) ambLoop = loopOf(assets.stadium_ambience, crowdBus);
+  }
+  // one-shot: opts { gain, bus: 'crowd'|'music'|'sfx', fade: seconds of fade-out at the end }
+  function asset(name, opts = {}) {
+    const buf = assets[name]; if (!ctx || !buf) return false;
+    const src = ctx.createBufferSource(); src.buffer = buf; const g = ctx.createGain(), t = t0(), gain = opts.gain ?? 1, dur = Math.min(buf.duration, opts.max || buf.duration);
+    g.gain.setValueAtTime(gain, t); if (opts.fade) { g.gain.setValueAtTime(gain, t + dur - opts.fade); g.gain.linearRampToValueAtTime(0.0001, t + dur); }
+    src.connect(g); g.connect(opts.bus === 'music' ? musicBus : opts.bus === 'sfx' ? sfx : crowdBus); src.start(t); if (opts.max) src.stop(t + dur + 0.05); return true;
+  }
   async function loadCommentary() {
     try { const r = await fetch('../assets/commentary/manifest.json'); if (r.ok) manifest = await r.json(); } catch (e) { manifest = null; }
+    try { const r = await fetch('../assets/audio/pro.json'); if (r.ok && manifest) { const pro = await r.json(); for (const [k, v] of Object.entries(pro.lines || {})) manifest.lines[k] = v.map(f => '../audio/' + f); } } catch (e) {}
   }
   async function getBuf(file) {
     if (buffers.has(file)) return buffers.get(file);
@@ -120,6 +141,7 @@ const Sound = (() => {
     let i = Math.floor(Math.random() * arr.length); if (arr.length > 1 && i === lastLine[cat]) i = (i + 1) % arr.length; lastLine[cat] = i;
     return arr[i];
   }
+  let speakerNow = null;
   function playNext() {
     if (voicePlaying || !voiceQueue.length || !ctx) return;
     const item = voiceQueue.shift();
@@ -127,7 +149,7 @@ const Sound = (() => {
     getBuf(item.file).then(buf => {
       if (!buf) { voicePlaying = null; voicePri = -1; return playNext(); }
       const s = ctx.createBufferSource(); s.buffer = buf; s.connect(voiceBus);
-      voicePlaying = s; s.onended = () => { if (voicePlaying === s) { voicePlaying = null; voicePri = -1; setTimeout(playNext, 120); } };
+      voicePlaying = s; speakerNow = /^colour/.test(item.file) ? 'co' : 'lead'; s.onended = () => { if (voicePlaying === s) { voicePlaying = null; speakerNow = null; voicePri = -1; setTimeout(playNext, 120); } };
       s.start();
     });
   }
@@ -210,7 +232,7 @@ const Sound = (() => {
     pass() { tone(170, 0.08, 0.3, 'sine', -80); noise(0.04, 1800, 0.15); },
     touch() { tone(210, 0.05, 0.12, 'sine', -100); },
     bounce(v) { tone(150, 0.06, Math.min(0.25, v * 0.05), 'sine', -60); },
-    post() { tone(780, 0.6, 0.3, 'triangle'); tone(1170, 0.45, 0.15, 'sine'); tone(1560, 0.3, 0.08, 'sine'); voices(200, 1.4, 0.5, 600, 60); },
+    post() { asset('crowd_nearmiss', { gain: 0.7, fade: 2, max: 5 }); tone(780, 0.6, 0.3, 'triangle'); tone(1170, 0.45, 0.15, 'sine'); tone(1560, 0.3, 0.08, 'sine'); voices(200, 1.4, 0.5, 600, 60); },
     net() { noise(0.35, 700, 0.35, 'bandpass'); },
     tackle() { noise(0.2, 900, 0.5); tone(80, 0.15, 0.3, 'sine', -40); },
     slide() { noise(0.45, 3000, 0.18, 'highpass'); },
@@ -226,14 +248,16 @@ const Sound = (() => {
       }, delay * 1000);
     },
     menu() { tone(620, 0.06, 0.12, 'triangle'); },
+    tick(level) { tone(380 + level * 900, 0.05, 0.07 + level * 0.06, 'square'); },
     confirm() { tone(660, 0.07, 0.14, 'triangle'); tone(990, 0.09, 0.14, 'triangle', 0, 0.07); },
     back() { tone(500, 0.07, 0.12, 'triangle', -150); },
-    crowd(level, tension = 0) { if (!ctx) return; crowdBed.g.gain.setTargetAtTime(level * 0.9, t0(), 0.5); crowdHigh.g.gain.setTargetAtTime(tension * 0.12, t0(), 0.3); },
-    roar() { swell(2.2, 0.15, 2.5, 3.5, 800); swell(0.8, 0.1, 2, 3, 1800); voices(260, 3, 0.6, 800, 80); },
-    ooh() { voices(210, 1.5, 0.6, 520, -50); swell(0.6, 0.2, 0.4, 1.2); },
+    crowd(level, tension = 0) { if (!ctx) return; const real = !!ambLoop; crowdBed.g.gain.setTargetAtTime(level * (real ? 0.3 : 0.9), t0(), 0.5); crowdHigh.g.gain.setTargetAtTime(tension * (real ? 0.06 : 0.12), t0(), 0.3); if (ambLoop) ambLoop.g.gain.setTargetAtTime(level * 1.35 + tension * 0.25, t0(), 0.6); },
+    roar(goal) { swell(2.2, 0.15, 2.5, 3.5, 800); swell(0.8, 0.1, 2, 3, 1800); voices(260, 3, 0.6, 800, 80); if (goal) { if (!asset('crowd_goal', { gain: 0.95, fade: 4.5, max: 14 })) asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); else asset('crowd_cheer', { gain: 0.4, fade: 3, max: 6 }); asset('goal_horn', { gain: 0.6, bus: 'sfx', fade: 1.2, max: 5 }); } else asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); },
+    ooh(fk) { if (asset(fk ? 'crowd_nearmiss_fk' : 'crowd_nearmiss', { gain: 0.9, fade: 2.5, max: 7 })) return; voices(210, 1.5, 0.6, 520, -50); swell(0.6, 0.2, 0.4, 1.2); },
     boo() { voices(130, 1.8, 0.5, 400, -15); },
     applause() { for (let i = 0; i < 40; i++) setTimeout(() => noise(0.04, 2500 + Math.random() * 1500, 0.06 + Math.random() * 0.05, 'bandpass', crowdBus), Math.random() * 2500); },
-    chant, say, comment, teamName, preload, music, nowPlaying, weather, thunder,
+    asset, hasAsset: n => !!assets[n], victory() { if (!asset('sting_decisive', { gain: 0.9, bus: 'music' }) && window.Music && Music.sting) Music.sting('victory'); },
+    speaker: () => (voicePlaying ? speakerNow : null), chant, say, comment, teamName, preload, music, nowPlaying, weather, thunder,
     get volume() { return volume; }, get commentary() { return commentary; },
     setVolume(k, v) { volume[k] = v; if (ctx) { master.gain.value = volume.master; sfx.gain.value = volume.sfx; crowdBus.gain.value = volume.crowd; musicBus.gain.value = volume.music; voiceBus.gain.value = volume.voice; } save(); },
     setCommentary(on) { commentary = on; if (!on && window.speechSynthesis) speechSynthesis.cancel(); save(); },

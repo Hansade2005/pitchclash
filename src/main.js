@@ -1,10 +1,14 @@
 // Pitch Clash — game shell: menus, match runtime, HUD, replays, shootouts and competition hub.
+import * as THREE from 'three';
 import { Match, PITCH, playerRatings, pickStarters } from './engine/sim.js';
 import { Extras } from './engine/extras.js';
 import { Renderer } from './engine/render.js';
 import { NATIONS, CLUBS, LEAGUES, makeSquad, formations as FORMATIONS } from './data/teams.js';
 import * as Comp from './hub.js';
 import { STADIUMS, homeStadium, venueFor } from './data/stadiums.js';
+import * as Bet from './ui_bet.js';
+import * as Career from './ui_career.js';
+import { Bank } from './economy.js';
 
 const $ = id => document.getElementById(id);
 const menuEl = $('menu'), hudEl = $('hud');
@@ -13,7 +17,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 // ------------------------------------------------------------------ settings
 const SETTINGS_KEY = 'pc_settings';
-export const settings = Object.assign({ assisted: true, stadium: 'home', ceremony: 'full', injuries: true, var: true, autoSubs: false, halfMinutes: 4, difficulty: 'pro', time: 'night', weather: 'clear', camera: 'broadcast', zoom: 1, replays: true, quality: 'high', radar: true, names: true, assisted: true }, (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })());
+export const settings = Object.assign({ cuts: true, autoSprint: true, mouseAim: true, assisted: true, stadium: 'home', ceremony: 'full', injuries: true, var: true, autoSubs: false, halfMinutes: 4, difficulty: 'pro', time: 'night', weather: 'clear', camera: 'broadcast', zoom: 1, replays: true, quality: 'high', radar: true, names: true, assisted: true }, (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })());
 export function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
 
 const renderer = new Renderer($('stage'));
@@ -41,6 +45,7 @@ const joinedDevices = []; // devices that have pressed something
 export function show(s) {
   screen = s; focus = (s && s.focus) || 0; renderScreen();
 }
+export function setFocus(i) { focus = i; renderScreen(); }
 export function renderScreen() {
   if (!screen) { menuEl.innerHTML = ''; return; }
   menuEl.innerHTML = screen.render();
@@ -73,6 +78,7 @@ function moveFocus(dx, dy) {
 function activate(el) { if (!screen) return; Sound.confirm(); screen.action && screen.action(el.dataset.act, el, 0); }
 function menuInput(inputs) {
   if (!screen) return;
+  if (screen.typing) return;
   const before = screen;
   if (screen.tick) screen.tick(inputs);
   if (!screen || screen.raw || screen !== before) return;
@@ -81,14 +87,18 @@ function menuInput(inputs) {
     const el = focusables[focus];
     if (inp.navX && el && el.dataset.cycle !== undefined) { Sound.menu(); screen.action(el.dataset.act, el, inp.navX); continue; }
     if (inp.navX || inp.navY) moveFocus(inp.navX, inp.navX ? 0 : inp.navY);
-    if (inp.confirmPressed && el) { activate(el); return; }
+    if (inp.confirmPressed && el && !(screen._numAt && performance.now() - screen._numAt < 200)) { activate(el); return; }
     if (inp.backPressed && screen.back) { Sound.back(); screen.back(); return; }
     if (inp.lbPressed && screen.tab) { Sound.menu(); screen.tab(-1); }
     if (inp.rbPressed && screen.tab) { Sound.menu(); screen.tab(1); }
   }
 }
 window.addEventListener('keydown', e => {
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat && !screen && M && run && !run.replay && !run.viewer && !run.fulltime) { pauseMenu(); return; }   // pause with Esc or P, any layout
   if (e.code === 'F1') { e.preventDefault(); if (run) run.help.pinned = !run.help.pinned; }
+  if (screen && screen.typing) { if (e.code === 'Escape' && screen.back) screen.back(); return; }
+  if (screen && screen.onKey && screen.onKey(e)) { screen._numAt = performance.now(); e.preventDefault(); return; }
+  if (screen && screen.raw && e.code === 'Escape' && screen.back) { e.preventDefault(); screen.back(); return; }   // Esc = back on every screen
   if (!screen || screen.raw) return;
   if (e.code === 'Enter' && focusables[focus]) { activate(focusables[focus]); }
   if (e.code === 'Escape' && screen.back) { Sound.back(); screen.back(); }
@@ -107,6 +117,8 @@ function mainMenu() {
         <div class="btn nav big" data-act="kickoff">⚽ Kick Off<small>Quick match · 1P vs CPU · 2P versus · 2P co-op</small></div>
         <div class="btn nav big" data-act="comps">🏆 Competitions<small>Leagues · Club cups · Nations championships</small></div>
         ${saved ? `<div class="btn nav" data-act="continue">▶ Continue: ${esc(saved)}</div>` : ''}
+        <div class="btn nav big" data-act="ml">👔 Master League<small>Manage a club for seasons · transfers · finances · youth · board</small></div>
+        <div class="btn nav" data-act="bet">🎰 Virtual Sportsbook<small>Play coins only · bet on CPU matches · up to 4 friends</small></div>
         <div class="btn nav" data-act="controls">🎮 Controls</div>
         <div class="btn nav" data-act="settings">⚙ Settings</div>
         <div class="btn nav" data-act="credits">ℹ Credits</div>
@@ -117,6 +129,8 @@ function mainMenu() {
       if (act === 'kickoff') sideSelect({ mode: 'quick' });
       if (act === 'comps') Comp.competitionsMenu();
       if (act === 'continue') Comp.continueSaved();
+      if (act === 'ml') Career.masterLeague();
+      if (act === 'bet') Bet.sportsbook();
       if (act === 'controls') controlsScreen(mainMenu);
       if (act === 'settings') settingsScreen(mainMenu);
       if (act === 'credits') creditsScreen();
@@ -131,7 +145,17 @@ export { mainMenu };
 export function sideSelect(opts) {
   const devs = Input.candidates();
   const side = new Map(); // devId -> -1 home, 0 none, 1 away
-  // first device that confirmed goes home by default
+  const assigned = () => [...side.values()].some(v => v !== 0);
+  const setSide = (id, n) => { const count = [...side.entries()].filter(([k, v]) => k !== id && v === n && n !== 0).length; if (n === 0 || count < 2) { side.set(id, n); Sound.menu(); return true; } return false; };
+  const goBack = () => { Sound.back(); (opts.back || mainMenu)(); };
+  const finish = () => {
+    if (!assigned()) return false;
+    const all = Input.candidates();
+    const sides = [...side.entries()].filter(([, v]) => v !== 0).map(([id, v]) => ({ device: devs.find(d => Input.devId(d) === id) || all.find(d => Input.devId(d) === id), team: v < 0 ? 0 : 1 }));
+    Sound.confirm();
+    if (opts.onDone) opts.onDone(sides); else teamSelect({ sides });
+    return true;
+  };
   show({
     raw: true,
     render: () => {
@@ -139,46 +163,56 @@ export function sideSelect(opts) {
       const homeName = opts.fixedTeams ? esc(opts.fixedTeams[0].name) : 'HOME';
       const awayName = opts.fixedTeams ? esc(opts.fixedTeams[1].name) : 'AWAY';
       const rows = list.map(d => {
-        const s = side.get(Input.devId(d)) || 0;
-        const icon = d.type === 'pad' ? '🎮' : '⌨';
-        return `<div class="siderow"><div class="slot ${s < 0 ? 'on home' : ''}">${s < 0 ? icon : ''}</div><div class="dev ${s === 0 ? 'mid' : ''}">${icon} ${esc(Input.deviceName(d))}</div><div class="slot ${s > 0 ? 'on away' : ''}">${s > 0 ? icon : ''}</div></div>`;
+        const id = Input.devId(d), s = side.get(id) || 0, icon = d.type === 'pad' ? '🎮' : '⌨';
+        return `<div class="siderow"><div class="slot nav ${s < 0 ? 'on home' : ''}" data-act="side:${id}:-1">${s < 0 ? icon : '<small>click</small>'}</div><div class="dev ${s === 0 ? 'mid' : ''}">${icon} ${esc(Input.deviceName(d))}</div><div class="slot nav ${s > 0 ? 'on away' : ''}" data-act="side:${id}:1">${s > 0 ? icon : '<small>click</small>'}</div></div>`;
       }).join('');
       const h = [...side.values()].filter(v => v < 0).length, a = [...side.values()].filter(v => v > 0).length;
       let mode = 'Choose sides';
       if (h && a) mode = 'VERSUS';
       else if (h > 1 || a > 1) mode = 'CO-OP vs CPU';
       else if (h || a) mode = '1 PLAYER vs CPU';
-      return `<div class="panel"><div class="title">SELECT SIDES</div><div class="sub">Push your stick ◀ for ${homeName} or ▶ for ${awayName} · Press <span class="key">A</span> / <span class="key">Start</span> when ready</div>
+      return `<div class="panel"><div class="title">SELECT SIDES</div><div class="sub">Click a slot, or push ◀ / ▶ (A / D, arrow keys, stick) · <span class="key">Enter</span> when ready</div>
         <div class="sidehead"><span>${homeName}</span><span></span><span>${awayName}</span></div>${rows}
         <div class="modepill">${mode}</div>
-        <div class="hint">Up to 2 players per side. <b>Playing on a keyboard?</b> Press <span class="key">Enter</span> (you'll be the home player) or push <span class="key">A</span> / <span class="key">←</span> to pick Home. One keyboard player can use WASD <i>and</i> the arrow keys. For 2 players on one keyboard: P1 = <span class="key">WASD</span>, P2 = <span class="key">arrows</span>. Then press <span class="key">Enter</span> · <span class="key">Esc</span> back</div></div>`;
+        <div class="opts" style="flex-direction:row;justify-content:center;margin-top:16px"><div class="btn nav" data-act="back" style="width:180px">← Back</div><div class="btn nav go" data-act="go" style="width:260px;${assigned() ? '' : 'opacity:.45'}">Continue ▶</div></div>
+        <div class="hint"><b>Playing on a keyboard?</b> Just press <span class="key">Enter</span> — you're the home player, with WASD <i>and</i> arrows both working. Two players on one keyboard: P1 = <span class="key">WASD</span>, P2 = <span class="key">arrows</span>. <span class="key">Esc</span> = back</div></div>`;
     },
+    action: act => {
+      if (act === 'back') return goBack();
+      if (act === 'go') { if (!finish()) { Sound.menu(); } return; }
+      if (act.startsWith('side:')) { const [, id, v] = act.split(':'); const cur = side.get(id) || 0; setSide(id, cur === +v ? 0 : +v); renderScreen(); }
+    },
+    back: goBack,
     tick: inputs => {
       let changed = false;
-      const nobody = ![...side.values()].some(v => v !== 0);
       const first = inputs.find(x => x.inp.confirmPressed || x.inp.startPressed);
-      if (nobody && first) { side.set(Input.devId(first.dev), -1); Sound.confirm(); renderScreen(); return; }   // Enter / A with nobody picked → you're the home player
+      if (!assigned() && first) { side.set(Input.devId(first.dev), -1); Sound.confirm(); renderScreen(); return; }   // Enter / A with nobody picked → you're the home player
       for (const { dev, inp } of inputs) {
         const id = Input.devId(dev), cur = side.get(id) || 0;
-        if (inp.navX) { const n = clamp(cur + inp.navX, -1, 1); const count = [...side.values()].filter(v => v === n && n !== 0).length; if (n === 0 || count < 2) { side.set(id, n); changed = true; Sound.menu(); } }
-        if ((inp.confirmPressed || inp.startPressed) && [...side.values()].some(v => v !== 0)) {
-          const sides = [...side.entries()].filter(([, v]) => v !== 0).map(([id, v]) => ({ device: devs.find(d => Input.devId(d) === id) || Input.candidates().find(d => Input.devId(d) === id), team: v < 0 ? 0 : 1 }));
-          Sound.confirm();
-          if (opts.onDone) opts.onDone(sides); else teamSelect({ sides });
-          return;
-        }
-        if (inp.backPressed || (dev.type !== 'pad' && inp.startPressed && false)) { Sound.back(); (opts.back || mainMenu)(); return; }
+        if (inp.navX && setSide(id, clamp(cur + inp.navX, -1, 1))) changed = true;
+        if ((inp.confirmPressed || inp.startPressed) && finish()) return;
+        if (inp.backPressed) return goBack();
       }
       if (changed || Input.candidates().length !== devs.length) renderScreen();
     },
   });
-  window.__sideKey = e => { if (screen && screen.raw && e.code === 'Escape') (opts.back || mainMenu)(); };
 }
 
 // ------------------------------------------------------------------ team select
 function teamSelect({ sides }) {
   const st = { cat: [0, 1], idx: [0, 2], alt: [false, false], active: 0 };
-  const pick = s => CATEGORIES[st.cat[s]].teams[st.idx[s] % CATEGORIES[st.cat[s]].teams.length];
+  const tl = s => CATEGORIES[st.cat[s]].teams;
+  const pick = s => tl(s)[st.idx[s] % tl(s).length];
+  const changeTeam = (s, d) => { const n = tl(s).length; st.idx[s] = (st.idx[s] + d + n) % n; Sound.menu(); renderScreen(); };
+  const changeCat = (s, d) => { st.cat[s] = (st.cat[s] + d + CATEGORIES.length) % CATEGORIES.length; st.idx[s] = 0; Sound.menu(); renderScreen(); };
+  const toggleKit = s => { st.alt[s] = !st.alt[s]; Sound.menu(); renderScreen(); };
+  const goBack = () => { Sound.back(); if (st.active === 1) { st.active = 0; renderScreen(); } else sideSelect({ mode: 'quick' }); };
+  const confirmStep = () => {
+    Sound.confirm();
+    if (st.active === 0) { st.active = 1; renderScreen(); return; }
+    if (pick(0).id === pick(1).id) { st.idx[1]++; renderScreen(); return; }
+    matchSettings({ sides, teams: [pick(0), pick(1)], alt: st.alt.slice(), from: 'quick' });
+  };
   show({
     raw: true,
     render: () => {
@@ -187,34 +221,37 @@ function teamSelect({ sides }) {
         const humans = sides.filter(x => x.team === s).length;
         return `<div class="teamcard ${st.active === s ? 'active' : ''}">
           <div class="side">${s === 0 ? 'HOME' : 'AWAY'} · ${humans ? humans + ' PLAYER' + (humans > 1 ? 'S' : '') : 'CPU'}</div>
-          <div class="cat">◀ LB &nbsp; ${esc(c.name)} &nbsp; RB ▶</div>
+          <div class="cat"><span class="arr nav" data-act="cat:${s}:-1">◀</span> ${esc(c.name)} <span class="arr nav" data-act="cat:${s}:1">▶</span></div>
           <div class="crest" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)"><span>${esc(t.short)}</span></div>
-          <div class="tname">◀ ${esc(t.name)} ▶</div>
+          <div class="tname"><span class="arr nav" data-act="team:${s}:-1">◀</span> ${esc(t.name)} <span class="arr nav" data-act="team:${s}:1">▶</span></div>
           <div class="stars">${stars(t.rating)} <small>${t.rating}</small></div>
           <div class="attrs">ATT ${t.style.attack} · DEF ${t.style.defence} · PAC ${t.style.pace} · PAS ${t.style.passing}</div>
           <div class="form">${esc(t.formation)}</div>
-          <div class="kits">${kitSwatch(t, false)} ${kitSwatch(t, true)} <small>${st.alt[s] ? 'Away kit (Y)' : 'Home kit (Y)'}</small></div></div>`;
+          <div class="kits nav" data-act="kit:${s}" style="cursor:pointer">${kitSwatch(t, false)} ${kitSwatch(t, true)} <small>${st.alt[s] ? 'Away kit' : 'Home kit'} (click to change)</small></div></div>`;
       };
-      return `<div class="panel wide"><div class="title">CHOOSE TEAMS</div><div class="teams">${col(0)}<div class="vs">VS</div>${col(1)}</div>
-        <div class="hint">Stick ◀▶ team · <span class="key">LB</span>/<span class="key">RB</span> league or region · <span class="key">Y</span> kit · <span class="key">A</span> confirm · <span class="key">B</span> back · CPU side is picked by the home player</div></div>`;
+      return `<div class="panel wide"><div class="title">CHOOSE TEAMS</div><div class="sub">${st.active === 0 ? 'Pick the HOME team, then press Enter' : 'Now pick the AWAY team, then press Enter'}</div><div class="teams">${col(0)}<div class="vs">VS</div>${col(1)}</div>
+        <div class="opts" style="flex-direction:row;justify-content:center;margin-top:14px"><div class="btn nav" data-act="back" style="width:180px">← Back</div><div class="btn nav go" data-act="ok" style="width:300px">${st.active === 0 ? 'Next: pick away team ▶' : 'Confirm teams ▶'}</div></div>
+        <div class="hint">◀ ▶ team · <span class="key">Q</span>/<span class="key">E</span> (LB/RB) league or region · <span class="key">L</span> (Y) kit · <span class="key">Enter</span> confirm · <span class="key">Esc</span> back · mouse: click the arrows</div></div>`;
     },
+    action: act => {
+      const [k, a, b] = act.split(':');
+      if (k === 'back') return goBack();
+      if (k === 'ok') return confirmStep();
+      if (k === 'team') return changeTeam(+a, +b);
+      if (k === 'cat') return changeCat(+a, +b);
+      if (k === 'kit') return toggleKit(+a);
+    },
+    back: goBack,
     tick: inputs => {
       for (const { dev, inp } of inputs) {
-        const own = sides.find(s => Input.devId(s.device) === Input.devId(dev));
+        const own = sides.find(x => Input.devId(x.device) === Input.devId(dev));
         let s = own ? own.team : st.active;
-        if (!sides.some(x => x.team === st.active) && own) s = st.active; // home player also picks the CPU team
-        if (inp.navX) { const n = CATEGORIES[st.cat[s]].teams.length; st.idx[s] = (st.idx[s] + inp.navX + n) % n; Sound.menu(); renderScreen(); }
-        if (inp.lbPressed || inp.rbPressed) { st.cat[s] = (st.cat[s] + (inp.rbPressed ? 1 : -1) + CATEGORIES.length) % CATEGORIES.length; st.idx[s] = 0; Sound.menu(); renderScreen(); }
-        if (inp.throughPressed) { st.alt[s] = !st.alt[s]; Sound.menu(); renderScreen(); }
-        if (inp.confirmPressed) {
-          Sound.confirm();
-          if (st.active === 0 && !sides.some(x => x.team === 1) ) { st.active = 1; renderScreen(); continue; }
-          if (st.active === 0 && sides.some(x => x.team === 1)) { st.active = 1; renderScreen(); continue; }
-          if (pick(0).id === pick(1).id) { st.idx[1]++; renderScreen(); continue; }
-          matchSettings({ sides, teams: [pick(0), pick(1)], alt: st.alt.slice(), from: 'quick' });
-          return;
-        }
-        if (inp.backPressed) { Sound.back(); if (st.active === 1) { st.active = 0; renderScreen(); } else sideSelect({ mode: 'quick' }); return; }
+        if (!sides.some(x => x.team === st.active) && own) s = st.active; // the human also picks the CPU team
+        if (inp.navX) changeTeam(s, inp.navX);
+        if (inp.lbPressed || inp.rbPressed) changeCat(s, inp.rbPressed ? 1 : -1);
+        if (inp.throughPressed) toggleKit(s);
+        if (inp.confirmPressed) return confirmStep();
+        if (inp.backPressed) return goBack();
       }
     },
   });
@@ -226,7 +263,7 @@ const OPTS = {
   difficulty: [['amateur', 'Amateur'], ['pro', 'Professional'], ['world', 'World Class'], ['legend', 'Legend']],
   time: [['day', 'Day'], ['sunset', 'Sunset'], ['night', 'Night']],
   weather: [['clear', 'Clear'], ['rain', 'Rain'], ['storm', 'Thunderstorm'], ['snow', 'Snow'], ['fog', 'Fog'], ['random', 'Random']],
-  camera: [['broadcast', 'Broadcast'], ['wide', 'Wide'], ['close', 'Close'], ['end', 'End-to-end']],
+  camera: [['broadcast', 'TV broadcast'], ['wide', 'Wide / tactical'], ['close', 'Close'], ['end', 'End-to-end']],
 };
 function cycleSetting(key, dir) { const list = OPTS[key]; const i = list.findIndex(o => o[0] === settings[key]); settings[key] = list[(i + dir + list.length) % list.length][0]; saveSettings(); }
 const label = key => (OPTS[key].find(o => o[0] === settings[key]) || OPTS[key][0])[1];
@@ -245,7 +282,7 @@ export function matchSettings(ctx) {
       if (act === 'stadium') { const opts = ['home', 'random', ...STADIUMS.map(s => s.id)]; settings.stadium = opts[(opts.indexOf(settings.stadium) + (dir || 1) + opts.length) % opts.length]; saveSettings(); renderScreen(); return; }
       cycleSetting(act, dir || 1); renderScreen();
     },
-    back: () => ctx.from === 'comp' ? Comp.hubScreen() : mainMenu(),
+    back: () => ctx.from === 'comp' ? Comp.hubScreen() : ctx.from === 'career' && ctx.onQuit ? ctx.onQuit() : mainMenu(),
   });
 }
 
@@ -277,6 +314,8 @@ function controlsScreen(back) {
       <table class="ctl"><tr><th>Action</th><th>Controller</th><th>Keyboard P1</th><th>Keyboard P2</th></tr>
       ${rows.map(([n, pad, a]) => `<tr><td>${n}</td><td>${pad}</td><td class="nav" data-act="kb1:${a}">${remap === 'kb1:' + a ? '<b>press a key…</b>' : kb('kb1', a)}</td><td class="nav" data-act="kb2:${a}">${remap === 'kb2:' + a ? '<b>press a key…</b>' : kb('kb2', a)}</td></tr>`).join('')}
       </table>
+      <div class="tips"><b>Mouse / touchpad (keyboard players):</b> move the pointer to aim — a dotted line shows the exact path of the ball · <b>click</b> = pass to the aimed spot or the player nearest it · <b>hold click</b> and release = shoot (longer = harder) · <b>right-click</b> = lob / cross / free-kick over the wall. Works on throw-ins, corners, free kicks and penalties too.<br>
+      <b>Keyboard extras:</b> you sprint automatically while moving · <b>E / G</b> = feint (sidestep and shield the ball) · a ring shows who your next pass goes to · <b>Enter</b> skips ceremonies, replays and waits · <b>F1</b> shows this help in a match · <b>Esc</b> or <b>P</b> pauses.</div>
       <div class="tips"><b>Tips:</b> Hold shoot longer for power, but too long sends it over the bar · Aim shots with the stick · Lob from the wing = cross into the box ·
       Defending: hold A to press the ball carrier, B to slide (from behind = foul!), Y for a standing tackle · Passing auto-switches you to the receiver.</div>
       <div class="opts" style="margin-top:14px"><div class="opt nav" data-act="reset"><span>Reset keyboard keys</span><span></span></div><div class="opt nav" data-act="back"><span>Back</span><span></span></div></div>
@@ -306,6 +345,7 @@ function creditsScreen() {
       <b>Motion capture:</b> The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.<br>
       <b>Commentary voice:</b> Kokoro-82M text-to-speech (voice “bm_george”).<br>
       <b>Engine:</b> three.js (MIT) · Electron (MIT).<br>
+      <b>Recordings:</b> royalty-free stadium, crowd, commentary and music audio by BombinSound, JonathanSlatterMusic, Arunangshu Banerjee, DJArtMusic, FreeSound Community and ZoeDit.<br>
       <b>Music:</b> original generative soundtrack${Sound.nowPlaying() ? ' · Now playing: ' + esc(Sound.nowPlaying().title + ' — ' + Sound.nowPlaying().artist) : ''}.<br>
       All club and competition names are fictional. National teams use country names and flag colours only.</div>
       <div class="opts" style="margin-top:16px"><div class="opt nav" data-act="back"><span>Back</span><span></span></div></div></div>`,
@@ -330,6 +370,9 @@ function settingsScreen(back) {
       <div class="opt nav" data-cycle data-act="ceremony"><span>Pre-match ceremony</span><span class="val">◀ ${{ full: 'Full', short: 'Short', off: 'Off' }[settings.ceremony]} ▶</span></div>
       <div class="opt nav" data-cycle data-act="injuries"><span>Injuries</span><span class="val">◀ ${settings.injuries ? 'On' : 'Off'} ▶</span></div>
       <div class="opt nav" data-cycle data-act="var"><span>VAR</span><span class="val">◀ ${settings.var ? 'On' : 'Off'} ▶</span></div>
+      <div class="opt nav" data-cycle data-act="cuts"><span>TV director cuts (corner / free-kick / injury cams)</span><span class="val">◀ ${settings.cuts ? 'On' : 'Off'} ▶</span></div>
+      <div class="opt nav" data-cycle data-act="mouseAim"><span>Mouse / touchpad aiming</span><span class="val">◀ ${settings.mouseAim ? 'On' : 'Off'} ▶</span></div>
+      <div class="opt nav" data-cycle data-act="autoSprint"><span>Keyboard auto-sprint (just hold a direction)</span><span class="val">◀ ${settings.autoSprint ? 'On' : 'Off'} ▶</span></div>
       <div class="opt nav" data-cycle data-act="assisted"><span>Player assists (auto-switch, easy shots)</span><span class="val">◀ ${settings.assisted ? 'On' : 'Off'} ▶</span></div>
       <div class="opt nav" data-cycle data-act="autoSubs"><span>Auto-substitutions (your team)</span><span class="val">◀ ${settings.autoSubs ? 'On' : 'Off'} ▶</span></div>
       <div class="opt nav" data-cycle data-act="replays"><span>Goal replays</span><span class="val">◀ ${settings.replays ? 'On' : 'Off'} ▶</span></div>
@@ -345,7 +388,7 @@ function settingsScreen(back) {
       if (act === 'commentary') Sound.setCommentary(!Sound.commentary);
       if (act === 'quality') { const q = ['low', 'medium', 'high']; settings.quality = q[(q.indexOf(settings.quality) + dir + 3) % 3]; renderer.setQuality(settings.quality); }
       if (act === 'zoom') { settings.zoom = clamp(Math.round((settings.zoom + dir * 0.1) * 10) / 10, 0.6, 1.5); renderer.zoomSetting = settings.zoom; }
-      if (['replays', 'radar', 'names', 'injuries', 'var', 'autoSubs', 'assisted'].includes(act)) settings[act] = !settings[act];
+      if (['replays', 'radar', 'names', 'injuries', 'var', 'autoSubs', 'assisted', 'mouseAim', 'autoSprint', 'cuts'].includes(act)) settings[act] = !settings[act];
       if (act === 'ceremony') { const o = ['full', 'short', 'off']; settings.ceremony = o[(o.indexOf(settings.ceremony) + dir + 3) % 3]; }
       saveSettings(); renderScreen();
     },
@@ -372,7 +415,7 @@ function buildMatch(ctx) {
   const kit0 = (ctx.alt && ctx.alt[0]) ? (t0.colors.alt || t0.colors) : t0.colors;
   let kit1 = (ctx.alt && ctx.alt[1]) ? (t1.colors.alt || t1.colors) : t1.colors;
   if (colorDist(kit0.shirt, kit1.shirt) < 120) kit1 = t1.colors.alt && colorDist(kit0.shirt, t1.colors.alt.shirt) > colorDist(kit0.shirt, kit1.shirt) ? t1.colors.alt : { shirt: '#f8fafc', shorts: '#111827', socks: '#f8fafc' };
-  const squads = [makeSquad(t0, 1), makeSquad(t1, 2)];
+  const squads = [0, 1].map(i => (ctx.squads && ctx.squads[i]) || makeSquad(ctx.teams[i], i + 1));
   const mg = ctx.manage || {};
   const forms = [0, 1].map(i => FORMATIONS[(mg[i] && mg[i].formation) || ctx.teams[i].formation] || FORMATIONS['4-4-2']);
   const lineups = [0, 1].map(i => mg[i] ? mg[i].xi : null);
@@ -383,18 +426,17 @@ function buildMatch(ctx) {
   Input.setMerge(!(humans.some(h => h.device.type === 'kb1') && humans.some(h => h.device.type === 'kb2')));   // one keyboard player → WASD and arrows both work
   M = new Match({
     teams: [t0, t1], squads, formations: forms, humans, lineups, tactics,
-    halfLength: settings.halfMinutes * 60, difficulty: settings.difficulty, knockout: !!ctx.knockout, extraTime: ctx.extraTime, aggregate: ctx.aggregate, weather, injuries: settings.injuries, var: settings.var, autoSubs: settings.autoSubs, assist: settings.assisted, events: (type, d) => onEvent(type, d),
+    halfLength: settings.halfMinutes * 60, difficulty: settings.difficulty, knockout: !!ctx.knockout, extraTime: ctx.extraTime, aggregate: ctx.aggregate, weather, injuries: settings.injuries, var: settings.var, autoSubs: settings.autoSubs, assist: settings.assisted, autoSprint: settings.autoSprint, events: (type, d) => onEvent(type, d),
   });
   M.kits = [kit0, kit1];
+  const venue = pickVenue(ctx); renderer.setStadium(venue); run_venue = venue;   // the stadium first: extras (booth, commentators) are placed in it
   renderer.clearCharacters();
+  renderer.onCut = () => wipe();
   const gk0 = GK_KITS.find(k => colorDist(k.shirt, kit0.shirt) > 120 && colorDist(k.shirt, kit1.shirt) > 120) || GK_KITS[0];
   const gk1 = GK_KITS.find(k => k !== gk0 && colorDist(k.shirt, kit0.shirt) > 120 && colorDist(k.shirt, kit1.shirt) > 120) || GK_KITS[1];
   for (const p of M.all) renderer.makeCharacter(p, p.team === 0 ? kit0 : kit1, p.team === 0 ? gk0 : gk1);
   M.gkKits = [gk0, gk1];
   extras.build(M, M.kits);
-  const venue = pickVenue(ctx);
-  renderer.setStadium(venue);
-  run_venue = venue;
   renderer.setAtmosphere(settings.time, weather);
   Sound.music(false); Sound.weather(weather); Sound.preload();
   renderer.colorCrowd(kit0.shirt, kit1.shirt);
@@ -404,7 +446,8 @@ function buildMatch(ctx) {
   hudEl.classList.remove('hidden');
   Sound.crowd(0.55, 0.1); Sound.chant(true);
   if (settings.ceremony !== 'off') startCeremony();
-  else { caption('KICK OFF', `${t0.name} vs ${t1.name}`, 2200); Sound.comment('intro', { pri: 1, fallback: `Welcome to tonight's match. ${t0.name} take on ${t1.name}.` }); }
+  else {
+    Sound.asset('jingle_kickoff', { gain: 0.8, bus: 'music', fade: 1.5 }); caption('KICK OFF', `${t0.name} vs ${t1.name}`, 2200); Sound.comment('intro', { pri: 1, fallback: `Welcome to tonight's match. ${t0.name} take on ${t1.name}.` }); }
   if (weather !== 'clear') setTimeout(() => ticker({ rain: '🌧 Rain — the ball will skid on the wet surface', storm: '⛈ Thunderstorm — wind and a slick pitch', snow: '❄ Snow — the ball holds up in the snow', fog: '🌫 Fog — visibility is poor' }[weather] || ''), 2500);
 }
 
@@ -418,6 +461,10 @@ function buildHud(t0, t1, k0, k1) {
     <div id="banner"></div>
     <div id="ticker"></div>
     <div id="prompt"></div>
+    <div id="lower"></div>
+    <div id="halfstats"></div>
+    <div id="wipe"></div>
+    <div id="gauges"></div>
     <div id="keyhelp"></div>
     <div id="replaybadge" class="hidden">● REPLAY <small>A to skip</small></div>`;
 }
@@ -427,6 +474,13 @@ function caption(text, sub = '', ms = 2000, cls = '') {
   b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   clearTimeout(caption._t); if (ms) caption._t = setTimeout(() => b.classList.remove('show'), ms);
 }
+// Premier League-style lower-third graphic
+function lower(title, sub, color = '#6ee7a8', ms = 4200) {
+  const el = $('lower'); if (!el) return;
+  el.style.setProperty('--c', color); el.innerHTML = `<div class="lt-strip"></div><div class="lt-body"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); clearTimeout(lower._t); lower._t = setTimeout(() => el.classList.remove('show'), ms);
+}
+function wipe() { const w = $('wipe'); if (!w) return; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); }
 function ticker(text) { const t = $('ticker'); if (!t) return; t.textContent = text; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); clearTimeout(ticker._t); ticker._t = setTimeout(() => t.classList.remove('show'), 3200); }
 const pname = p => p && p.info ? p.info.name : '';
 const tname = t => M.teams[t].def.name;
@@ -436,7 +490,8 @@ function keyHelpHtml() {
   return M.humans.map(h => {
     const d = h.device, k = a => `<b>${esc(Input.keyLabel(d, a))}</b>`;
     return `<div class="khrow"><span class="khp" style="background:${HUMAN_COLORS[h.id]}">P${h.id + 1}</span>
-      MOVE <b>${moveLabel(d)}</b> · PASS ${k('pass')} · SHOOT ${k('shoot')} <i>(hold = power)</i> · LOB / CROSS ${k('lob')} · THROUGH ${k('through')} · SPRINT ${k('sprint')} · SWITCH ${k('switch')}</div>
+      MOVE <b>${moveLabel(d)}</b> <i>${settings.autoSprint && d.type !== 'pad' ? '(you sprint automatically)' : ''}</i> · PASS ${k('pass')} · SHOOT ${k('shoot')} <i>(hold = power)</i> · LOB / CROSS ${k('lob')} · THROUGH ${k('through')} · FEINT ${k('skill')} · SWITCH ${k('switch')}</div>
+      ${['kb1', 'kb2'].includes(d.type) && settings.mouseAim ? `<div class="khrow">🖱 <b>MOUSE / TOUCHPAD</b>: aim the dotted line · <b>click</b> = pass · <b>hold click</b> = shoot (release) · <b>right-click</b> = lob / cross / free-kick</div>` : ''}
       <div class="khrow dim">Defending: hold ${k('pass')} to chase the ball · ${k('shoot')} near the carrier = slide tackle · ${k('through')} = standing tackle · ${d.type === 'pad' ? 'Start' : 'Esc'} = pause</div>`;
   }).join('');
 }
@@ -456,8 +511,46 @@ function updatePrompts() {
   } else if (sp && sp.type === 'kickoff' && !run.ceremony) msg = 'Waiting for the opposition to kick off…';
   if (msg !== pr._m) { pr._m = msg; pr.innerHTML = msg; pr.classList.toggle('show', !!msg); }
 }
+// ---- PES-style shot power gauge: fills while the shoot key is held, red zone = over-hit
+const gaugeState = {};
+function updateGauges() {
+  const box = $('gauges'); if (!box) return;
+  const now = performance.now();
+  const hs = M.humans.filter(h => h.player);
+  if (box.children.length !== M.humans.length) box.innerHTML = M.humans.map(() => '<div class="gauge"><div class="gl"><span>SHOT POWER</span><b></b></div><div class="gtrack"><div class="gfill"><i></i></div><div class="gred"></div></div></div>').join('');
+  M.humans.forEach((h, idx) => {
+    const el = box.children[idx], p = h.player; if (!el) return;
+    const gs = gaugeState[h.id] || (gaugeState[h.id] = { was: false, hold: 0, val: 0 });
+    const charging = !!p && p.charging === 'shoot';
+    let g = charging ? M.gauge(p.charge) : 0;
+    if (charging) { gs.was = true; gs.val = g; gs.hold = 0; if (now - (gs.tick || 0) > 85 && g > 0.02) { gs.tick = now; Sound.tick && Sound.tick(g); } }
+    else if (gs.was) { gs.was = false; gs.hold = now + 900; }       // just released: keep the final value on screen for a moment
+    const show = charging || now < gs.hold;
+    el.classList.toggle('show', show && !!p);
+    if (!show || !p) return;
+    g = charging ? g : gs.val;
+    const v = camVec.set(p.x, 0, p.z).project(renderer.camera);
+    el.style.left = ((v.x + 1) / 2 * window.innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * window.innerHeight + 16) + 'px';
+    el.querySelector('.gfill').style.width = (g * 100) + '%';
+    const over = g >= 0.77;
+    el.classList.toggle('over', over); el.classList.toggle('released', !charging);
+    el.querySelector('b').textContent = over ? Math.round(g * 100) + '% · OVER-HIT!' : Math.round(g * 100) + '%';
+  });
+}
+const camVec = new THREE.Vector3();
+// ---- predicted flight of the shot while charging (keyboard / pad)
+function updateShotPreview(inputs) {
+  if (!M || !run || screen || run.ceremony || run.replay || run.viewer) return;
+  let shown = false;
+  M.humans.forEach((h, i) => {
+    const p = h.player; if (shown || !p || p.charging !== 'shoot' || !(M.ball.owner === p || (M.phase === 'setpiece' && M.setPiece && M.setPiece.taker === p))) return;
+    const inp = inputs[i] || {}, aim = M.shotAim(p, { x: inp.mx || 0, z: inp.my || 0 }, p.charge), pr = M.predictShot(p, aim, M.shotPowerKey(p.charge));
+    renderer.setAim(pr.pts, pr.over ? 0xff4d4d : p.charge > 0.5 ? 0xffa31a : 0x6ee7a8, pr.end, 1.4); shown = true;
+  });
+}
 function updateHud() {
   const s = $('sbs'); if (!s) return;
+  { const hs = $('halfstats'), on = !!(run && (run.halftime || (run.fulltime && !(run.shootout && run.shootout.state !== 'done')))); if (hs && on !== hs._on) { hs._on = on; hs.classList.toggle('show', on); if (on) hs.innerHTML = `<h3>${esc(tname(0))} ${M.score[0]} – ${M.score[1]} ${esc(tname(1))}</h3>${statsTable(M.stats)}`; } }
   updatePrompts();
   s.textContent = `${M.score[0]} - ${M.score[1]}`;
   $('sbc').textContent = (M.half > 2 ? 'ET ' : '') + M.clockLabel();
@@ -476,6 +569,7 @@ function updateHud() {
     el.children[1].firstChild.style.background = p.charge > 0.92 ? '#ff3b3b' : '';
     el.children[2].firstChild.style.width = (p.stamina * 100) + '%';
   });
+  updateGauges();
   // radar
   if (settings.radar) {
     const c = $('radar'), g = c.getContext('2d'), W = c.width, H = c.height;
@@ -512,11 +606,11 @@ function onEvent(type, d) {
     case 'bounce': Sound.bounce(d.v); break;
     case 'control': Sound.touch(); break;
     case 'deflect': Sound.touch(); break;
-    case 'post': Sound.post(); renderer.shake = 0.3; caption('OFF THE WOODWORK!', '', 1500, 'small'); Sound.comment('post', { pri: 2, fallback: 'Off the post!' }); break;
+    case 'post': Sound.post(); renderer.shake = 0.3; caption('OFF THE WOODWORK!', '', 1500, 'small'); Sound.comment('post', { pri: 2, then: ['colour_post'], fallback: 'Off the post!' }); break;
     case 'net': if (M.phase === 'goal') { const s = d.side; renderer.rippleNet(s, M.ball.x, M.ball.y, M.ball.z); Sound.net(); } break;
     case 'save': {
       Sound.catchBall();
-      if (M.ball.shot || run.tension > 0.5) { Sound.ooh(); const line = d.caught ? `Great save by ${pname(d.k)}!` : `${pname(d.k)} pushes it away!`; ticker(line); Sound.comment('save', { pri: 2, fallback: line }); }
+      if (M.ball.shot || run.tension > 0.5) { Sound.ooh(M.ball.lastKick && M.ball.lastKick.sp === 'freekick'); const line = d.caught ? `Great save by ${pname(d.k)}!` : `${pname(d.k)} pushes it away!`; ticker(line); Sound.comment('save', { pri: 2, then: Math.random() < 0.35 ? ['colour_save'] : [], fallback: line }); }
       else if (d.caught) Sound.comment('catch', { pri: 0 });
       run.tension = 0; break;
     }
@@ -526,17 +620,19 @@ function onEvent(type, d) {
       Sound.whistle(0.4); Sound.boo();
       const v = d.victim; if (v.human !== null) Input.rumble(M.humans[v.human].device, 1, 0.6, 300);
       let msg = `Foul by ${pname(d.offender)}`;
-      Sound.comment(d.penalty ? 'penalty' : d.card === 'yellow' ? 'yellow' : d.card ? 'red' : 'foul', { pri: d.penalty || d.card ? 2 : 0 });
+      Sound.comment(d.penalty ? 'penalty' : d.card === 'yellow' ? 'yellow' : d.card ? 'red' : 'foul', { pri: d.penalty || d.card ? 2 : 0, then: Math.random() < 0.3 ? ['colour_foul'] : [] });
+      if (d.card) lower((d.card === 'yellow' ? '🟨 YELLOW CARD' : '🟥 RED CARD'), `${pname(d.offender)} · ${M.teams[d.offender.team].def.name}`, d.card === 'yellow' ? '#facc15' : '#ef4444', 3800);
       if (d.card === 'yellow') msg = `🟨 Yellow card · ${pname(d.offender)}`;
       if (d.card === 'red' || d.card === 'red2') msg = `🟥 RED CARD · ${pname(d.offender)}`;
       if (d.penalty) { caption('PENALTY!', msg, 2500); } else caption(d.card ? (d.card === 'yellow' ? 'YELLOW CARD' : 'RED CARD') : 'FOUL', msg, 1800, 'small ' + (d.card ? 'card-' + d.card.slice(0, 3) : ''));
       break;
     }
     case 'offside': Sound.whistle(0.3); caption('OFFSIDE', pname(d.p), 1400, 'small'); Sound.comment('offside', { pri: 1 }); break;
-    case 'whistle': if (d.reason === 'out') { Sound.whistle(0.18); if (M.ball.shot && M.pending && M.pending.type === 'goalkick') { Sound.ooh(); Sound.comment('miss', { pri: 1 }); } } if (d.reason === 'period') { Sound.whistle(0.4); Sound.whistle(0.4, 0.5); Sound.whistle(0.9, 1.0); } break;
+    case 'whistle': if (d.reason === 'out') { Sound.whistle(0.18); if (M.ball.shot && M.pending && M.pending.type === 'goalkick') { Sound.ooh(M.ball.lastKick && M.ball.lastKick.sp === 'freekick'); Sound.comment('miss', { pri: 1 }); } } if (d.reason === 'period') { Sound.whistle(0.4); Sound.whistle(0.4, 0.5); Sound.whistle(0.9, 1.0); } break;
     case 'setpiece': {
       const names = { corner: 'CORNER', goalkick: 'GOAL KICK', throwin: 'THROW-IN', freekick: 'FREE KICK', penalty: 'PENALTY' };
       if (d.type !== 'kickoff' && d.type !== 'throwin' && !run.shootout) ticker(`${names[d.type]} · ${tname(d.team)}`);
+      if (['corner', 'freekick', 'penalty'].includes(d.type) && !run.shootout && M.setPiece && M.setPiece.taker) { const tk = M.setPiece.taker; lower(({ corner: 'CORNER KICK', freekick: 'FREE KICK', penalty: 'PENALTY' })[d.type], `${tk.info.number}  ${tk.info.name} · ${tname(d.team)}`, M.kits[d.team].shirt, 3600); }
       if (d.type === 'corner' && !run.shootout) Sound.comment('corner', { pri: 0 });
       if (d.type === 'freekick' && !run.shootout && Math.abs(M.goalX(d.team) - M.setPiece.x) < 32) Sound.comment('freekick', { pri: 1 });
       break;
@@ -544,9 +640,9 @@ function onEvent(type, d) {
     case 'play': if (M.setPiece && M.setPiece.type === 'kickoff') { Sound.whistle(0.3); if (M.score[0] + M.score[1] === 0 || M.clock < 1) Sound.comment(M.half === 1 ? 'kickoff' : 'secondhalf', { pri: 0 }); } break;
     case 'kickoff': break;
     case 'goal': onGoal(d); break;
-    case 'halftime': run.halftime = true; caption('HALF TIME', `${tname(0)} ${M.score[0]} - ${M.score[1]} ${tname(1)}`, 0); Sound.applause(); Sound.comment('halftime', { pri: 2 }); break;
+    case 'halftime': run.halftime = true; caption('HALF TIME', `${tname(0)} ${M.score[0]} - ${M.score[1]} ${tname(1)}`, 0); Sound.applause(); Sound.comment('halftime', { pri: 2, then: ['colour_halftime'] }); renderer.director && renderer.director.request('booth', 3.6); break;
     case 'extratime': run.halftime = true; caption('EXTRA TIME', 'All square — 30 more minutes', 0); Sound.comment('extratime', { pri: 2 }); break;
-    case 'fulltime': run.fulltime = true; caption('FULL TIME', `${tname(0)} ${M.score[0]} - ${M.score[1]} ${tname(1)}`, 0); Sound.applause(); { const w = M.score[0] === M.score[1] ? null : M.score[0] > M.score[1] ? 0 : 1; Sound.comment('fulltime', { pri: 3, then: w !== null ? ['winner'] : [] }); if (w !== null) setTimeout(() => Sound.teamName(M && M.teams[w].def.id, 3), 10); } break;
+    case 'fulltime': run.fulltime = true; caption('FULL TIME', `${tname(0)} ${M.score[0]} - ${M.score[1]} ${tname(1)}`, 0); Sound.applause(); { const w = M.score[0] === M.score[1] ? null : M.score[0] > M.score[1] ? 0 : 1; Sound.comment('fulltime', { pri: 3, then: [...(w !== null ? ['winner'] : []), 'colour_fulltime'] }); if (w !== null) setTimeout(() => Sound.teamName(M && M.teams[w].def.id, 3), 10); } break;
     case 'penalties': startShootout(); break;
     case 'switch': break;
     case 'injury': Sound.whistle(0.5); caption('INJURY', `${pname(d.p)} is down`, 2500, 'small'); Sound.comment('injury', { pri: 2 }); ticker('🚑 Medical team on the pitch · press A to skip'); break;
@@ -555,12 +651,13 @@ function onEvent(type, d) {
       const t = M.teams[d.team].def;
       caption('SUBSTITUTION', `${t.short}  ⬇ ${d.outInfo.number} ${d.outInfo.name}   ⬆ ${d.inInfo.number} ${d.inInfo.name}`, 2600, 'small sub');
       Sound.comment('sub', { pri: 0 }); Sound.applause();
+      lower('🔁 SUBSTITUTION', `⬇ ${d.outInfo.number} ${d.outInfo.name}   ⬆ ${d.inInfo.number} ${d.inInfo.name} · ${t.name}`, M.kits[d.team].shirt, 5000);
       renderer.replaceCharacter(d.p, M.kits[d.team], M.gkKits[d.team]);
       break;
     }
     case 'subQueued': if (M.humans.some(h => h.team === d.team)) ticker(`Substitution ready · ${d.inn.name} comes on at the next stoppage`); break;
     case 'added': caption(`+${d.minutes}`, 'Minutes of added time', 1800, 'small'); Sound.comment('added', { pri: 0 }); break;
-    case 'var': caption('VAR CHECK', 'Checking possible ' + (M.var ? M.var.reason.toLowerCase() : 'infringement'), 0, 'small var'); Sound.comment('var', { pri: 3 }); Sound.crowd(0.3, 0.9); break;
+    case 'var': caption('VAR CHECK', 'Checking possible ' + (M.var ? M.var.reason.toLowerCase() : 'infringement'), 0, 'small var'); Sound.comment('var', { pri: 3, then: ['colour_var'] }); Sound.crowd(0.3, 0.9); break;
     case 'varResult':
       if (d.overturn) { caption('NO GOAL', d.reason + ' · goal disallowed', 2600, 'small card-red'); Sound.boo(); Sound.comment('var_no', { pri: 3 }); run.excite[d.team] = 0; }
       else { caption('GOAL STANDS', 'VAR confirms the goal', 2000, 'small'); Sound.roar(); Sound.comment('var_ok', { pri: 3 }); }
@@ -571,7 +668,7 @@ function onEvent(type, d) {
 function onGoal(d) {
   if (run.shootout) return run.shootout.onGoal();
   const team = d.team;
-  Sound.roar(); Sound.whistle(0.25, 0.3);
+  Sound.roar(true); Sound.whistle(0.25, 0.3);
   if (window.Music && Music.sting) Music.sting('goal');
   renderer.shake = 0.5;
   run.excite[team] = 1;
@@ -579,7 +676,9 @@ function onGoal(d) {
   const who = d.player ? d.player.name : '';
   caption('GOAL!', d.own ? `Own goal · ${who}` : `${who} · ${tname(team)}`, 3200, 'goal');
   const sc = M.score, then = sc[0] === sc[1] ? ['equaliser'] : (sc[team] - sc[1 - team] === 1 ? ['lead'] : []);
-  Sound.comment(d.own ? 'owngoal' : 'goal', { pri: 3, team: d.own ? null : M.teams[team].def.id, then, fallback: `Goal! ${who} scores for ${tname(team)}!` });
+  const pro = !d.own && Math.random() < 0.5;                        // half the time the real commentator calls it
+  Sound.comment(d.own ? 'owngoal' : pro ? 'goal_pro' : 'goal', { pri: 3, team: d.own || pro ? null : M.teams[team].def.id, then: [...then, 'colour_goal'], fallback: `Goal! ${who} scores for ${tname(team)}!` });
+  lower(`⚽ ${d.label || d.minute + "'"}  ${who}${d.own ? ' (OG)' : ''}`, `${tname(team)} ${M.score[0]} – ${M.score[1]} ${tname(1 - team)}${d.assist ? ' · assist ' + d.assist.name : ''}`, M.kits[team].shirt, 6000);
   M.humans.forEach(h => Input.rumble(h.device, h.team === team ? 0.5 : 1, h.team === team ? 1 : 0.3, 600));
   renderer.emit(M.ball.x, 1.2, M.ball.z, 60, { colors: [M.kits[team].shirt, '#ffffff'], speed: 5, life: 1.5, size: 0.2 });
   extras.flares(team, M.kits);
@@ -657,7 +756,7 @@ function teamManagement(ctx, team, back) {
   if (live) mg = { formation: T.formationName || tdef.formation, tactics: M.tactics[team] };
   else {
     ctx.manage = ctx.manage || {};
-    if (!ctx.manage[team]) { const squad = makeSquad(tdef, team + 1); const f = tdef.formation; const xi = pickStarters(squad, FORMATIONS[f] || FORMATIONS['4-4-2']); ctx.manage[team] = { formation: f, xi, bench: squad.filter(p => !xi.includes(p)), tactics: { mentality: 0, pressing: 1, width: 1, line: 1, passing: 1 } }; }
+    if (!ctx.manage[team] || !ctx.manage[team].xi) { const squad = (ctx.squads && ctx.squads[team]) || makeSquad(tdef, team + 1); const prev = ctx.manage[team] || {}; const f = prev.formation || tdef.formation; const xi = pickStarters(squad, FORMATIONS[f] || FORMATIONS['4-4-2']); ctx.manage[team] = { formation: f, xi, bench: squad.filter(p => !xi.includes(p)), tactics: prev.tactics || { mentality: 0, pressing: 1, width: 1, line: 1, passing: 1 } }; }
     mg = ctx.manage[team];
   }
   let sel = null; // selected entry {kind:'xi'|'bench', i}
@@ -772,7 +871,7 @@ function endCeremony() {
   { const tk = $('ticker'); if (tk) tk.classList.remove('show'); }
   extras.tifo(false, M.kits, [M.teams[0].def, M.teams[1].def]);
   M.kickoff(M.setPiece ? M.setPiece.team : 0);
-  Sound.chant(true); Sound.crowd(0.55, 0.1);
+  Sound.chant(true); Sound.crowd(0.55, 0.1); Sound.asset('jingle_kickoff', { gain: 0.8, bus: 'music', fade: 1.5 });
   caption('KICK OFF', `${M.teams[0].def.name} vs ${M.teams[1].def.name}`, 1800);
 }
 function ceremonyUpdate(dt, inputs, enterHit) {
@@ -784,15 +883,18 @@ function ceremonyUpdate(dt, inputs, enterHit) {
   // camera choreography
   const cam = renderer.camera, R = renderer;
   let pos, look;
-  if (c.stage === 'walk') { const k = Math.min(1, c.t / 5.5); pos = new R.camPos.constructor(lerp(-30, 0, k), lerp(26, 6, k), lerp(40, 14, k)); look = new R.camPos.constructor(0, 1.2, -1); }
+  let fov = 30;
+  if (c.stage === 'walk' && R.boothPos && c.t < (c.short ? 1.6 : 2.9)) { const bp = R.boothPos; pos = new R.camPos.constructor(bp.x * 0.3 + Math.sin(c.t * 0.5) * 2, bp.y + 7, bp.z + 30); look = new R.camPos.constructor(bp.x, bp.y - 0.2, bp.z); fov = 21; }   // opening shot: the commentary booth
+  else if (c.stage === 'walk') { const k = Math.min(1, c.t / 5.5); pos = new R.camPos.constructor(lerp(-30, 0, k), lerp(26, 6, k), lerp(40, 14, k)); look = new R.camPos.constructor(0, 1.2, -1); }
   else if (c.stage.startsWith('anthem')) {
     const side = c.stage === 'anthem0' ? -1 : 1, k = (c.t / c.maxT);
     const x = side * lerp(1.6, 11.6, k);
     pos = new R.camPos.constructor(x + side * 0.4, 1.75, 2.6); look = new R.camPos.constructor(x, 1.55, -1);
     if (c.t > c.maxT * 0.7) { pos = new R.camPos.constructor(side * 6 + Math.sin(c.t * 0.2) * 20, 14, 30); look = new R.camPos.constructor(side * 30, 6, -10); }
   } else { pos = new R.camPos.constructor(0, 3, 6); look = new R.camPos.constructor(0, 1.2, -1); }
-  R.camPos.lerp(pos, Math.min(1, dt * 2)); R.camLook.lerp(look, Math.min(1, dt * 2.5));
+  const booth = fov < 25; R.camPos.lerp(pos, booth ? 1 : Math.min(1, dt * 2)); R.camLook.lerp(look, booth ? 1 : Math.min(1, dt * 2.5));
   cam.position.copy(R.camPos); cam.lookAt(R.camLook);
+  if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * (booth ? 1 : Math.min(1, dt * 3)); cam.updateProjectionMatrix(); }
   // nametags while the camera passes
   if (c.stage.startsWith('anthem')) {
     const team = c.stage === 'anthem0' ? 0 : 1; const ps = M.active(team);
@@ -816,7 +918,7 @@ function pauseMenu() {
       <div class="opt nav" data-act="settings"><span>⚙ Settings</span><span></span></div>
       <div class="opt nav" data-act="controls"><span>Controls</span><span></span></div>
       ${run.ctx.from === 'quick' ? '<div class="opt nav" data-act="restart"><span>Restart match</span><span></span></div>' : ''}
-      <div class="opt nav" data-act="quit"><span>${run.ctx.from === 'comp' ? 'Quit to competition hub' : 'Quit to main menu'}</span><span></span></div>
+      <div class="opt nav" data-act="quit"><span>${run.ctx.from === 'comp' ? 'Quit to competition hub' : run.ctx.from === 'career' ? 'Quit to Master League (match not counted)' : 'Quit to main menu'}</span><span></span></div>
       <div class="opt nav" data-act="exitgame"><span>⏻ Exit game</span><span></span></div></div></div>`,
     action: (act, el, dir) => {
       if (act === 'resume') { show(null); run.paused = false; }
@@ -828,7 +930,7 @@ function pauseMenu() {
       if (act === 'exitgame') window.close();
       if (act === 'replay') { if (M.replay.length > 10) { show(null); run.viewer = { frames: M.replay.slice(), t: M.replay.length - 30 * 4, playing: true, speed: 1, angle: 0, orbit: 0 }; $('replaybadge').classList.remove('hidden'); $('replaybadge').innerHTML = '● INSTANT REPLAY <small>◀▶ scrub · A play/pause · Y slow-mo · X camera · B exit</small>'; } }
       if (act === 'restart') { startMatch(run.ctx); }
-      if (act === 'quit') { const ctx = run.ctx; endRun(); if (ctx.from === 'comp') Comp.hubScreen(); else mainMenu(); }
+      if (act === 'quit') { const ctx = run.ctx; endRun(); if (ctx.from === 'comp') Comp.hubScreen(); else if (ctx.from === 'career' && ctx.onQuit) ctx.onQuit(); else mainMenu(); }
     },
     back: () => { show(null); run.paused = false; },
   });
@@ -846,7 +948,7 @@ function postMatch() {
   const ctx = run.ctx, so = run.shootout;
   const result = { hg: M.score[0], ag: M.score[1], pens: so && so.result ? { h: so.result.h, a: so.result.a } : null, scorers: M.scorers.map(s => ({ team: s.team, name: s.player ? s.player.name : '?', id: s.player ? s.player.id : null, minute: s.minute, own: s.own })), et: M.half > 2 };
   const winner = result.pens ? (result.pens.h > result.pens.a ? 0 : 1) : result.hg > result.ag ? 0 : result.hg < result.ag ? 1 : null;
-  if (winner !== null && M.humans.some(h => h.team === winner) && window.Music && Music.sting) Music.sting('victory');
+  if (winner !== null && M.humans.some(h => h.team === winner) ) Sound.victory();
   if (winner !== null && M.humans.some(h => h.team === winner)) { renderer.confetti([M.kits[winner].shirt, '#ffffff', '#ffd700']); extras.fireworks([M.kits[winner].shirt, '#ffffff', '#ffd700'], 12); }
   const sc = t => result.scorers.filter(s => s.team === t).map(s => `${esc(s.name)} ${s.minute}'${s.own ? ' (og)' : ''}`).join('<br>') || '&nbsp;';
   const ratings = playerRatings(M), motm = ratings[0];
@@ -879,7 +981,9 @@ function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   // gather menu inputs from every device
   const menuInputs = Input.candidates().map(dev => ({ dev, inp: Input.read(dev) }));
-  const enterHit = Input.takeEnter();   // Enter = skip whatever cut-scene / replay / wait is on screen
+  Input.endFrame();   // taps made during this frame have been read
+  const enterHit = Input.takeEnter();
+  if (!M || !run || !aimActive()) { if (renderer.aimDots && renderer.aimDots.visible) hideAim(); }   // Enter = skip whatever cut-scene / replay / wait is on screen
   if (!M || !run) {
     menuInput(menuInputs);
     idleMatch.ball.x = Math.sin(now / 9000) * 30;
@@ -959,6 +1063,9 @@ function loop(now) {
     run.goalT += dt;
     if (run.goalT > 3.6) { if (run.replayQueued && startReplay()) { run.replayQueued = false; } else M.afterGoal(); }
   }
+  updateAim(dt);
+  updateShotPreview(humanInputs);
+  updatePassMarker(humanInputs);
   acc += dt; let first = true;
   while (acc >= FIXED) {
     const inp = first ? humanInputs : humanInputs.map(i => { const o = Object.assign({}, i); for (const k in o) if (k.endsWith('Pressed')) o[k] = false; return o; });
@@ -966,6 +1073,10 @@ function loop(now) {
     if (!M) break;
   }
   if (!M) return;
+  // the pair in the booth keep chatting during quiet spells of play
+  run.chatT = (run.chatT ?? 8) - dt;
+  if (run.chatT <= 0 && M.phase === 'play' && run.tension < 0.25 && !(Sound.speaker && Sound.speaker())) { run.chatTurn = !run.chatTurn; Sound.comment(run.chatTurn ? 'chatter' : 'colour', { pri: 0 }); run.chatT = 9 + Math.random() * 8; }
+  else if (run.chatT <= 0) run.chatT = 2;
   if (M.half === 2 && M.minute() >= 85 && !run.lateSaid && M.phase === 'play') { run.lateSaid = true; Sound.comment('late', { pri: 0 }); }
   if (M.cfg.weather === 'storm' && Math.random() < dt / 9) { renderer.lightning(); Sound.thunder(); }
   // crowd dynamics
@@ -974,12 +1085,71 @@ function loop(now) {
   run.excite = run.excite.map(e => Math.max(0, e - dt * 0.12));
   Sound.crowd(0.5 + nearGoal * 0.25 + run.tension * 0.2, nearGoal * 0.7 + run.tension);
   renderer.setCrowdExcitement(run.excite[0] + nearGoal * 0.15, run.excite[1] + nearGoal * 0.15);
-  renderer.sync(M, dt, { camera: settings.camera, humanColors: HUMAN_COLORS });
+  renderer.sync(M, dt, { camera: settings.camera, cuts: settings.cuts, humanColors: HUMAN_COLORS });
   extras.sync(M, dt);
   if (M.phase === 'play' && run.tension < 0.1 && Math.random() < dt / 70 && extras.waveT < 0) { extras.mexicanWave(); ticker('🌊 The crowd starts a Mexican wave!'); Sound.comment('wave', { pri: 0 }); }
   updateHud();
   renderer.render();
 }
+
+// ------------------------------------------------------------------ mouse / touchpad aiming
+// Move the pointer to aim: a dotted line shows the exact flight of the ball and what the action will do.
+//   LEFT click = pass to the aimed point (or the teammate nearest it) · HOLD left, release = shoot (hold longer = more power)
+//   RIGHT click = lob / cross / long free-kick to the aimed point
+const mouse = { x: 0, y: 0, moved: 0, left: false, right: false, leftT: 0, rightT: 0 };
+const ray = new THREE.Raycaster(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), tmpP = new THREE.Vector3();
+function mouseHuman() { return M && settings.mouseAim ? M.humans.find(h => h.device.type === 'kb1' || h.device.type === 'kb2') : null; }
+function aimActive() { return !!(mouseHuman() && run && !screen && !run.ceremony && !run.replay && !run.viewer && !run.fulltime && !run.halftime && M.phase !== 'injury' && M.phase !== 'var'); }
+function groundPoint() {
+  const cam = renderer.camera; cam.updateMatrixWorld();
+  ray.setFromCamera(new THREE.Vector2(mouse.x / window.innerWidth * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1), cam);
+  return ray.ray.intersectPlane(ground, tmpP) ? { x: tmpP.x, z: tmpP.z } : null;
+}
+function aimKind() { return mouse.right ? 'lob' : mouse.left && mouse.leftT > 0.18 ? 'shoot' : 'pass'; }
+const aimPower = () => clamp((mouse.leftT - 0.18) / 0.9, 0, 1);
+function hideAim() { renderer.setAim(null); const t = $('aimtip'); if (t) t.classList.remove('show'); document.body.style.cursor = ''; }
+// pass-target ring: shows who the next pass will go to, following your movement direction
+function updatePassMarker(inputs) {
+  let target = null;
+  if (M && run && !screen && !run.ceremony && !run.replay && !run.viewer && M.phase === 'play') {
+    M.humans.forEach((h, i) => { const p = h.player; if (!target && p && M.ball.owner === p) { const t = M.smartPass(p, { x: inputs[i] ? inputs[i].mx || 0 : 0, z: inputs[i] ? inputs[i].my || 0 : 0 }); if (t) target = t.p; } });
+  }
+  renderer.setPassMarker(target ? [target.x, target.z] : null);
+}
+function updateAim(dt) {
+  const h = mouseHuman();
+  if (!aimActive() || !M.mouseReady(h)) { renderer.setAim(null); const t = $('aimtip'); if (t) t.classList.remove('show'); mouse.left = mouse.right = false; document.body.style.cursor = aimActive() ? 'crosshair' : ''; return; }
+  document.body.style.cursor = 'crosshair';
+  if (mouse.left) mouse.leftT += dt;
+  const recent = performance.now() - mouse.moved < 5000 || mouse.left || mouse.right;
+  const g = groundPoint(); const tip = $('aimtip');
+  if (!g || !recent) { renderer.setAim(null); if (tip) tip.classList.remove('show'); return; }
+  const kind = aimKind(), pr = M.predict(h.player, kind, g.x, g.z, aimPower());
+  const color = kind === 'shoot' ? (pr.power > 0.95 ? 0xff4d4d : 0xffa31a) : kind === 'lob' ? 0xffe066 : 0x6ee7a8;
+  renderer.setAim(pr.pts, color, pr.end, kind === 'shoot' ? 1.4 : 1);
+  if (tip) {
+    tip.style.left = (mouse.x + 18) + 'px'; tip.style.top = (mouse.y + 18) + 'px'; tip.classList.add('show');
+    const pw = kind === 'shoot' ? `<div class="pwbar"><i style="width:${Math.round(aimPower() * 100)}%"></i></div>` : '';
+    tip.innerHTML = `<b>${esc(pr.label)}</b> · ${pr.dist.toFixed(0)} m${pw}<small>${mouse.left ? 'hold to add power — release to shoot' : 'click = pass · hold = shoot · right-click = lob'}</small>`;
+    tip.style.borderColor = '#' + color.toString(16).padStart(6, '0');
+  }
+}
+function mouseRelease(kind) {
+  const h = mouseHuman(); if (!h || !aimActive() || !M.mouseReady(h)) return;
+  const g = groundPoint(); if (!g) return;
+  M.mouseAct(h, kind, g.x, g.z, aimPower());
+}
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.moved = performance.now(); });
+window.addEventListener('mousedown', e => {
+  if (!aimActive() || !M.mouseReady(mouseHuman())) return;
+  if (e.button === 0) { mouse.left = true; mouse.leftT = 0; }
+  if (e.button === 2) { mouse.right = true; }
+});
+window.addEventListener('mouseup', e => {
+  if (e.button === 0 && mouse.left) { const kind = mouse.leftT > 0.18 ? 'shoot' : 'pass'; if (!mouse.right) mouseRelease(kind); mouse.left = false; mouse.leftT = 0; }
+  if (e.button === 2 && mouse.right) { mouseRelease('lob'); mouse.right = false; mouse.left = false; mouse.leftT = 0; }
+});
+window.addEventListener('contextmenu', e => { if (aimActive()) e.preventDefault(); });
 
 // ------------------------------------------------------------------ boot sequence (studio logo → notice → title / PRESS START)
 let bootMode = null;
@@ -1019,9 +1189,11 @@ async function boot() {
   requestAnimationFrame(t => { last = t; loop(t); });
   $('loading').classList.add('hidden');
   await bootSequence();
-  Comp.init({ show, renderScreen, mainMenu, sideSelect, matchSettings, startMatch, teamById, stars, CATEGORIES, esc, kitSwatch, settings });
+  Career.init({ show, setFocus, renderScreen, mainMenu, kitSwatch, stars, sideSelect, matchSettings, teamManagement, venueFor, sportsbook: () => Bet.sportsbook() });
+  Bet.init({ show, setFocus, renderScreen, mainMenu, kitSwatch }, { hasCareer: () => Career.hasCareer(), fund: id => Career.fundScreen(id) });
+  Comp.init({ show, renderScreen, setFocus, mainMenu, sideSelect, matchSettings, startMatch, teamById, stars, CATEGORIES, esc, kitSwatch, settings });
   mainMenu();
   if (window.Music) Music.onTrackChange = d => { const el = $('nowplaying'); if (!el || !d) return; el.innerHTML = `♪ <b>${esc(d.title)}</b> — ${esc(d.artist)}`; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 4500); };
-  window.__pc = { get M() { return M; }, get run() { return run; }, renderer, settings, startMatch, teamById, NATIONS, CLUBS, matchSettings, teamManagement };
+  window.__pc = { get M() { return M; }, get run() { return run; }, get extras() { return extras; }, renderer, settings, startMatch, teamById, NATIONS, CLUBS, matchSettings, teamManagement, Career, Bet };
 }
 boot().catch(err => { $('loadtext').textContent = 'Failed to start: ' + err.message; console.error(err); });
