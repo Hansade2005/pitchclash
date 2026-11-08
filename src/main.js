@@ -1165,11 +1165,15 @@ function bootSequence() {
       if (stages[k] === 'title') { renderer.setAtmosphere('night', 'clear'); Sound.crowd(0.35, 0.1); Sound.music(true); }
     };
     showStage(0);
-    const finish = () => { if (done) return; done = true; if (window.Music && Music.sting) Music.sting('press'); else Sound.confirm(); boot.style.transition = 'opacity .5s'; boot.style.opacity = '0'; setTimeout(() => { boot.classList.add('hidden'); boot.style.opacity = ''; bootMode = null; renderer.setAtmosphere(settings.time, 'clear'); }, 500); sessionStorage.setItem('pc_booted', '1'); resolve(); };
+    let hit = false;   // any key (not just Enter) or any controller button; read straight from the browser, not through Input (the main loop already consumes those edges)
+    const onKey = e => { if (!e.repeat && !/^(Shift|Control|Alt|Meta|CapsLock|NumLock|ScrollLock|Tab|F\d+)/.test(e.code)) hit = true; };
+    window.addEventListener('keydown', onKey);
+    const padHit = () => Array.from(navigator.getGamepads ? navigator.getGamepads() : []).some(g => g && g.connected && g.buttons.some((b, i) => i !== 8 && b.pressed));
+    const finish = () => { window.removeEventListener('keydown', onKey); if (done) return; done = true; if (window.Music && Music.sting) Music.sting('press'); else Sound.confirm(); boot.style.transition = 'opacity .5s'; boot.style.opacity = '0'; setTimeout(() => { boot.classList.add('hidden'); boot.style.opacity = ''; bootMode = null; renderer.setAtmosphere(settings.time, 'clear'); }, 500); sessionStorage.setItem('pc_booted', '1'); resolve(); };
     const tick = () => {
       if (done) return;
       const el = performance.now() - t0;
-      const pressed = Input.candidates().some(d => { const r = Input.read(d); return r.confirmPressed || r.startPressed || r.passPressed; });
+      const pressed = hit || padHit(); hit = false;
       if (stages[i] === 'studio' && (el > 3300 || (pressed && el > 400))) showStage(++i);
       else if (stages[i] === 'notice' && (el > 3400 || (pressed && el > 400))) showStage(++i);
       else if (stages[i] === 'title' && pressed && el > 500) return finish();

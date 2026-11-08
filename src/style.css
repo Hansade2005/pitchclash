@@ -251,3 +251,5 @@ tr.nav { transition: background .08s; } tr.nav:hover, tr.nav.focus { background:
 #halfstats h3 { margin: 0 0 6px; text-align: center; font-size: 17px; letter-spacing: 1px; } #halfstats table.stats { width: 100%; }
 #wipe { position: fixed; inset: 0; z-index: 9; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(110,231,168,.95) 38%, rgba(110,231,168,.95) 43%, rgba(5,10,18,.96) 43%, rgba(5,10,18,.96) 57%, rgba(110,231,168,.95) 57%, rgba(110,231,168,.95) 62%, transparent 62%); transform: translateX(-130%); }
 #wipe.go { animation: wipe .5s ease-in-out; } @keyframes wipe { from { transform: translateX(-130%); } 55% { transform: translateX(0); } to { transform: translateX(130%); } }
+
+#title .tag { transform: none !important; left: auto !important; top: auto !important; text-align: center; }
