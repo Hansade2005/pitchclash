@@ -1,0 +1,63 @@
+{
+  "name": "pitch-clash",
+  "version": "1.1.1",
+  "description": "Pitch Clash - 11v11 stadium football for 1-4 players",
+  "main": "main.js",
+  "scripts": {
+    "build:js": "esbuild src/main.js --bundle --format=iife --minify --outfile=src/bundle.js",
+    "start": "npm run build:js && electron .",
+    "test": "node tests/tournament.test.mjs",
+    "dist:win": "npm run build:js && electron-builder --win portable zip --x64"
+  },
+  "keywords": [],
+  "author": "Pitch Clash",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "resedit": "^2.0.3",
+    "three": "^0.170.0"
+  },
+  "productName": "Pitch Clash",
+  "build": {
+    "appId": "dev.pipilot.pitchclash",
+    "productName": "Pitch Clash",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "src/index.html",
+      "src/style.css",
+      "src/audio.js",
+      "src/input.js",
+      "src/music.js",
+      "src/bundle.js",
+      "assets/icon.png",
+      "assets/players/**",
+      "assets/commentary/**",
+      "assets/music/**",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "PitchClash-${version}-win-x64.${ext}"
+    },
+    "portable": {
+      "artifactName": "PitchClash-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PitchClash-${version}-Setup.exe",
+      "shortcutName": "Pitch Clash"
+    }
+  }
+}

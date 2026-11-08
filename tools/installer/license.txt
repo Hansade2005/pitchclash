@@ -1,0 +1,10 @@
+Pitch Clash — End User Notice
+
+Pitch Clash is a fictional football game. All club, league and competition names are invented.
+National teams use country names and flag colours only. Any resemblance to real players is coincidental.
+
+Third-party components: three.js (MIT), Electron (MIT), MakeHuman base assets (CC0),
+CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu; funded by NSF EIA-0196217),
+Kokoro-82M speech synthesis for commentary clips.
+
+The software is provided "as is" without warranty of any kind.

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#888}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const params = new URLSearchParams(location.search);
+const files = (params.get('files') || 'footballer_a.glb').split(',');
+const W = +(params.get('w') || 1280), H = +(params.get('h') || 720);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x87a6c8);
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x446644, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(4, 8, 5); sun.castShadow = true;
+sun.shadow.camera.left = -8; sun.shadow.camera.right = 8; sun.shadow.camera.top = 8; sun.shadow.camera.bottom = -8;
+sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x3f8f3f }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const loader = new GLTFLoader();
+window.__info = { errors: [], models: [] };
+const mixers = [];
+const tints = [[0xd02020, 0xffffff, 0xd02020], [0x2050d0, 0x2050d0, 0xffffff], [0xf0d020, 0x103080, 0xf0d020], [0x202020, 0xffffff, 0x202020], [0x20a040, 0x20a040, 0x20a040]];
+Promise.all(files.map(f => loader.loadAsync('/assets/players/' + f).catch(e => { __info.errors.push(String(e)); return null; }))).then(gltfs => {
+  gltfs.forEach((g, i) => {
+    if (!g) return;
+    const root = g.scene; root.position.x = (i - (gltfs.length - 1) / 2) * 1.1;
+    let tris = 0; const mats = new Set(); const box = new THREE.Box3().setFromObject(root);
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false;
+      tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+      const ms = Array.isArray(o.material) ? o.material : [o.material];
+      ms.forEach(m => { mats.add(m.name); const t = tints[i % tints.length];
+        if (params.get('tint') && m.name === 'Shirt') m.color.setHex(t[0]);
+        if (params.get('tint') && m.name === 'Shorts') m.color.setHex(t[1]);
+        if (params.get('tint') && m.name === 'Socks') m.color.setHex(t[2]);
+        if (m.name === 'Hair' || m.name === 'Eyebrows') { m.alphaTest = 0.5; m.transparent = false; }
+      }); } });
+    scene.add(root);
+    const mixer = new THREE.AnimationMixer(root); mixers.push(mixer);
+    const clips = g.animations.map(c => ({ name: c.name, duration: +c.duration.toFixed(3), tracks: c.tracks.length }));
+    __info.models.push({ file: files[i], tris, materials: [...mats], height: +(box.max.y - box.min.y).toFixed(3),
+      minY: +box.min.y.toFixed(3), clips });
+    root.userData.gltf = g; root.userData.mixer = mixer;
+  });
+  window.__roots = gltfs.filter(Boolean).map(g => g.scene);
+  window.play = (name, t) => { __roots.forEach(r => { const g = r.userData.gltf, m = r.userData.mixer; m.stopAllAction();
+      const c = THREE.AnimationClip.findByName(g.animations, name); if (!c) { __info.errors.push('missing ' + name); return; }
+      const a = m.clipAction(c); a.play(); m.setTime(t !== undefined ? t : 0); }); renderer.render(scene, cam); };
+  window.view = (dir, h, d) => { const dd = d || 6; const y = h || 1.0;
+    if (dir === 'side') cam.position.set(dd, y, 0); else if (dir === 'back') cam.position.set(0, y, -dd);
+    else if (dir === 'top') cam.position.set(0.01, 25, 18); else cam.position.set(0, y, dd);
+    cam.lookAt(0, dir === 'top' ? 0 : y * 0.9, 0); renderer.render(scene, cam); };
+  view('front', 1.0, Math.max(6, gltfs.length * 1.6));
+  window.__ready = true;
+}).catch(e => { __info.errors.push(String(e)); window.__ready = true; });
+</script></body></html>

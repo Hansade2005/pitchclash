@@ -1,0 +1,204 @@
+{
+ "intro": [
+  "Good evening, and welcome to a packed stadium for tonight's match.",
+  "What an atmosphere here tonight. The players are out, and we are ready for kick off.",
+  "Welcome along. Two sides with everything to play for. Let's get underway."
+ ],
+ "kickoff": [
+  "And we're underway!",
+  "The referee blows, and off we go.",
+  "Kick off. Here we go again."
+ ],
+ "secondhalf": [
+  "The second half is underway.",
+  "Back underway for the second forty five."
+ ],
+ "goal": [
+  "Goal! What a finish!",
+  "It's in! Absolutely brilliant!",
+  "Goal! The stadium erupts!",
+  "He scores! What a moment!",
+  "Into the back of the net! Superb!",
+  "Goal! That is a wonderful strike!",
+  "Oh, he's buried it! Goal!",
+  "Goal! The keeper had no chance!"
+ ],
+ "goal_for": [
+  "Goal for"
+ ],
+ "owngoal": [
+  "Oh no! It's gone in off the defender! An own goal!",
+  "Disaster! He's put it into his own net!"
+ ],
+ "equaliser": [
+  "And that's the equaliser! All square!",
+  "Level again! What a response!"
+ ],
+ "lead": [
+  "And they take the lead!",
+  "They're in front now!"
+ ],
+ "shot": [
+  "He shoots!",
+  "Has a go from there!",
+  "Strikes it!",
+  "Lets fly!"
+ ],
+ "chance": [
+  "He's through on goal!",
+  "Big chance here!",
+  "Only the keeper to beat!"
+ ],
+ "save": [
+  "Great save!",
+  "What a stop by the goalkeeper!",
+  "Saved! Brilliant reactions!",
+  "The keeper gets down well to keep it out!",
+  "Denied by the goalkeeper!",
+  "Fingertip save! Magnificent!"
+ ],
+ "catch": [
+  "Comfortable for the keeper.",
+  "Gathered safely.",
+  "The goalkeeper collects."
+ ],
+ "post": [
+  "Off the post! So close!",
+  "It hits the woodwork!",
+  "Oh, the crossbar saves them!",
+  "Rattles the frame of the goal!"
+ ],
+ "miss": [
+  "Just wide!",
+  "Over the bar!",
+  "That's off target.",
+  "He'll be disappointed with that one.",
+  "Inches wide! So close!"
+ ],
+ "tackle": [
+  "Superb tackle!",
+  "Great challenge to win it back!",
+  "Timed that perfectly!",
+  "What a block!"
+ ],
+ "foul": [
+  "That's a foul.",
+  "The referee blows for a free kick.",
+  "He's brought him down.",
+  "Clumsy challenge there."
+ ],
+ "yellow": [
+  "Out comes the yellow card.",
+  "That's a booking.",
+  "He goes into the referee's notebook."
+ ],
+ "red": [
+  "Red card! He's off!",
+  "The referee shows red! They're down to ten!",
+  "That's a sending off!"
+ ],
+ "penalty": [
+  "Penalty! The referee points to the spot!",
+  "It's a penalty!",
+  "Penalty kick! Big moment here!"
+ ],
+ "offside": [
+  "The flag is up for offside.",
+  "Offside. Good call from the linesman.",
+  "He's strayed offside."
+ ],
+ "corner": [
+  "Corner kick.",
+  "They win a corner.",
+  "Over for a corner."
+ ],
+ "freekick": [
+  "Free kick in a dangerous position.",
+  "This is a great chance from the free kick."
+ ],
+ "cross": [
+  "Whips in a cross!",
+  "Swings it into the box!"
+ ],
+ "header": [
+  "Header!",
+  "Gets his head to it!"
+ ],
+ "halftime": [
+  "The referee blows for half time.",
+  "That's the end of the first half."
+ ],
+ "fulltime": [
+  "It's all over! The referee blows the final whistle!",
+  "Full time here!",
+  "And that's the end of the match!"
+ ],
+ "extratime": [
+  "We're going to extra time!",
+  "Thirty more minutes to settle this one!"
+ ],
+ "shootout": [
+  "It's going to penalties!",
+  "Penalty shootout! Nerves of steel needed now!"
+ ],
+ "pen_scored": [
+  "Scores!",
+  "Calmly slotted away!",
+  "Sends the keeper the wrong way!"
+ ],
+ "pen_missed": [
+  "Missed!",
+  "Saved! What a stop!",
+  "He's put it wide!"
+ ],
+ "winner": [
+  "They've done it!",
+  "What a victory!"
+ ],
+ "champions": [
+  "They are the champions!",
+  "The trophy is theirs!"
+ ],
+ "late": [
+  "We're into the final minutes now.",
+  "Time is running out."
+ ],
+ "injury": [
+  "He's down, and he looks hurt.",
+  "That looks painful. The physios are coming on.",
+  "Concern here. He's not getting up.",
+  "The medical team are rushing on."
+ ],
+ "sub": [
+  "A change for them.",
+  "Substitution coming.",
+  "Fresh legs coming on.",
+  "The manager makes a change."
+ ],
+ "added": [
+  "The fourth official signals the added time.",
+  "We'll have some added time here."
+ ],
+ "var": [
+  "Hold on. VAR is checking this one.",
+  "The referee is waiting on VAR.",
+  "We have a VAR check."
+ ],
+ "var_ok": [
+  "The goal stands!",
+  "VAR confirms it. Goal!"
+ ],
+ "var_no": [
+  "No goal! VAR rules it out!",
+  "It's been disallowed!",
+  "Heartbreak! The goal is chalked off!"
+ ],
+ "wave": [
+  "And the crowd are doing the Mexican wave!",
+  "Here comes the wave around the stadium!"
+ ],
+ "anthem": [
+  "The players line up for the anthems.",
+  "A proud moment as the anthems ring out."
+ ]
+}

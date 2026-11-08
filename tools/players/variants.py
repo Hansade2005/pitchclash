@@ -1,0 +1,23 @@
+# Character variants. race weights drive the MakeHuman face/body shape.
+VARIANTS = {
+    'a': dict(height=1.80, muscle=0.78, weight=0.48, proportions=0.85,
+              race=dict(caucasian=0.85, african=0.05, asian=0.10),
+              skin='young_caucasian_male', hair='short01', hair_color=(0.10, 0.065, 0.04),
+              eyebrows='eyebrow001', eyes='brown'),
+    'b': dict(height=1.84, muscle=0.80, weight=0.52, proportions=0.85,
+              race=dict(caucasian=0.05, african=0.92, asian=0.03),
+              skin='young_african_male', hair='short04', hair_color=(0.03, 0.025, 0.02),
+              eyebrows='eyebrow002', eyes='brown'),
+    'c': dict(height=1.76, muscle=0.72, weight=0.45, proportions=0.85,
+              race=dict(caucasian=0.35, african=0.05, asian=0.60),
+              skin='young_asian_male', hair='short04', hair_color=(0.035, 0.03, 0.025),
+              eyebrows='eyebrow007', eyes='brown'),
+    'd': dict(height=1.82, muscle=0.75, weight=0.55, proportions=0.8,
+              race=dict(caucasian=0.55, african=0.35, asian=0.10),
+              skin='young_caucasian_male2', hair='short02', hair_color=(0.20, 0.13, 0.07),
+              eyebrows='eyebrow005', eyes='brownlight'),
+    'keeper': dict(height=1.88, muscle=0.74, weight=0.52, proportions=0.85, keeper=True,
+                   race=dict(caucasian=0.75, african=0.10, asian=0.15),
+                   skin='middleage_caucasian_male', hair='short02', hair_color=(0.16, 0.11, 0.06),
+                   eyebrows='eyebrow003', eyes='blue'),
+}
