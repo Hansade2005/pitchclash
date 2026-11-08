@@ -115,7 +115,7 @@ const Sound = (() => {
   const assets = {}; let ambLoop = null, stompLoop = null;
   function loopOf(buf, bus) { const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; const g = ctx.createGain(); g.gain.value = 0; src.connect(g); g.connect(bus); src.start(0, Math.random() * buf.duration * 0.7); return { src, g }; }
   async function loadAssets() {
-    await Promise.all(['stadium_ambience', 'crowd_cheer', 'chant_stomps', 'jingle_kickoff', 'sting_decisive', 'crowd_goal', 'crowd_nearmiss', 'crowd_nearmiss_fk', 'goal_horn'].map(async n => {
+    await Promise.all(['stadium_ambience', 'crowd_cheer', 'chant_stomps', 'jingle_kickoff', 'sting_decisive', 'crowd_goal', 'crowd_nearmiss', 'crowd_nearmiss_fk', 'goal_horn', 'goal_stadium', 'goal_cheer2'].map(async n => {
       try { const r = await fetch(`../assets/audio/${n}.mp3`); if (r.ok) assets[n] = await ctx.decodeAudioData(await r.arrayBuffer()); } catch (e) {}
     }));
     if (assets.stadium_ambience && ctx && !ambLoop) ambLoop = loopOf(assets.stadium_ambience, crowdBus);
@@ -252,7 +252,7 @@ const Sound = (() => {
     confirm() { tone(660, 0.07, 0.14, 'triangle'); tone(990, 0.09, 0.14, 'triangle', 0, 0.07); },
     back() { tone(500, 0.07, 0.12, 'triangle', -150); },
     crowd(level, tension = 0) { if (!ctx) return; const real = !!ambLoop; crowdBed.g.gain.setTargetAtTime(level * (real ? 0.3 : 0.9), t0(), 0.5); crowdHigh.g.gain.setTargetAtTime(tension * (real ? 0.06 : 0.12), t0(), 0.3); if (ambLoop) ambLoop.g.gain.setTargetAtTime(level * 1.35 + tension * 0.25, t0(), 0.6); },
-    roar(goal) { swell(2.2, 0.15, 2.5, 3.5, 800); swell(0.8, 0.1, 2, 3, 1800); voices(260, 3, 0.6, 800, 80); if (goal) { if (!asset('crowd_goal', { gain: 0.95, fade: 4.5, max: 14 })) asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); else asset('crowd_cheer', { gain: 0.4, fade: 3, max: 6 }); asset('goal_horn', { gain: 0.6, bus: 'sfx', fade: 1.2, max: 5 }); } else asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); },
+    roar(goal) { swell(2.2, 0.15, 2.5, 3.5, 800); swell(0.8, 0.1, 2, 3, 1800); voices(260, 3, 0.6, 800, 80); if (goal) { const pool = ['crowd_goal', 'goal_stadium', 'goal_cheer2'].filter(n => assets[n]), main = pool[Math.floor(Math.random() * pool.length)]; if (!asset(main, { gain: 0.95, fade: 4.5, max: 14 })) asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); else asset('crowd_cheer', { gain: 0.35, fade: 3, max: 6 }); asset('goal_horn', { gain: Math.random() < 0.5 ? 0.6 : 0.3, bus: 'sfx', fade: 1.2, max: 5 }); } else asset('crowd_cheer', { gain: 0.95, fade: 4, max: 9 }); },
     ooh(fk) { if (asset(fk ? 'crowd_nearmiss_fk' : 'crowd_nearmiss', { gain: 0.9, fade: 2.5, max: 7 })) return; voices(210, 1.5, 0.6, 520, -50); swell(0.6, 0.2, 0.4, 1.2); },
     boo() { voices(130, 1.8, 0.5, 400, -15); },
     applause() { for (let i = 0; i < 40; i++) setTimeout(() => noise(0.04, 2500 + Math.random() * 1500, 0.06 + Math.random() * 0.05, 'bandpass', crowdBus), Math.random() * 2500); },

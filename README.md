@@ -53,3 +53,5 @@ See `assets/players/LICENSES.md`. Commentary clips are generated with Kokoro-82M
 
 ## Audio credits
 Royalty-free recordings (stadium ambience, crowd, commentary calls, jingles) by BombinSound, JonathanSlatterMusic, Arunangshu Banerjee, DJArtMusic, FreeSound Community and ZoeDit. `assets/audio_upload/` holds the originals; `tools/audio/process_uploads.sh` builds the game-ready files. The Champions League theme in that folder is a copyrighted broadcast anthem and is intentionally **not** used.
+
+Goal audio (uploaded by the project owner): Voicy "Goaaaaal" and "An incredible goal" commentary calls, Voicy "Football Goal Stadium Sound Effect", TunePocket "Football Soccer Goal Crowd Cheer" — see assets/audio_upload.

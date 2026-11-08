@@ -676,7 +676,7 @@ function onGoal(d) {
   const who = d.player ? d.player.name : '';
   caption('GOAL!', d.own ? `Own goal · ${who}` : `${who} · ${tname(team)}`, 3200, 'goal');
   const sc = M.score, then = sc[0] === sc[1] ? ['equaliser'] : (sc[team] - sc[1 - team] === 1 ? ['lead'] : []);
-  const pro = !d.own && Math.random() < 0.5;                        // half the time the real commentator calls it
+  const pro = !d.own && Math.random() < 0.65;                       // most of the time the real commentator calls it
   Sound.comment(d.own ? 'owngoal' : pro ? 'goal_pro' : 'goal', { pri: 3, team: d.own || pro ? null : M.teams[team].def.id, then: [...then, 'colour_goal'], fallback: `Goal! ${who} scores for ${tname(team)}!` });
   lower(`⚽ ${d.label || d.minute + "'"}  ${who}${d.own ? ' (OG)' : ''}`, `${tname(team)} ${M.score[0]} – ${M.score[1]} ${tname(1 - team)}${d.assist ? ' · assist ' + d.assist.name : ''}`, M.kits[team].shirt, 6000);
   M.humans.forEach(h => Input.rumble(h.device, h.team === team ? 0.5 : 1, h.team === team ? 1 : 0.3, 600));

@@ -19,3 +19,8 @@ enc "$U"/8d82b5_Crowd_Reaction_to_Near_Miss_Sound_Effect.mp3               $O/cr
 enc "$U"/8d82b5_Football_Crowd_Near_Miss_From_Freekick_Sound_Effect.mp3    $O/crowd_nearmiss_fk.mp3 -20
 enc "$U"/8d82b5_Soccer_Goal_Sound_Effect.mp3                               $O/goal_horn.mp3 -18
 ls -la $O
+# 3rd upload batch: goal calls and goal crowd effects
+enc "$U"/Voicy_Goaaaaaal.mp3                                  $O/goalpro_3.mp3 -15
+enc "$U"/Voicy_An_incredible_goal.mp3                         $O/goalpro_4.mp3 -15
+enc "$U"/Voicy_Football_Goal_Stadium_Sound_Effect.mp3         $O/goal_stadium.mp3 -19
+enc "$U"/TunePocket-Football-Soccer-Goal-Crowd-Cheer-Preview.mp3 $O/goal_cheer2.mp3 -19
