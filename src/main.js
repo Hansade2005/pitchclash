@@ -16,8 +16,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ------------------------------------------------------------------ settings
-const SETTINGS_KEY = 'pc_settings';
-export const settings = Object.assign({ cuts: true, autoSprint: true, mouseAim: true, assisted: true, stadium: 'home', ceremony: 'full', injuries: true, var: true, autoSubs: false, halfMinutes: 4, difficulty: 'pro', time: 'night', weather: 'clear', camera: 'broadcast', zoom: 1, replays: true, quality: 'high', radar: true, names: true, assisted: true }, (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })());
+const SETTINGS_KEY = 'pc_settings2';
+export const settings = Object.assign({ cuts: false, autoSprint: true, mouseAim: true, assisted: true, stadium: 'home', ceremony: 'full', injuries: true, var: true, autoSubs: false, halfMinutes: 4, difficulty: 'pro', time: 'night', weather: 'clear', camera: 'classic', zoom: 1, replays: true, quality: 'high', radar: true, names: true, assisted: true }, (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })());
 export function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
 
 const renderer = new Renderer($('stage'));
@@ -263,7 +263,7 @@ const OPTS = {
   difficulty: [['amateur', 'Amateur'], ['pro', 'Professional'], ['world', 'World Class'], ['legend', 'Legend']],
   time: [['day', 'Day'], ['sunset', 'Sunset'], ['night', 'Night']],
   weather: [['clear', 'Clear'], ['rain', 'Rain'], ['storm', 'Thunderstorm'], ['snow', 'Snow'], ['fog', 'Fog'], ['random', 'Random']],
-  camera: [['broadcast', 'Modern · TV broadcast'], ['classic', 'Classic · high side-on'], ['wide', 'Wide / tactical'], ['close', 'Close'], ['end', 'End-to-end']],
+  camera: [['broadcast', 'TV broadcast (dynamic)'], ['classic', 'Steady · high side-on (recommended)'], ['wide', 'Wide / tactical'], ['close', 'Close'], ['end', 'End-to-end']],
 };
 function cycleSetting(key, dir) { const list = OPTS[key]; const i = list.findIndex(o => o[0] === settings[key]); settings[key] = list[(i + dir + list.length) % list.length][0]; saveSettings(); }
 const label = key => (OPTS[key].find(o => o[0] === settings[key]) || OPTS[key][0])[1];
@@ -670,7 +670,7 @@ function onGoal(d) {
   const team = d.team;
   Sound.roar(true); Sound.whistle(0.25, 0.3);
   if (window.Music && Music.sting) Music.sting('goal');
-  renderer.shake = 0.5;
+  renderer.shake = 0.15;
   run.excite[team] = 1;
   run.goalT = 0; run.replayQueued = settings.replays;
   const who = d.player ? d.player.name : '';
