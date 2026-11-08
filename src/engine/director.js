@@ -23,7 +23,7 @@ export class Director {
     let hx0 = b.x, hx1 = b.x, hz0 = b.z, hz1 = b.z;                       // ball + the players you control must always be in shot
     for (const p of mine) { hx0 = Math.min(hx0, p.x); hx1 = Math.max(hx1, p.x); hz0 = Math.min(hz0, p.z); hz1 = Math.max(hz1, p.z); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
     const spread = Math.max(maxX - minX, (maxZ - minZ) * 1.7, (hx1 - hx0) * 1.15);
-    const lx = clamp(lerp(lerp(b.x + b.vx * 0.3, (minX + maxX) / 2, 0.3), (hx0 + hx1) / 2, 0.35), -HL + 14, HL - 14), lz = clamp(lerp(b.z * 0.42, (hz0 + hz1) / 2 * 0.5, 0.3), -12, 10);
+    const lx = clamp(lerp(lerp(b.x + b.vx * 0.42, (minX + maxX) / 2, 0.3), (hx0 + hx1) / 2, 0.35), -HL + 14, HL - 14), lz = clamp(lerp(b.z * 0.42, (hz0 + hz1) / 2 * 0.5, 0.3), -12, 10);
     return { lx, lz, spread };
   }
 
@@ -62,8 +62,13 @@ export class Director {
     this.t += dt;
     const mode = opts.camera || 'broadcast', want = this.pick(match, mode, opts.cuts !== false && mode !== 'classic', dt), cam = this.R.camera;
     if (want.name !== this.cur) { const wasCut = want.cut || this.cur === 'booth'; this.cur = want.name; this.t = 0; if (want.cut) { this.snapNext = true; this.R.onCut && this.R.onCut(want.name); } else if (wasCut) this.snapNext = false; }
-    const k = this.snapNext ? 1 : 1 - Math.exp(-dt * want.rate);
-    this.pos.lerp(want.pos, k); this.look.lerp(want.look, this.snapNext ? 1 : 1 - Math.exp(-dt * (want.rate + 1.2))); this.fov = lerp(this.fov, want.fov, this.snapNext ? 1 : 1 - Math.exp(-dt * 2.5));
+    // live-TV panning: the camera follows the action sideways almost instantly (so the ball never outruns it),
+    // while height, distance and zoom drift slowly so the picture stays calm and clean
+    const sn = this.snapNext, tvLike = want.name === 'tv', fast = tvLike ? 9 : want.rate, slow = want.rate;
+    const kx = sn ? 1 : 1 - Math.exp(-dt * fast), kr = sn ? 1 : 1 - Math.exp(-dt * slow);
+    this.pos.x += (want.pos.x - this.pos.x) * kx; this.pos.y += (want.pos.y - this.pos.y) * kr; this.pos.z += (want.pos.z - this.pos.z) * (tvLike && !sn ? 1 - Math.exp(-dt * 5) : kr);
+    const kl = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 11 : want.rate + 1.2));
+    this.look.x += (want.look.x - this.look.x) * kl; this.look.y += (want.look.y - this.look.y) * kl; this.look.z += (want.look.z - this.look.z) * (tvLike && !sn ? 1 - Math.exp(-dt * 6) : kl); this.fov = lerp(this.fov, want.fov, this.snapNext ? 1 : 1 - Math.exp(-dt * 2.5));
     this.snapNext = false;
     cam.position.copy(this.pos);
     // handheld micro-movement on the low cameras
