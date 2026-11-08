@@ -73,6 +73,14 @@ const DOMESTIC = [
     cup: "Coupe de l'Hexagone", cshort: 'CDH', sup: 'Trophée des Étoiles', sshort: 'TDE' },
   { league: 'afr', country: null, league_name: 'Pan-African Super League', lshort: 'PSL',
     cup: 'Pan-African Shield', cshort: 'PAS', sup: 'Pan-African Super Cup', sshort: 'PSC' },
+  { league: 'low', country: 'ned', league_name: 'Lowlands Eerste Klasse', lshort: 'LEK', cup: 'Lowlands Beker', cshort: 'LBE', sup: 'Lowlands Supercup', sshort: 'LSC' },
+  { league: 'lus', country: 'por', league_name: 'Liga Lusitana', lshort: 'LLU', cup: 'Taça Lusitana', cshort: 'TLU', sup: 'Supertaça Lusitana', sshort: 'SLU' },
+  { league: 'ana', country: 'tur', league_name: 'Anatolian Süper Lig', lshort: 'ASL', cup: 'Anatolian Kupa', cshort: 'AKU', sup: 'Anatolian Süper Kupa', sshort: 'ASK' },
+  { league: 'cal', country: 'sco', league_name: 'Caledonian Premiership', lshort: 'CPR', cup: 'Caledonian Cup', cshort: 'CCU', sup: 'Caledonian Shield', sshort: 'CSD' },
+  { league: 'bsr', country: 'bra', league_name: 'Brasa Série Ouro', lshort: 'BSO', cup: 'Copa Brasa', cshort: 'CBR', sup: 'Supercopa Brasa', sshort: 'SBR' },
+  { league: 'pla', country: 'arg', league_name: 'Liga del Plata', lshort: 'LDP', cup: 'Copa del Plata', cshort: 'CDP2', sup: 'Supercopa del Plata', sshort: 'SDP' },
+  { league: 'cam', country: 'usa', league_name: 'Americas Premier Soccer', lshort: 'APS', cup: 'Americas Open Cup', cshort: 'AOC', sup: 'Americas Champions Shield', sshort: 'ACS' },
+  { league: 'gul', country: 'ksa', league_name: 'Gulf Stars League', lshort: 'GSL', cup: 'Gulf Crown Cup', cshort: 'GCC', sup: 'Gulf Super Cup', sshort: 'GSC' },
 ];
 
 const domesticComps = [];

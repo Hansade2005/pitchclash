@@ -17,10 +17,13 @@ export class Director {
 
   // framing information shared by the TV shots
   framing(match, o) {
-    const b = match.ball, act = match.all.filter(p => !p.sentOff && Math.hypot(p.x - b.x, p.z - b.z) < 26);
-    let minX = b.x, maxX = b.x, minZ = b.z, maxZ = b.z; for (const p of act) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
-    const spread = Math.max(maxX - minX, (maxZ - minZ) * 1.7);
-    const lx = clamp(lerp(b.x + b.vx * 0.3, (minX + maxX) / 2, 0.3), -HL + 14, HL - 14), lz = clamp(b.z * 0.42, -12, 10);
+    const b = match.ball, mine = match.humans.map(h => h.player).filter(Boolean), act = match.all.filter(p => !p.sentOff && Math.hypot(p.x - b.x, p.z - b.z) < 26);
+    let minX = b.x, maxX = b.x, minZ = b.z, maxZ = b.z;
+    for (const p of act) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+    let hx0 = b.x, hx1 = b.x, hz0 = b.z, hz1 = b.z;                       // ball + the players you control must always be in shot
+    for (const p of mine) { hx0 = Math.min(hx0, p.x); hx1 = Math.max(hx1, p.x); hz0 = Math.min(hz0, p.z); hz1 = Math.max(hz1, p.z); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+    const spread = Math.max(maxX - minX, (maxZ - minZ) * 1.7, (hx1 - hx0) * 1.15);
+    const lx = clamp(lerp(lerp(b.x + b.vx * 0.3, (minX + maxX) / 2, 0.3), (hx0 + hx1) / 2, 0.35), -HL + 14, HL - 14), lz = clamp(lerp(b.z * 0.42, (hz0 + hz1) / 2 * 0.5, 0.3), -12, 10);
     return { lx, lz, spread };
   }
 
@@ -29,6 +32,7 @@ export class Director {
     const tvShot = () => {
       const zoomT = clamp(0.88 + F.spread / 62, 0.88, 1.14); this.zoom = lerp(this.zoom, zoomT, 1 - Math.exp(-dt * 1.3));
       const z = o.z;
+      if (mode === 'classic') return { name: 'tv', pos: new THREE.Vector3(F.lx, 31 * z, 35 * z), look: new THREE.Vector3(F.lx, 0, 3), fov: 44, rate: 4.5 };   // high, steady, side-on: scrolls sideways only, like the arcade classics
       if (mode === 'wide') return { name: 'tv', pos: new THREE.Vector3(F.lx * 0.82, 40 * z, F.lz + 76 * z), look: new THREE.Vector3(F.lx, 0, F.lz + 1), fov: 27 * this.zoom, rate: 3 };
       if (mode === 'close') return { name: 'tv', pos: new THREE.Vector3(F.lx, 13 * z, F.lz + 38 * z), look: new THREE.Vector3(F.lx, 0.5, F.lz + 1), fov: 30 * this.zoom, rate: 3.4 };
       if (mode === 'end') { const h = match.humans[0], d = h ? match.dir(h.team) : 1; return { name: 'tv', pos: new THREE.Vector3(b.x - d * 36 * z, 15 * z, b.z * 0.55), look: new THREE.Vector3(b.x + d * 10, 0.5, b.z * 0.7), fov: 34 * this.zoom, rate: 3.2 }; }
@@ -56,7 +60,7 @@ export class Director {
 
   update(match, dt, opts) {
     this.t += dt;
-    const mode = opts.camera || 'broadcast', want = this.pick(match, mode, opts.cuts !== false, dt), cam = this.R.camera;
+    const mode = opts.camera || 'broadcast', want = this.pick(match, mode, opts.cuts !== false && mode !== 'classic', dt), cam = this.R.camera;
     if (want.name !== this.cur) { const wasCut = want.cut || this.cur === 'booth'; this.cur = want.name; this.t = 0; if (want.cut) { this.snapNext = true; this.R.onCut && this.R.onCut(want.name); } else if (wasCut) this.snapNext = false; }
     const k = this.snapNext ? 1 : 1 - Math.exp(-dt * want.rate);
     this.pos.lerp(want.pos, k); this.look.lerp(want.look, this.snapNext ? 1 : 1 - Math.exp(-dt * (want.rate + 1.2))); this.fov = lerp(this.fov, want.fov, this.snapNext ? 1 : 1 - Math.exp(-dt * 2.5));
