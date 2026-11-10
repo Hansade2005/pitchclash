@@ -441,6 +441,7 @@ function buildMatch(ctx) {
   Sound.music(false); Sound.weather(weather); Sound.preload();
   renderer.colorCrowd(kit0.shirt, kit1.shirt);
   run = { help: { until: performance.now() + 35000, pinned: false }, ctx, t: 0, replay: null, shootout: null, paused: false, goalT: 0, excite: [0, 0], lastEvent: 0, tension: 0 };
+  try { renderer.renderer.compile(renderer.scene, renderer.camera); renderer.render(); } catch (e) { console.warn('prewarm', e); }
   $('loading').classList.add('hidden');
   buildHud(t0, t1, kit0, kit1);
   hudEl.classList.remove('hidden');
@@ -1203,3 +1204,11 @@ async function boot() {
   window.__pc = { get M() { return M; }, get run() { return run; }, get extras() { return extras; }, renderer, settings, startMatch, teamById, NATIONS, CLUBS, matchSettings, teamManagement, Career, Bet };
 }
 boot().catch(err => { $('loadtext').textContent = 'Failed to start: ' + err.message; console.error(err); });
+
+// slow-frame / error log (F9): helps diagnose stutter on a specific PC
+{
+  const logErr = (name, msg) => { try { const L = JSON.parse(localStorage.getItem('pc_errors') || '[]'); L.push({ t: new Date().toISOString(), name, msg: String(msg).slice(0, 240), gpu: window.__gpuName || '' }); localStorage.setItem('pc_errors', JSON.stringify(L.slice(-40))); } catch (x) {} };
+  window.addEventListener('error', e => logErr('error', e.message)); window.addEventListener('unhandledrejection', e => logErr('promise', e.reason && e.reason.message || e.reason));
+  let lt = performance.now(); const tick = t => { if (t - lt > 1500 && run) logErr('stall', 'frame took ' + Math.round(t - lt) + ' ms'); lt = t; requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+  window.addEventListener('keydown', e => { if (e.code !== 'F9') return; let d = document.getElementById('errlog'); if (d) { d.remove(); return; } d = document.createElement('pre'); d.id = 'errlog'; d.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;max-height:80vh;overflow:auto;z-index:99;background:#000d;color:#9fe;padding:12px;font:12px monospace;white-space:pre-wrap;user-select:text'; let t = 'PITCH CLASH log (F9 closes)  GPU: ' + (window.__gpuName || '?') + (window.__lowGpu ? '  [low-GPU mode]' : '') + '\n\n'; try { t += JSON.parse(localStorage.getItem('pc_errors') || '[]').map(x => x.t + ' [' + x.name + '] ' + x.msg).join('\n') || 'Nothing logged.'; } catch (x) { t += 'unreadable'; } d.textContent = t; document.body.appendChild(d); });
+}

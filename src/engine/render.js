@@ -1,4 +1,5 @@
 // Rendering: stadium, players, ball, effects, weather, cameras and replays.
+import { lowify, lowGpuDetected } from './lowgpu.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -26,9 +27,10 @@ const ONCE = new Set(['Pass', 'Shoot', 'Tackle', 'Header', 'Fall', 'KeeperDiveLe
 export class Renderer {
   constructor(container) {
     this.container = container;
-    const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+    const LOW = window.__lowGpu = lowGpuDetected(); this.capR = x => LOW ? Math.min(x, 1100 / Math.max(1, window.innerWidth), 0.9) : x;
+    const r = this.renderer = new THREE.WebGLRenderer({ antialias: !LOW, powerPreference: 'high-performance' });
+    r.setPixelRatio(this.capR(Math.min(window.devicePixelRatio || 1, 1.5)));
+    r.shadowMap.enabled = !LOW; r.shadowMap.type = THREE.PCFShadowMap;
     r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
     container.appendChild(r.domElement);
     this.scene = new THREE.Scene();
@@ -37,9 +39,10 @@ export class Renderer {
     this.zoomSetting = 1; this.shake = 0; this.time = 0;
     this.models = {}; this.chars = []; this.quality = 'high';
     window.addEventListener('resize', () => this.resize()); this.resize();
-    const pmrem = new THREE.PMREMGenerator(r); this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
+    if (!LOW) { const pmrem = new THREE.PMREMGenerator(r); this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose(); }
     this.buildLights(); this.buildStadium(); this.buildBall(); this.buildEffects(); this.buildAim();
     this.setAtmosphere('day', 'clear');
+    lowify(this.scene); setInterval(() => lowify(this.scene), 1200);
   }
 
   resize() {
@@ -49,9 +52,9 @@ export class Renderer {
 
   setQuality(q) {
     this.quality = q;
-    this.renderer.setPixelRatio(q === 'low' ? 0.75 : q === 'medium' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
-    this.renderer.shadowMap.enabled = q !== 'low';
-    this.sun.shadow.mapSize.set(q === 'high' ? 4096 : 2048, q === 'high' ? 4096 : 2048);
+    this.renderer.setPixelRatio(this.capR(q === 'low' ? 0.75 : q === 'medium' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)));
+    this.renderer.shadowMap.enabled = q !== 'low' && !window.__lowGpu;
+    this.sun.shadow.mapSize.set(q === 'high' ? 2048 : 1024, q === 'high' ? 2048 : 1024);
     if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     this.resize();
   }
@@ -60,7 +63,7 @@ export class Renderer {
   buildLights() {
     this.hemi = new THREE.HemisphereLight(0xcfe3ff, 0x2a4a22, 1.0); this.scene.add(this.hemi);
     const s = this.sun = new THREE.DirectionalLight(0xffffff, 2.6);
-    s.position.set(-40, 80, 45); s.castShadow = true; s.shadow.mapSize.set(4096, 4096);
+    s.position.set(-40, 80, 45); s.castShadow = !window.__lowGpu; s.shadow.mapSize.set(2048, 2048);
     Object.assign(s.shadow.camera, { left: -70, right: 70, top: 50, bottom: -50, near: 10, far: 220 });
     s.shadow.bias = -0.0004; s.shadow.normalBias = 0.04;
     this.scene.add(s); this.scene.add(s.target);
@@ -81,7 +84,7 @@ export class Renderer {
     this.scene.background = bg;
     this.scene.fog = weather === 'fog' ? new THREE.Fog(fog, 18, 110) : new THREE.Fog(fog, weather === 'clear' ? 160 : 90, weather === 'clear' ? 420 : 260);
     this.baseHemi = null;
-    this.hemi.color.setHex(p.hemi[0]); this.hemi.groundColor.setHex(p.hemi[1]); this.hemi.intensity = p.hemi[2] * (weather === 'clear' ? 1 : 0.85);
+    this.hemi.color.setHex(p.hemi[0]); this.hemi.groundColor.setHex(p.hemi[1]); this.hemi.intensity = p.hemi[2] * (weather === 'clear' ? 1 : 0.85) * (window.__lowGpu ? (time === 'night' ? 2.0 : 1.35) : 1);
     this.sun.color.setHex(p.sun[0]); this.sun.intensity = p.sun[1] * (weather === 'clear' ? 1 : 0.55);
     this.sun.position.set(...p.pos);
     this.renderer.toneMappingExposure = p.exp;
@@ -235,9 +238,10 @@ export class Renderer {
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.5), new THREE.MeshBasicMaterial({ map: this.canvasTex(512, 76, (g, w, h) => { g.fillStyle = '#0b1220'; g.fillRect(0, 0, w, h); g.fillStyle = '#6ee7a8'; g.font = 'italic 900 44px Segoe UI, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('COMMENTARY', w / 2, h / 2 + 2); }) }));
       sign.position.set(0, 3.7, 1.85); bg.add(sign);
     }
-    const positions = crowdPos.map(c => c.g.localToWorld(c.v.clone())).filter(p => !(Math.abs(p.x) < 5 && Math.abs(p.z - bz0) < 3.4 && p.y > boothY - 1.2 && p.y < boothY + 4));
+    let positions = crowdPos.map(c => c.g.localToWorld(c.v.clone())).filter(p => !(Math.abs(p.x) < 5 && Math.abs(p.z - bz0) < 3.4 && p.y > boothY - 1.2 && p.y < boothY + 4));
+    if (window.__lowGpu) positions = positions.filter((_, i) => i % 3 === 0);
     // crowd: real little humanoids (torso + arms + head), instanced, with shader-driven bobbing, cheering arms and the Mexican wave
-    const lowCrowd = !location.search.includes('hi=1') && (/low/.test(localStorage.getItem('pc_settings') || '') || navigator.webdriver);
+    const lowCrowd = !location.search.includes('hi=1') && (/low/.test(localStorage.getItem('pc_settings') || '') || navigator.webdriver || window.__lowGpu);
     const box = (w, h, d, x, y, z, rx = 0, rz = 0, part = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateZ(rz); g.translate(x, y, z); g.setAttribute('aPart', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(part), 1)); return g; };
     const bodyGeo = lowCrowd ? box(0.42, 0.9, 0.3, 0, 0.3, 0) : BufferGeometryUtils.mergeGeometries([
       box(0.44, 0.52, 0.26, 0, 0.3, 0),                     // torso
@@ -267,7 +271,7 @@ export class Renderer {
          transformed.y += max(0.0, sin(uTime * sp + aPhase)) * (0.04 + ex * 0.55) + wv * 0.85;
          transformed.x += sin(uTime * 1.3 + aPhase) * 0.03;`);
     }; };
-    const bodyMat = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }), headMat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0, vertexColors: true });
+    const bodyMat = window.__lowGpu ? new THREE.MeshLambertMaterial({}) : new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }), headMat = window.__lowGpu ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0, vertexColors: true });
     patch(bodyMat, true); patch(headMat, false);
     const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, n); geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1)); geo.setAttribute('aSide', new THREE.InstancedBufferAttribute(sidesAttr, 1)); geo.setAttribute('aAng', new THREE.InstancedBufferAttribute(angs, 1)); m.frustumCulled = false; return m; };
     const body = mk(bodyGeo, bodyMat), head = mk(headGeo, headMat);
@@ -369,6 +373,7 @@ export class Renderer {
     });
     this.ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 32, 20), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35 }));
     this.ballMesh.castShadow = true; this.scene.add(this.ballMesh);
+    if (window.__lowGpu) { this.ballBlob = new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false })); this.ballBlob.rotation.x = -Math.PI / 2; this.scene.add(this.ballBlob); }
     // trail
     this.trail = [];
     const tm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false });
@@ -552,6 +557,7 @@ export class Renderer {
     // ground shadow blob + controlled-player ring
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; holder.add(ring);
+    if (window.__lowGpu) { const blob = new THREE.Mesh(new THREE.CircleGeometry(0.62, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false })); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; holder.add(blob); }
     this.scene.add(holder);
     const mixer = new THREE.AnimationMixer(root);
     const actions = {};
@@ -722,7 +728,7 @@ export class Renderer {
     this.camera.position.copy(this.camPos); this.camera.lookAt(this.camLook);
   }
 
-  render() { this.renderer.render(this.scene, this.camera); }
+  render() { if (this.ballBlob) { const b = this.ballMesh.position, k = 1 / (1 + Math.max(0, b.y) * 0.45); this.ballBlob.position.set(b.x, 0.025, b.z); this.ballBlob.scale.setScalar(k); this.ballBlob.material.opacity = 0.42 * k; } this.renderer.render(this.scene, this.camera); }
 
   setCrowdExcitement(e0, e1) { this.crowdUniforms.uExcite0.value = e0; this.crowdUniforms.uExcite1.value = e1; }
 
