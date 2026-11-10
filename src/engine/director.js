@@ -11,6 +11,12 @@ export class Director {
     this.R = R; this.cur = 'tv'; this.t = 0; this.snapNext = true; this.forced = null; this.onCut = null;
     this.pos = new THREE.Vector3(0, 24, 60); this.look = new THREE.Vector3(); this.fov = 26; this.zoom = 1; this.noise = 0;
     this._v = new THREE.Vector3();
+    this.vp = { x: 0, y: 0, z: 0 }; this.vl = { x: 0, y: 0, z: 0 };
+  }
+  // Unity-style SmoothDamp: critically damped spring, no overshoot, starts and stops softly (broadcast-camera feel)
+  sd(cur, tgt, vel, key, st, dt) {
+    const o = 2 / st, x = o * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x), mx = 70 * st; const ch = clamp(cur - tgt, -mx, mx), t0 = (vel[key] + o * ch) * dt;
+    vel[key] = (vel[key] - o * t0) * e; return tgt + (ch + t0) * e;
   }
   request(name, seconds) { this.forced = { name, until: performance.now() + seconds * 1000 }; }
   snap() { this.snapNext = true; }
@@ -71,11 +77,23 @@ export class Director {
       this.fx += eff * (1 - Math.exp(-dt * 4));                       // filtered target
       const shift = this.fx - want.look.x;                            // keep camera and look-at moving as one
       want.look.x += shift; want.pos.x += shift;
+      if (this.fz === undefined || sn) this.fz = want.look.z;          // depth is filtered the same way: no sway when the ball runs up and down the pitch
+      const offz = want.look.z - this.fz, effz = Math.sign(offz) * Math.max(0, Math.abs(offz) - 1.8); this.fz += effz * (1 - Math.exp(-dt * 2.6));
+      const shz = this.fz - want.look.z; want.look.z += shz; want.pos.z += shz;
     } else this.fx = undefined;
-    const kx = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 3.4 : want.rate)), kr = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 2.2 : want.rate));
-    this.pos.x += (want.pos.x - this.pos.x) * kx; this.pos.y += (want.pos.y - this.pos.y) * kr; this.pos.z += (want.pos.z - this.pos.z) * kr;
-    const kl = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 3.6 : want.rate + 1.2));
-    this.look.x += (want.look.x - this.look.x) * kl; this.look.y += (want.look.y - this.look.y) * kl; this.look.z += (want.look.z - this.look.z) * kr;
+    if (tvLike && !sn) {
+      const n = Math.max(1, Math.ceil(dt / (1 / 60))), h = dt / n;   // fixed sub-steps: identical motion at 20 fps and at 144 fps
+      for (let i = 0; i < n; i++) {
+        this.pos.x = this.sd(this.pos.x, want.pos.x, this.vp, 'x', 0.55, h); this.pos.y = this.sd(this.pos.y, want.pos.y, this.vp, 'y', 0.9, h); this.pos.z = this.sd(this.pos.z, want.pos.z, this.vp, 'z', 0.9, h);
+        this.look.x = this.sd(this.look.x, want.look.x, this.vl, 'x', 0.42, h); this.look.y = this.sd(this.look.y, want.look.y, this.vl, 'y', 0.6, h); this.look.z = this.sd(this.look.z, want.look.z, this.vl, 'z', 0.7, h);
+      }
+    } else {
+      this.vp.x = this.vp.y = this.vp.z = this.vl.x = this.vl.y = this.vl.z = 0;
+      const kx = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 3.4 : want.rate)), kr = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 2.2 : want.rate));
+      this.pos.x += (want.pos.x - this.pos.x) * kx; this.pos.y += (want.pos.y - this.pos.y) * kr; this.pos.z += (want.pos.z - this.pos.z) * kr;
+      const kl = sn ? 1 : 1 - Math.exp(-dt * (tvLike ? 3.6 : want.rate + 1.2));
+      this.look.x += (want.look.x - this.look.x) * kl; this.look.y += (want.look.y - this.look.y) * kl; this.look.z += (want.look.z - this.look.z) * kr;
+    }
     this.fov = lerp(this.fov, want.fov, sn ? 1 : 1 - Math.exp(-dt * 1.2));
     this.snapNext = false;
     cam.position.copy(this.pos);
