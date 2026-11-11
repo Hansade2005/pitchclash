@@ -1,0 +1,51 @@
+{
+  "name": "apex-clash",
+  "version": "2.1.0",
+  "description": "APEX CLASH - city street racing for cars and bikes, 1-8 players",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "installer": "bash installer/build_installer.sh"
+  },
+  "keywords": [],
+  "author": "Anye Happiness Ade (AI Engineer, Cameroon)",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "productName": "APEX CLASH",
+  "build": {
+    "appId": "dev.pipilot.apexclash",
+    "productName": "APEX CLASH",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron-main.js",
+      "server.js",
+      "package.json",
+      "public/**",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "copyright": "Copyright (c) 2026 Anye Happiness Ade, Cameroon - AI Engineer"
+  }
+}

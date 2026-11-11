@@ -1,0 +1,21 @@
+APEX CLASH
+Copyright (c) 2026 Anye Happiness Ade
+Cameroon - AI Engineer
+All rights reserved.
+
+AUTHOR
+  Anye Happiness Ade, Cameroon, AI Engineer - creator and owner of APEX CLASH.
+
+LICENCE
+  You may install and play this game for personal entertainment. It is
+  provided as is, without warranty of any kind. You may not sell it or
+  present it as your own work.
+
+MULTIPLAYER
+  When you host a room, the game accepts connections from other devices on
+  your local network. Setup can add a Windows Firewall rule for this
+  (private networks only); you can untick that option.
+
+THIRD-PARTY
+  Music is licensed under Creative Commons Attribution 3.0 (see README).
+  Built with three.js, Electron and ws (MIT licences).

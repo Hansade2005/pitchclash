@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APEX CLASH — City Street Racing</title>
+<meta name="description" content="APEX CLASH: fast 3D city street racing for cars and bikes. Career mode, split-screen and LAN MultiClash. By Anye Happiness Ade.">
+<link rel="icon" href="icon.png">
+<style>
+:root { --y:#ffc21f; --o:#ff5a12; --c:#35f0ff; --bg:#07080d; --panel:#10131d; --line:rgba(255,255,255,.1); --mut:#9aa5bd; }
+* { box-sizing:border-box; } html { scroll-behavior:smooth; }
+body { margin:0; background:var(--bg); color:#eef1f8; font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif; line-height:1.55; }
+a { color:var(--c); }
+.wrap { max-width:1080px; margin:0 auto; padding:0 20px; }
+header { background:radial-gradient(900px 420px at 50% -60px, rgba(255,120,20,.28), transparent 70%), radial-gradient(700px 380px at 85% 10%, rgba(53,240,255,.14), transparent 70%); padding:56px 0 34px; text-align:center; }
+header img.logo { width:min(640px,92%); height:auto; }
+header p { max-width:640px; margin:10px auto 26px; font-size:19px; color:#cfd6e6; }
+.cta { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.btn { display:inline-flex; flex-direction:column; align-items:center; text-decoration:none; font-weight:800; font-size:19px; padding:14px 30px; border-radius:12px; border:2px solid transparent; transition:transform .12s, filter .12s; }
+.btn small { font-weight:500; font-size:12.5px; opacity:.85; margin-top:2px; }
+.btn:hover { transform:translateY(-2px); filter:brightness(1.1); }
+.btn.play { background:linear-gradient(90deg,var(--o),var(--y)); color:#1a1006; }
+.btn.dl { background:rgba(255,255,255,.06); color:#fff; border-color:var(--c); }
+section { padding:34px 0; border-top:1px solid var(--line); }
+h2 { font-size:15px; letter-spacing:3px; text-transform:uppercase; color:var(--c); margin:0 0 18px; }
+.shots { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+.shots img { width:100%; height:auto; display:block; border-radius:10px; border:1px solid var(--line); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+.card b { display:block; font-size:17px; margin-bottom:4px; color:var(--y); }
+.card span { color:#c3cbdc; font-size:14.5px; }
+table { width:100%; border-collapse:collapse; font-size:15px; } th { text-align:left; color:var(--mut); font-size:12px; letter-spacing:1px; text-transform:uppercase; padding:6px 8px; } td { padding:8px; border-top:1px solid var(--line); } td:first-child { font-weight:700; }
+.tablewrap { overflow-x:auto; }
+.note { color:var(--mut); font-size:14px; margin-top:12px; }
+footer { padding:30px 0 50px; border-top:1px solid var(--line); text-align:center; color:var(--mut); font-size:14px; }
+footer strong { color:#fff; font-size:16px; }
+@media (max-width:640px) { .shots { grid-template-columns:1fr; } header { padding-top:36px; } header p { font-size:17px; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <img class="logo" src="logo.png" alt="APEX CLASH — City Street Racing" width="983" height="358">
+  <p>Race cars, bikes, boats, helicopters, planes and spaceships across 8 countries. Fight, outrun the police, and clash with friends.</p>
+  <div class="cta">
+    <a class="btn play" href="play/">Play in your browser<small>no install · keyboard or controller</small></a>
+    <a class="btn dl" href="download/APEX-CLASH-2.1.0-Setup.exe" download>Download for Windows<small>installer · 64-bit · 99 MB</small></a>
+  </div>
+</div></header>
+<main class="wrap">
+  <section><h2>Screenshots</h2><div class="shots">
+    <img src="shots/plane.jpg" alt="Planes racing through ring gates over Paris" width="960" height="540" loading="lazy">
+    <img src="shots/boat.jpg" alt="Boat racing on the canals of Rio" width="960" height="540" loading="lazy">
+    <img src="shots/space.jpg" alt="Spaceship race among asteroids" width="960" height="540" loading="lazy">
+    <img src="shots/combat.jpg" alt="Combat race in Douala, Cameroon" width="960" height="540" loading="lazy">
+    <img src="shots/police.jpg" alt="Police chase in New York" width="960" height="540" loading="lazy">
+    <img src="shots/tunnel.jpg" alt="Bike racing through a tunnel" width="960" height="540" loading="lazy">
+  </div></section>
+  <section><h2>What's in the game</h2><div class="grid">
+    <div class="card"><b>Six classes</b><span>Cars, bikes, boats, helicopters, planes and spaceships – each with its own handling.</span></div>
+    <div class="card"><b>World Tour</b><span>8 countries, 16 circuits and 192 levels. Win and raise the flag.</span></div>
+    <div class="card"><b>Combat &amp; cops</b><span>Guns, rockets, mines, shields – and police chases with roadblocks.</span></div>
+    <div class="card"><b>City Rush &amp; relays</b><span>Traffic, pedestrians, tunnels, stunt ramps and land-to-sea relay stages.</span></div>
+    <div class="card"><b>MultiClash</b><span>Points tournament for 2–8 players: split-screen or over Wi-Fi.</span></div>
+    <div class="card"><b>Easy to pick up</b><span>Full controller support with auto-brake and steering help. Runs on laptops.</span></div>
+  </div></section>
+  <section><h2>Controls</h2><div class="tablewrap"><table>
+    <tr><th></th><th>Controller</th><th>Keyboard</th></tr>
+    <tr><td>Steer</td><td>Left stick / D-pad</td><td>A · D or ← · →</td></tr>
+    <tr><td>Accelerate</td><td>RT or A</td><td>W or ↑</td></tr>
+    <tr><td>Brake</td><td>LT</td><td>S or ↓</td></tr>
+    <tr><td>Nitro</td><td>X or RB</td><td>Shift</td></tr>
+    <tr><td>Drift</td><td>B or LB</td><td>Space</td></tr>
+    <tr><td>Camera / Pause</td><td>Y / Start</td><td>C / Esc</td></tr>
+  </table></div>
+  <p class="note">The browser version has solo play, career and split-screen. Hosting rooms for friends over Wi-Fi needs the Windows app. Windows may show a SmartScreen notice for the installer because it is not code-signed: choose “More info” → “Run anyway”.</p></section>
+</main>
+<footer><div class="wrap">
+  <strong>Created by Anye Happiness Ade</strong><br>AI Engineer · Cameroon<br><br>
+  © 2026 Anye Happiness Ade. Music CC BY 3.0 (Sevennotes, Lyvo, Smallest via Jamendo). Built with three.js.
+</div></footer>
+</body>
+</html>
