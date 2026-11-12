@@ -5,6 +5,7 @@ import glob, json, os, re, sys
 src = 'src/data/real_squads.js'
 text = open(src, encoding='utf8').read()
 have = set(re.findall(r'^  "([^"]+)":', text, re.M))
+junk = re.compile(r"\b(signed|from|loan|loaned|free agent|until|since|contract|transfer|released|retired|joined|on loan|academy|reserves?)\b", re.I)
 ok = re.compile(r"^[^\W\d_][\w'.\- ÀØ-öø-ÿĀ-ſ]+$", re.U)
 added, names = 0, 0
 lines = []
@@ -14,7 +15,7 @@ for f in sorted(glob.glob(os.path.join(sys.argv[1], 'final_*.json'))):
         seen, out = set(), []
         for n in v.get('players', []):
             n = ' '.join(str(n).split())
-            if len(n) < 3 or len(n) > 40 or not ok.match(n) or n.lower() in seen: continue
+            if len(n) < 3 or len(n) > 40 or not ok.match(n) or junk.search(n) or n.lower() in seen: continue
             seen.add(n.lower()); out.append(n)
         if not out: continue
         lines.append(f'  {json.dumps(tid)}: {json.dumps(out, ensure_ascii=False)},')

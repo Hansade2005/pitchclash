@@ -1,6 +1,7 @@
 // Run: node tests/tournament.test.mjs
 import assert from 'node:assert/strict';
 import { NATIONS, CLUBS, LEAGUES, formations, makeSquad, getTeam, YOUTH_LEVELS, clubsInPool } from '../src/data/teams.js';
+import { REAL_SQUADS } from '../src/data/real_squads.js';
 import { COMPETITIONS, getCompetition, COMPETITION_CATEGORIES, WORLD_CYCLE_SLOTS } from '../src/data/competitions.js';
 import {
   createCompetition, nextFixtures, simulateRound, advance, simulateAll, recordResult, standings,
@@ -561,12 +562,15 @@ const BLOCKED_PLAYERS = ['messi', 'ronaldo', 'neymar', 'mbappe', 'haaland', 'sal
 BLOCKED.push(...BLOCKED_PLAYERS);
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 test('no superstar player names in generated squads (blocked list)', () => {
-  // Club, league and competition names are real by design; only famous players stay out of generated squads.
+  // Club, league and competition names are real by design, and real players come from REAL_SQUADS;
+  // only generated names must avoid famous players.
   // Player names of all new clubs / youth sides avoid famous surnames too.
   const newTeams = [...CLUBS.filter((c) => ['alb2', 'ibe2'].includes(c.league) || (c.pool === 'row' && !['EUR', 'AFR'].includes(c.confed))),
     ...NATIONS.map((n) => getTeam(`${n.id}-u23`)), ...NATIONS.map((n) => getTeam(`${n.id}-u20`))];
   for (const t of newTeams) {
+    const real = new Set(REAL_SQUADS[t.id] || []);       // real players are allowed; only generated names are checked
     for (const p of makeSquad(t)) {
+      if (real.has(p.name)) continue;
       const s = ` ${norm(p.name)} `;
       for (const b of BLOCKED_PLAYERS) assert.ok(!s.includes(` ${b} `), `${t.name}: ${p.name}`);
     }
