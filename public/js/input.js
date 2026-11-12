@@ -3,6 +3,17 @@ const keys = {}, prev = {};
 addEventListener('keydown', e => { keys[e.code] = true; if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && !(e.target instanceof HTMLInputElement)) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+// ---- mouse aiming (keyboard + mouse device): pointer position in normalised device coords, buttons 0/1/2
+export const opts = { mouse: true };
+const mouse = { nx: 0, ny: 0, t: -1e9, l: false, m: false, r: false, pl: false, pm: false, pr: false }; // p* = pressed since the last frame (a click shorter than a frame is not lost)
+export const endFrame = () => { mouse.pl = mouse.pm = mouse.pr = false; };
+addEventListener('pointermove', e => { mouse.nx = e.clientX / innerWidth * 2 - 1; mouse.ny = -(e.clientY / innerHeight * 2 - 1); mouse.t = performance.now(); });
+addEventListener('pointerdown', e => { mouse.nx = e.clientX / innerWidth * 2 - 1; mouse.ny = -(e.clientY / innerHeight * 2 - 1); mouse.t = performance.now(); if (e.button === 0) mouse.l = mouse.pl = true; else if (e.button === 1) mouse.m = mouse.pm = true; else if (e.button === 2) mouse.r = mouse.pr = true; });
+addEventListener('pointerup', e => { if (e.button === 0) mouse.l = false; else if (e.button === 1) mouse.m = false; else if (e.button === 2) mouse.r = false; });
+addEventListener('contextmenu', e => { if (!document.getElementById('ui').firstChild) e.preventDefault(); });
+addEventListener('mousedown', e => { if (e.button === 1 && !document.getElementById('ui').firstChild) e.preventDefault(); });
+addEventListener('blur', () => { mouse.l = mouse.m = mouse.r = false; });
+const mouseOn = () => opts.mouse && !document.getElementById('ui').firstChild && performance.now() - mouse.t < 6000;
 const K = (...c) => c.some(k => keys[k]) ? 1 : 0;
 export const pads = () => (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(p => p && p.connected);
 const padAt = i => (navigator.getGamepads ? navigator.getGamepads()[i] : null);
@@ -11,26 +22,27 @@ const btn = (p, i) => p.buttons[i] ? p.buttons[i].value || (p.buttons[i].pressed
 
 // Returns { x, z, pass, shoot, through, sprint, switch, pause } ; x = right, z = towards the camera (down the screen).
 function raw(dev) {
-  if (dev === 'all') { const o = raw('kb'); for (let i = 0; i < 4; i++) { const r = raw('pad' + i); if (!r) continue; if (Math.hypot(r.x, r.z) > Math.hypot(o.x, o.z)) { o.x = r.x; o.z = r.z; } for (const k of ['pass', 'shoot', 'through', 'sprint', 'switch', 'pause']) o[k] = o[k] || r[k]; } return o; }
+  if (dev === 'all') { const o = raw('kb'); o.ax = o.az = 0; for (let i = 0; i < 4; i++) { const r = raw('pad' + i); if (!r) continue; if (Math.hypot(r.x, r.z) > Math.hypot(o.x, o.z)) { o.x = r.x; o.z = r.z; } for (const k of ['pass', 'shoot', 'through', 'sprint', 'switch', 'pause', 'keeper']) o[k] = o[k] || r[k]; if (Math.hypot(r.ax, r.az) > Math.hypot(o.ax, o.az)) { o.ax = r.ax; o.az = r.az; } } return o; }
   if (dev.startsWith('pad')) {
     const p = padAt(+dev.slice(3)); if (!p || !p.connected) return null;
-    return { x: dz(p.axes[0] || 0) + (btn(p, 15) ? 1 : 0) - (btn(p, 14) ? 1 : 0), z: dz(p.axes[1] || 0) + (btn(p, 13) ? 1 : 0) - (btn(p, 12) ? 1 : 0), pass: btn(p, 0) > 0.5, shoot: btn(p, 2) > 0.5 || btn(p, 1) > 0.5, through: btn(p, 3) > 0.5, sprint: btn(p, 7) > 0.3 || btn(p, 5) > 0.5, switch: btn(p, 4) > 0.5, pause: btn(p, 9) > 0.5 };
+    return { x: dz(p.axes[0] || 0) + (btn(p, 15) ? 1 : 0) - (btn(p, 14) ? 1 : 0), z: dz(p.axes[1] || 0) + (btn(p, 13) ? 1 : 0) - (btn(p, 12) ? 1 : 0), pass: btn(p, 0) > 0.5, shoot: btn(p, 2) > 0.5 || btn(p, 1) > 0.5, through: btn(p, 3) > 0.5, sprint: btn(p, 7) > 0.3 || btn(p, 5) > 0.5, switch: btn(p, 4) > 0.5, pause: btn(p, 9) > 0.5, keeper: btn(p, 6) > 0.5 || btn(p, 8) > 0.5, ax: dz(p.axes[2] || 0), az: dz(p.axes[3] || 0) };
   }
-  const a = dev !== 'kb2', b = dev !== 'kb1', o = { x: 0, z: 0, pass: false, shoot: false, through: false, sprint: false, switch: false, pause: !!keys.Escape };
-  if (a) { o.x += K('KeyD') - K('KeyA'); o.z += K('KeyS') - K('KeyW'); o.pass ||= !!K('KeyJ'); o.shoot ||= !!K('KeyK'); o.through ||= !!K('KeyL'); o.sprint ||= !!K('ShiftLeft', 'Space'); o.switch ||= !!K('KeyQ'); }
-  if (b) { o.x += K('ArrowRight') - K('ArrowLeft'); o.z += K('ArrowDown') - K('ArrowUp'); o.pass ||= !!K('Numpad1', 'Comma'); o.shoot ||= !!K('Numpad2', 'Period'); o.through ||= !!K('Numpad3', 'Slash'); o.sprint ||= !!K('ShiftRight', 'ControlRight'); o.switch ||= !!K('Numpad0', 'KeyM'); }
-  if (dev === 'kb') { o.pass ||= !!K('KeyZ'); o.shoot ||= !!K('KeyX'); o.through ||= !!K('KeyC'); }
+  const a = dev !== 'kb2', b = dev !== 'kb1', o = { x: 0, z: 0, pass: false, shoot: false, through: false, sprint: false, switch: false, pause: !!keys.Escape, keeper: false, curl: 0, ax: 0, az: 0, aim: null, ml: false, mm: false, mr: false };
+  if (a) { o.x += K('KeyD') - K('KeyA'); o.z += K('KeyS') - K('KeyW'); o.pass ||= !!K('KeyJ'); o.shoot ||= !!K('KeyK'); o.through ||= !!K('KeyL'); o.sprint ||= !!K('ShiftLeft', 'Space'); o.switch ||= !!K('KeyQ'); o.keeper ||= !!K('KeyG'); o.curl += K('KeyE') - K('KeyR'); }
+  if (b) { o.x += K('ArrowRight') - K('ArrowLeft'); o.z += K('ArrowDown') - K('ArrowUp'); o.pass ||= !!K('Numpad1', 'Comma'); o.shoot ||= !!K('Numpad2', 'Period'); o.through ||= !!K('Numpad3', 'Slash'); o.sprint ||= !!K('ShiftRight', 'ControlRight'); o.switch ||= !!K('Numpad0', 'KeyM'); o.keeper ||= !!K('Numpad4', 'KeyN'); }
+  if (dev === 'kb' || dev === 'kbm') { o.pass ||= !!K('KeyZ'); o.shoot ||= !!K('KeyX'); o.through ||= !!K('KeyC'); }
+  if (dev === 'kb' || dev === 'kbm' || dev === 'kb1') { if (mouseOn()) { o.aim = { nx: mouse.nx, ny: mouse.ny }; o.ml = mouse.l || mouse.pl; o.mm = mouse.m || mouse.pm; o.mr = mouse.r || mouse.pr; } }
   return o;
 }
-export const ZERO = { x: 0, z: 0, pass: false, shoot: false, through: false, sprint: false, switch: false, pause: false };
+export const ZERO = { x: 0, z: 0, pass: false, shoot: false, through: false, sprint: false, switch: false, pause: false, keeper: false, curl: 0, ax: 0, az: 0, aim: null, ml: false, mm: false, mr: false };
 // Adds edge flags: passDown, shootDown/shootUp, throughDown, switchDown, pauseDown.
 export function edges(r, p) {
   p = p || ZERO; const l = Math.hypot(r.x, r.z), k = l > 1 ? 1 / l : 1;
-  return { ...r, x: r.x * k, z: r.z * k, passDown: r.pass && !p.pass, shootDown: r.shoot && !p.shoot, shootUp: !r.shoot && p.shoot, throughDown: r.through && !p.through, switchDown: r.switch && !p.switch, pauseDown: r.pause && !p.pause };
+  return { ...r, x: r.x * k, z: r.z * k, passDown: r.pass && !p.pass, shootDown: r.shoot && !p.shoot, shootUp: !r.shoot && p.shoot, throughDown: r.through && !p.through, switchDown: r.switch && !p.switch, pauseDown: r.pause && !p.pause, keeperDown: r.keeper && !p.keeper, mlDown: r.ml && !p.ml, mlUp: !r.ml && p.ml, mmDown: r.mm && !p.mm, mrDown: r.mr && !p.mr };
 }
 export function read(dev) { const r = raw(dev) || ZERO, out = edges(r, prev[dev]); prev[dev] = r; return out; }
 export function rawState(dev) { return raw(dev) || ZERO; }
-export const deviceLabel = d => d === 'kb' || d === 'all' ? 'Keyboard / Controller' : d === 'kb1' ? 'Keyboard (WASD + J K L)' : d === 'kb2' ? 'Keyboard (Arrows + , . /)' : 'Controller ' + (+d.slice(3) + 1);
+export const deviceLabel = d => d === 'kbm' ? 'Keyboard + Mouse (WASD / arrows)' : d === 'kb' || d === 'all' ? 'Keyboard / Controller' : d === 'kb1' ? 'Keyboard + Mouse (WASD, J K L)' : d === 'kb2' ? 'Keyboard (Arrows + , . /)' : 'Controller ' + (+d.slice(3) + 1);
 
 // Menu navigation events from any pad + keyboard: 'up','down','left','right','ok','back','start'
 const navPrev = {}; let repeatAt = 0;

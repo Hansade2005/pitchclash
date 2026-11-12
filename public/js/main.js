@@ -11,7 +11,7 @@ import * as input from './input.js';
 import * as audio from './audio.js';
 import * as ui from './ui.js';
 
-const S = save.settings, $ = id => document.getElementById(id);
+const S = save.settings, $ = id => document.getElementById(id); input.opts.mouse = S.mouse !== false;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: S.quality === 'high', powerPreference: 'high-performance', stencil: false });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -65,9 +65,14 @@ function hud() {
   const sec = m.clockSec(), mm = Math.floor(sec / 60), ss = Math.floor(sec % 60); set('ck', $('clock'), `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`);
   const agg = m.agg && (m.agg[0] || m.agg[1] || m.cfg.leg2) ? `  ·  agg ${m.agg[0] + m.score[0]}-${m.agg[1] + m.score[1]}` : '';
   set('hf', $('half'), (m.phase === 'pens' ? 'PENS' : ['1st', '2nd', 'ET 1', 'ET 2'][m.half - 1] || '') + agg);
-  const h = m.humans[0], p = h && h.sel; set('pn', $('pname'), p ? `${p.num}  ${p.name}${p.sta < 0.7 ? '  ·  tired' : ''}` : ''); const pw = Math.round((h ? h.power : 0) * 100); if (hudC.pw !== pw) { hudC.pw = pw; $('power').style.width = pw + '%'; }
+  const multi = m.humans.length > 1; $('hud').classList.toggle('multi', multi);
+  if (multi) { const pl = $('plist'); if (hudC.rows !== m) { hudC.rows = m; pl.innerHTML = m.humans.map((h, n) => `<div class="pr" style="--c:#${m.HC[n % 4].toString(16).padStart(6, '0')}"><b>P${n + 1}</b><span class="t">${esc(code(m.teams[h.side]))}</span><span class="n"></span><i class="pwb"><u></u></i><em class="ai"></em></div>`).join(''); }
+    [...pl.children].forEach((row, n) => { const h = m.humans[n], q = h.sel, nm = row.querySelector('.n'), t = (h.gkMode ? 'GK  ' : '') + (q ? `${q.num} ${q.name}` : '—'); if (nm._t !== t) { nm._t = t; nm.textContent = t; } row.querySelector('u').style.width = Math.round(h.power * 100) + '%';
+      const inf = h.info && q && m.ball.owner === q ? `⌖ ${Math.round(h.info.deg)}° · ${Math.round(h.info.open * 100)}% open` : '', ai = row.querySelector('.ai'); if (ai._t !== inf) { ai._t = inf; ai.textContent = inf; ai.className = 'ai ' + (h.info && h.info.open > 0.6 ? 'g' : h.info && h.info.open > 0.3 ? 'o' : 'r'); } }); }
+  const h = m.humans[0], p = h && h.sel; set('pn', $('pname'), p && !multi ? `${p.num}  ${p.name}${h.gkMode ? '  ·  KEEPER' : ''}${p.sta < 0.7 ? '  ·  tired' : ''}` : '');
+  const ah = $('aimhud'), inf1 = !multi && h && h.info && p && m.ball.owner === p ? `Shot angle ${Math.round(h.info.deg)}°  ·  ${Math.round(h.info.open * 100)}% of the goal open` : ''; set('ai', ah, inf1); ah.className = h && h.info && h.info.open > 0.6 ? 'g' : h && h.info && h.info.open > 0.3 ? 'o' : 'r'; const pw = Math.round((h ? h.power : 0) * 100); if (hudC.pw !== pw) { hudC.pw = pw; $('power').style.width = pw + '%'; }
   set('msg', $('msg'), m.msgT > 0 ? m.msg : '');
-  const P = m.pens, pe = $('pens'); if (P) { pe.style.display = 'block'; const dots = l => l.map(x => x ? '●' : '✕').join(' ').padEnd(9, ' '); set('pens', pe, `${code(m.teams[0])}  ${dots(P.log[0])}  ${P.score[0]} - ${P.score[1]}  ${dots(P.log[1])}  ${code(m.teams[1])}` + (P.state === 'aim' ? '\n      aim with the stick, then press SHOOT' : '')); } else pe.style.display = 'none';
+  const P = m.pens, pe = $('pens'); if (P) { pe.style.display = 'block'; const dots = l => l.map(x => x ? '●' : '✕').join(' ').padEnd(9, ' '); set('pens', pe, `${code(m.teams[0])}  ${dots(P.log[0])}  ${P.score[0]} - ${P.score[1]}  ${dots(P.log[1])}  ${code(m.teams[1])}` + (P.state === 'aim' ? '\n   aim with the mouse or stick (left / right, up = high), then SHOOT  ·  keeper: choose a dive' : '')); } else pe.style.display = 'none';
   const c = $('radar'), g = c.getContext('2d'), W = 210, H = 136, X = x => (x + PL + 4) / (PL * 2 + 8) * W, Z = z => (z + PW + 4) / (PW * 2 + 8) * H;
   if (!radarBase) { radarBase = document.createElement('canvas'); radarBase.width = W; radarBase.height = H; const b = radarBase.getContext('2d'); b.fillStyle = 'rgba(8,30,16,0.88)'; b.fillRect(0, 0, W, H); b.strokeStyle = 'rgba(255,255,255,0.7)'; b.lineWidth = 1; b.strokeRect(X(-PL), Z(-PW), X(PL) - X(-PL), Z(PW) - Z(-PW)); b.beginPath(); b.moveTo(X(0), Z(-PW)); b.lineTo(X(0), Z(PW)); b.stroke(); b.beginPath(); b.arc(X(0), Z(0), 12, 0, 7); b.stroke(); }
   g.clearRect(0, 0, W, H); g.drawImage(radarBase, 0, 0);
@@ -97,13 +102,42 @@ function kickMenu(pens) {
     { html: `<div class="vs"><div>${flag(A)}<small>${A.rating}</small></div><div>${esc(A.name)}<br><small>vs</small>${esc(B.name)}</div><div>${flag(B)}<small>${B.rating}</small></div></div>` },
     opt('Your team', A.name, d => { k.a = cyc(ids, k.a, d); if (k.a === k.b) k.a = cyc(ids, k.a, d); save.team = k.a; persist(); }),
     opt('Opponent', B.name, d => { k.b = cyc(ids, k.b, d); if (k.a === k.b) k.b = cyc(ids, k.b, d); }),
-    opt('Players', { 1: '1 player', vs: '2 players – versus', coop: '2 players – same team' }[k.players], d => k.players = cyc(['1', 'vs', 'coop'], k.players, d)),
+    opt('Players', playersLabel(k.players), d => k.players = cyc(['1', 'vs', 'coop', 'custom'], k.players, d)),
+    k.players === 'custom' ? { label: 'Choose controllers & teams', value: slots().filter(x => x.on).length + ' joined', onClick: playersMenu } : null,
     k.pens ? null : opt('Half length', S.half + ' min', d => { S.half = cyc([2, 3, 4, 5, 8], S.half, d); persist(); }),
     opt('Difficulty', S.diff, d => { S.diff = cyc(Object.keys(DIFFS), S.diff, d); persist(); }),
     { label: 'KICK OFF', cls: 'primary', onClick: () => friendly() },
   ], back: mainMenu });
 }
-function humansFor(mode) { return mode === '1' ? [{ side: 0, device: 'all' }] : mode === 'vs' ? [{ side: 0, device: firstPad(0, 'kb1') }, { side: 1, device: firstPad(1, 'kb2') }] : [{ side: 0, device: firstPad(0, 'kb1') }, { side: 0, device: firstPad(1, 'kb2') }]; }
+// ---- local two-player: both on one screen (keyboard + mouse, second keyboard, or controllers)
+const DEVS = ['kb1', 'kb2', 'kbm', 'pad0', 'pad1', 'pad2', 'pad3'];
+const devName = d => d.startsWith('pad') ? 'Controller ' + (+d.slice(3) + 1) : { kb1: 'Keys + Mouse (WASD)', kb2: 'Keys (arrows)', kbm: 'Keys + Mouse (all)' }[d] || d;
+const devClash = (a, b) => a === b || (a === 'kbm' && (b === 'kb1' || b === 'kb2')) || (b === 'kbm' && (a === 'kb1' || a === 'kb2'));
+function slots() {
+  if (!Array.isArray(S.slots) || S.slots.length !== 2) { const pd = input.pads().map(p => 'pad' + p.index); S.slots = [0, 1].map(i => ({ on: true, side: i, dev: i === 0 ? 'kb1' : (pd[0] || 'kb2') })); }
+  return S.slots;
+}
+function playersLabel(mode) { return { 1: '1 player', vs: '2 players – versus', coop: '2 players – same team', custom: '2 players – pick controllers & teams' }[mode]; }
+function humansFor(mode) {
+  if (mode === 'custom') { const hs = slots().filter(x => x.on).map(x => ({ side: x.side, device: x.dev })); return hs.length ? hs : [{ side: 0, device: 'all' }]; }
+  return mode === '1' ? [{ side: 0, device: 'all' }] : mode === 'vs' ? [{ side: 0, device: firstPad(0, 'kb1') }, { side: 1, device: firstPad(1, 'kb2') }] : [{ side: 0, device: firstPad(0, 'kb1') }, { side: 0, device: firstPad(1, 'kb2') }];
+}
+function playersMenu() {
+  const sl = slots(), re = playersMenu, used = i => sl.filter((x, n) => n !== i && x.on).map(x => x.dev);
+  const items = [{ text: 'Two players on one screen: Keyboard + Mouse, a second keyboard side, or controllers. Press RT / R2 on a controller (or J / ,) to assign it. Mouse aiming works with the Keyboard + Mouse slot.' }];
+  sl.forEach((x, i) => {
+    const cyc2 = d => { let n = DEVS.indexOf(x.dev), t = 0; do { n = (n + d + DEVS.length) % DEVS.length; t++; } while (t < DEVS.length && (used(i).some(u => devClash(u, DEVS[n])) || (DEVS[n].startsWith('pad') && !input.pads().some(p => 'pad' + p.index === DEVS[n]) && DEVS[n] !== x.dev))); x.dev = DEVS[n]; };
+    const tm = d => { const o = x.on ? x.side : 2, n = (o + d + 3) % 3; if (n === 2) x.on = false; else { x.on = true; x.side = n; } };
+    items.push({ row: [
+      { label: 'Player ' + (i + 1), value: x.on ? devName(x.dev) : '—', hint: x.on ? '' : 'press a button to join', cycle: true, onClick: () => { if (!x.on) x.on = true; else cyc2(1); persist(); re(); }, onLeft: () => { cyc2(-1); persist(); re(); } },
+      { label: 'Team', value: x.on ? (x.side ? 'Away (' + code(teamById(k.b)) + ')' : 'Home (' + code(teamById(k.a)) + ')') : 'Off', cycle: true, onClick: () => { tm(1); persist(); re(); }, onLeft: () => { tm(-1); persist(); re(); } },
+    ] });
+  });
+  const n = sl.filter(x => x.on).length, h = sl.filter(x => x.on && !x.side).length, a = n - h;
+  items.push({ text: n ? `${n} player${n > 1 ? 's' : ''}: ${h} on Home, ${a} on Away — the CPU plays any side with nobody.` : 'Switch at least one player on.' });
+  items.push({ label: 'Done', cls: 'primary', onClick: () => { if (!n) { sl[0].on = true; persist(); } kickMenu(); } });
+  ui.menu({ id: 'players', title: 'Players', sub: 'Two players on one screen', items, back: () => kickMenu() });
+}
 function firstPad(n, fallback) { const p = input.pads(); return p[n] ? 'pad' + p[n].index : fallback; }
 function friendly() {
   const A = teamById(k.a), B = teamById(k.b);
@@ -159,7 +193,7 @@ function compMenu() {
 }
 function playComp() {
   const c = save.comp, def = compDef(c.id), f = myFixture(c), A = teamById(c.me), B = teamById(f.opp), rn = stageName(c);
-  play({ home: A, away: B, humans: [{ side: 0, device: 'all' }], mustWin: f.decider, agg: f.agg, leg2: !!f.agg, onEnd: r => {
+  play({ home: A, away: B, humans: S.compFriends ? humansFor('custom').map(h => ({ ...h, side: 0 })) : [{ side: 0, device: 'all' }], mustWin: f.decider, agg: f.agg, leg2: !!f.agg, onEnd: r => {
     playRound(c, def, { gf: r.score[0], ga: r.score[1], pens: r.pens });
     let extra = '', next = compMenu, nextLabel = 'Continue', more = [];
     if (c.done && c.champion === c.me) { extra = `🏆 CHAMPIONS! ${esc(A.name)} win the ${esc(def.name)}!`; save.trophies.push(c.id); save.comp = null; next = mainMenu; audio.say('champions'); }
@@ -267,17 +301,23 @@ function settingsMenu() {
   const opt = (label, value, fn, hint) => ({ label, value, hint, cycle: true, onClick: () => { fn(1); persist(); audio.setVolumes(); re(); }, onLeft: () => { fn(-1); persist(); audio.setVolumes(); re(); } });
   ui.menu({ id: 'settings', title: 'Settings', items: [
     opt('Difficulty', S.diff, d => S.diff = cyc(Object.keys(DIFFS), S.diff, d)), opt('Half length', S.half + ' minutes', d => S.half = cyc([2, 3, 4, 5, 8], S.half, d)),
+    opt('Friends in competitions', S.compFriends ? 'On – Players screen joins your team' : 'Off', d => S.compFriends = !S.compFriends, 'Choose the controllers in Kick-off → Players'),
+    opt('Mouse aiming', S.mouse === false ? 'Off' : 'On', d => { S.mouse = S.mouse === false; input.opts.mouse = S.mouse !== false; }, 'Point to pass · click to pass · hold to shoot'),
     opt('Graphics', S.quality, d => S.quality = cyc(['auto', 'low', 'medium', 'high'], S.quality, d), 'Restart the game to apply'),
     opt('Music', Math.round((S.music ?? 0.5) * 100) + '%', d => S.music = cyc(vols, near(S.music ?? 0.5), d)), opt('Commentary', Math.round(S.commentary * 100) + '%', d => S.commentary = cyc(vols, near(S.commentary), d)), opt('Crowd & effects', Math.round(S.sfx * 100) + '%', d => S.sfx = cyc(vols, near(S.sfx), d)),
   ], back: mainMenu });
 }
 function howMenu() {
-  ui.menu({ id: 'how', title: 'How to play', items: [{ html: `<table class="how"><tr><th></th><th>Controller</th><th>Keyboard</th><th>Keyboard P2</th></tr>
+  ui.menu({ id: 'how', title: 'How to play', items: [{ html: `<table class="how"><tr><th></th><th>Controller</th><th>Keyboard (WASD)</th><th>Keyboard P2 (arrows)</th></tr>
     <tr><td>Move</td><td>Left stick / D-pad</td><td>W A S D</td><td>Arrows</td></tr><tr><td>Pass · (defending: hold to chase)</td><td>A</td><td>J</td><td>,</td></tr>
     <tr><td>Shoot – hold for power · (defending: slide tackle)</td><td>X or B</td><td>K</td><td>.</td></tr><tr><td>Through ball · (defending: standing tackle)</td><td>Y</td><td>L</td><td>/</td></tr>
-    <tr><td>Sprint</td><td>RT / RB</td><td>Shift or Space</td><td>Right Shift</td></tr><tr><td>Switch player</td><td>LB</td><td>Q</td><td>M</td></tr><tr><td>Pause · substitutions</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
+    <tr><td>Sprint</td><td>RT / RB</td><td>Shift or Space</td><td>Right Shift</td></tr><tr><td>Switch player</td><td>LB</td><td>Q</td><td>M</td></tr>
+    <tr><td>Goalkeeper mode on / off</td><td>LT / Select</td><td>G</td><td>N</td></tr><tr><td>Aim pass &amp; shot</td><td>Right stick</td><td>Mouse</td><td>—</td></tr>
+    <tr><td>Curl a shot or free kick</td><td>—</td><td>E (right) / R (left)</td><td>—</td></tr><tr><td>Pause · substitutions</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
+    <p class="tip"><b>Mouse:</b> move the pointer – a line shows where the ball will go and the team-mate it finds. <b>Click</b> = pass to the pointer · <b>hold &amp; release</b> = shoot (longer = harder) · <b>right-click</b> = through ball / lob · <b>click a team-mate</b> (when defending) = switch to him, click elsewhere = slide tackle · <b>middle-click</b> = auto-switch. Aim past the goal line for a high shot into the top corner; the read-out shows the shot angle and how much of the goal is still open. A controller's right stick aims the same way.</p>
+    <p class="tip"><b>Goalkeeper:</b> press G (LT) to take over your keeper – move him across the area, Shoot / click to dive towards the pointer or stick, Pass to throw and hold Shoot for a long kick. Free kicks: aim with the pointer and curl the ball with E / R.</p>
+    <p class="tip"><b>Two players:</b> Kick-off → Players. Keyboard + mouse vs controller, two controllers, or both on one team against the CPU. During a penalty, aim with the mouse or stick (up = high corner); the keeper picks a side to dive.</p>
     <p class="tip"><b>Rules:</b> offside is given when a pass finds a team-mate beyond the second-last defender. Tackles from behind are fouls and can bring yellow or red cards; a foul in the box is a penalty. Players tire as the match goes on – use your 5 substitutions from the pause menu. Cup ties level after 90 minutes (or on aggregate) go to extra time and penalties.</p>
-    <p class="tip"><b>Penalties:</b> point left / centre / right and press Shoot; when defending in a shoot-out, point the way you want to dive.</p>
     <p class="tip">After a goal, press Pass or Shoot to skip the replay. At kick-off, press Pass to skip the walk-out.</p>
     <p class="tip dim">Commentary voices, crowd recordings, chants and the original music come from the Pitch Clash library. GOAL NATION 2026 © 2026 Anye Happiness Ade — AI Engineer, Cameroon. All clubs, squads and competitions are fictional unless you rename them in Edit mode.</p>` }], back: mainMenu });
 }
@@ -286,13 +326,14 @@ function howMenu() {
 let last = performance.now(), fpsT = 0, fpsN = 0;
 function frame(now) {
   requestAnimationFrame(frame); const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (ui.menuId() === 'players') { for (const d of input.pollJoin()) { const sl = slots(); if (sl.some(x => x.on && x.dev === d)) continue; const f = sl.find(x => !x.on); if (f) { f.on = true; f.dev = d; f.side = sl.filter(x => x.on && x !== f && !x.side).length <= sl.filter(x => x.on && x !== f && x.side).length ? 0 : 1; persist(); playersMenu(); } } }
   for (const ev of input.pollNav(now)) { if (ev === 'start') { if (game.match && game.match.paused) togglePause(); } else ui.nav(ev); }
   const m = game.match; if (m) { m.update(dt); m.render(renderer); hud(); if (m.cfg.demo && m.time > 150) demo(); }
-  fpsT += dt; fpsN++; if (fpsT >= 1.5) { const fps = fpsN / fpsT; fpsT = 0; fpsN = 0; if (S.quality === 'auto' && document.hasFocus()) { const o = resScale; if (fps < 45) resScale = Math.max(0.5, resScale - 0.1); else if (fps > 57) resScale = Math.min(1, resScale + 0.05); if (o !== resScale) resize(); } }
+  input.endFrame(); fpsT += dt; fpsN++; if (fpsT >= 1.5) { const fps = fpsN / fpsT; fpsT = 0; fpsN = 0; if (S.quality === 'auto' && document.hasFocus()) { const o = resScale; if (fps < 45) resScale = Math.max(0.5, resScale - 0.1); else if (fps > 57) resScale = Math.min(1, resScale + 0.05); if (o !== resScale) resize(); } }
 }
 (async function boot() {
   try { await loadAll(p => ui.loading(p * 0.9, 'Loading players…')); } catch (e) { console.error(e); ui.loading(0.5, 'Failed to load: ' + e.message); return; }
   ui.loading(0.95, 'Building the stadium…'); await new Promise(r => setTimeout(r, 30));
   demo(); ui.loading(1); mainMenu(); requestAnimationFrame(frame);
-  window.__g = { game, play, k, friendly, compMenu, playComp, save, teamById, COMPS, startComp, compDef, editMenu, lobby: () => lobby(), get net() { return net; } };
+  window.__g = { game, play, k, kickMenu, playersMenu, friendly, compMenu, playComp, save, teamById, COMPS, startComp, compDef, editMenu, lobby: () => lobby(), get net() { return net; } };
 })();
