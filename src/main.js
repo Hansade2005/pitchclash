@@ -222,7 +222,7 @@ function teamSelect({ sides }) {
         return `<div class="teamcard ${st.active === s ? 'active' : ''}">
           <div class="side">${s === 0 ? 'HOME' : 'AWAY'} · ${humans ? humans + ' PLAYER' + (humans > 1 ? 'S' : '') : 'CPU'}</div>
           <div class="cat"><span class="arr nav" data-act="cat:${s}:-1">◀</span> ${esc(c.name)} <span class="arr nav" data-act="cat:${s}:1">▶</span></div>
-          <div class="crest" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)"><span>${esc(t.short)}</span></div>
+          <div class="crest ${t.kind === 'club' ? 'img' : ''}" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)">${t.kind === 'club' ? `<img src="../assets/crests/${t.id}.svg" alt="" onerror="this.remove()">` : `<span>${esc(t.short)}</span>`}</div>
           <div class="tname"><span class="arr nav" data-act="team:${s}:-1">◀</span> ${esc(t.name)} <span class="arr nav" data-act="team:${s}:1">▶</span></div>
           <div class="stars">${stars(t.rating)} <small>${t.rating}</small></div>
           <div class="attrs">ATT ${t.style.attack} · DEF ${t.style.defence} · PAC ${t.style.pace} · PAS ${t.style.passing}</div>
@@ -453,9 +453,11 @@ function buildMatch(ctx) {
 }
 
 // ------------------------------------------------------------------ HUD
+const crestImg = t => (t && t.kind === 'club' ? `<img class="sbcrest" src="../assets/crests/${t.id}.svg" alt="" onerror="this.remove()">` : '');
+
 function buildHud(t0, t1, k0, k1) {
   hudEl.innerHTML = `
-    <div id="sb"><div class="sbt"><i style="background:${k0.shirt}"></i>${esc(t0.short)}</div><div id="sbs">0 - 0</div><div class="sbt">${esc(t1.short)}<i style="background:${k1.shirt}"></i></div><div id="sbc">0'</div></div>
+    <div id="sb"><div class="sbt">${crestImg(t0)}<i style="background:${k0.shirt}"></i>${esc(t0.short)}</div><div id="sbs">0 - 0</div><div class="sbt">${esc(t1.short)}<i style="background:${k1.shirt}"></i>${crestImg(t1)}</div><div id="sbc">0'</div></div>
     <div id="pens" class="hidden"></div>
     <canvas id="radar" width="260" height="168" class="${settings.radar ? '' : 'hidden'}"></canvas>
     <div id="tags"></div>

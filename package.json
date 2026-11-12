@@ -39,6 +39,8 @@
       "assets/audio/**",
       "assets/players/**",
       "assets/commentary/**",
+      "assets/crests/**",
+      "assets/flags/**",
       "assets/music/**",
       "!**/*.map"
     ],
