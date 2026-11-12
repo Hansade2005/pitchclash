@@ -14,7 +14,22 @@ export function initAudio() {
   crowdBus = ctx.createGain(); sfxBus = ctx.createGain(); musicBus = ctx.createGain(); crowdBus.connect(master); sfxBus.connect(master); musicBus.connect(master); setVolumes();
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   for (const f of FILES) fetch('assets/audio/' + f + '.mp3').then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a)).then(b => { buf[f] = b; if (f === 'stadium_ambience' && wantBed) crowd(true); }).catch(() => {});
+  wxApply();
   if (window.Music) { try { Music.attach(ctx, musicBus); if (musicMode) { const m = musicMode; musicMode = null; music(m); } } catch (e) { console.warn(e); } }
+}
+// weather ambience: rain / storm noise beds and a thunder roll (synthesised from the noise buffer)
+let wxWant = null, wxNode = null;
+function wxApply() {
+  if (wxNode) { try { wxNode.g.gain.setTargetAtTime(0, ctx.currentTime, 0.3); wxNode.s.stop(ctx.currentTime + 1.5); } catch (e) {} wxNode = null; }
+  if (!ctx || !noise || !wxWant) return;
+  const spec = { rain: [900, 7000, 0.11], storm: [500, 6000, 0.2], snow: [200, 900, 0.03], fog: [150, 700, 0.025], cloudy: [200, 1200, 0.025] }[wxWant]; if (!spec) return;
+  const s = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noise; s.loop = true; hp.type = 'highpass'; hp.frequency.value = spec[0]; lp.type = 'lowpass'; lp.frequency.value = spec[1];
+  g.gain.value = 0; g.gain.setTargetAtTime(spec[2] * (S().sfx ?? 0.8) * 1.6, ctx.currentTime, 0.6); s.connect(hp).connect(lp).connect(g).connect(sfxBus); s.start(); wxNode = { s, g };
+}
+export function weatherSound(kind) { wxWant = kind; wxApply(); }
+export function thunder() {
+  if (!ctx || !noise) return; const s = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noise; s.loop = true; lp.type = 'lowpass'; lp.frequency.value = 220;
+  const t = ctx.currentTime; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.9 * (S().sfx ?? 0.8), t + 0.08); g.gain.exponentialRampToValueAtTime(0.01, t + 3); s.connect(lp).connect(g).connect(sfxBus); s.start(); s.stop(t + 3.2);
 }
 export function setVolumes() { if (!ctx) return; crowdBus.gain.value = S().sfx; sfxBus.gain.value = S().sfx; musicBus.gain.value = S().music ?? 0.5; }
 function play(name, bus, gain = 1, loop = false) {

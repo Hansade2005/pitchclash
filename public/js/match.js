@@ -2,23 +2,29 @@
 import * as THREE from 'three';
 import { PL, PW, GW, GH, buildStadium } from './pitch.js';
 import { makePlayer } from './assets.js';
-import { FORMATION, DIFFS, squad, code } from './data.js';
+import { FORMATION, FORMATIONS, layoutXI, DIFFS, squad, code } from './data.js';
+import { createWeather } from './weather.js';
+import { stadiumById } from './stadiums.js';
 import * as input from './input.js';
 import * as audio from './audio.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v, R = Math.random;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const CAMS = { broadcast: { y: 27, z: 50, fov: 38, look: 3 }, close: { y: 19, z: 36, fov: 38, look: 2 }, wide: { y: 36, z: 64, fov: 38, look: 4 }, high: { y: 60, z: 28, fov: 38, look: 0 }, sideline: { y: 13, z: 46, fov: 46, look: 3 } };
+export const CAM_IDS = Object.keys(CAMS);
 const CL = ['Idle', 'Jog', 'Run', 'Sprint', 'Dribble', 'Pass', 'Shoot', 'Tackle', 'Fall', 'Celebrate', 'Header', 'ThrowIn', 'KeeperIdle', 'KeeperCatch', 'KeeperDiveLeft', 'KeeperDiveRight', 'KeeperThrow'];
 
 export class Match {
   // cfg: { home, away (team objects), humans: [{ side: 0|1, device | remote }], half (minutes of real time), diff, night,
   //       mustWin (tie must be decided: extra time + penalties), agg (first-leg goals), net + role ('host'|'guest') for online, onEnd }
   constructor(game, cfg) {
-    this.game = game; this.cfg = cfg; this.scene = game.scene; this.teams = [cfg.home, cfg.away]; this.score = [0, 0]; this.stats = [{ shots: 0, poss: 0 }, { shots: 0, poss: 0 }];
+    this.game = game; this.cfg = cfg; this.scene = game.scene; this.teams = [cfg.home, cfg.away]; this.score = [0, 0]; this.stats = [0, 1].map(() => ({ shots: 0, sot: 0, poss: 0, passes: 0, fouls: 0, corners: 0, offsides: 0, tackles: 0 }));
     this.net = cfg.net || null; this.role = cfg.role || 'local'; this.evq = []; this.agg = cfg.agg || [0, 0]; this.decider = !!cfg.mustWin; this.subsLeft = [5, 5]; this.bench = [[], []];
     const fwd = k => (...a) => { audio[k](...a); if (this.role === 'host') this.evq.push([k, ...a]); };
     this.A = Object.fromEntries(['say', 'sayTeam', 'sfx', 'cheer', 'chant', 'jingle', 'decisive', 'sting', 'chatter'].map(k => [k, fwd(k)]));
-    this.stadium = buildStadium(this.scene, game.renderer, { night: cfg.night });
+    this.tod = cfg.tod || (cfg.night ? 'night' : 'day'); this.wkey = cfg.weather || 'clear'; this.shadowsOn = !!game.shadows; this.pscale = { normal: 1, large: 1.18, xl: 1.35 }[cfg.psize || 'large'] || 1.18; this.labelMode = cfg.labels || 'sel'; this.camMode = cfg.camera || 'broadcast'; this.stad = stadiumById(cfg.stadium);
+    this.stadium = buildStadium(this.scene, game.renderer, { stadium: this.stad, tod: this.tod, weather: this.wkey, homeColor: cfg.home.kit[0], shadows: this.shadowsOn });
+    this.weather = createWeather(this.scene, this.wkey, { thunder: () => audio.thunder(), flash: f => this.stadium.flash(f) }); this.wx = this.weather.mods; this.wclock = 0; audio.weatherSound(cfg.demo ? null : this.wkey);
     this.halfLen = (cfg.half || 3) * 60; this.time = 0; this.half = 1; this.dir = [1, -1]; this.phase = 'intro'; this.phaseT = 6.5; this.k = DIFFS[cfg.diff || 'normal']; this.etLen = this.halfLen / 3;
     this.cam = new THREE.PerspectiveCamera(30, 1, 1, 600); this.camX = 0; this.camZ = 0; this.zoom = 0;
     this.ball = { x: 0, y: 0.11, z: 0, vx: 0, vy: 0, vz: 0, owner: null, last: null, free: 0 };
@@ -27,14 +33,14 @@ export class Match {
     this.ballSh = sh(); this.ballSh.scale.setScalar(0.2); this.scene.add(this.ballMesh, this.ballSh);
     this.players = [];
     for (let t = 0; t < 2; t++) {
-      const team = this.teams[t], names = squad(team), rate = team.rating, vs = [...team.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 16, kit = t === 1 && this.clash() ? [0xf2f2f2, 0x222222, 0xf2f2f2] : team.kit;
-      FORMATION.forEach((f, i) => {
+      const team = this.teams[t], form = FORMATIONS[(cfg.formations || [])[t]] || FORMATION, lay = layoutXI(squad(team), form), names = lay.xi, rate = team.rating, vs = [...team.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 16, kit = t === 1 && this.clash() ? [0xf2f2f2, 0x222222, 0xf2f2f2] : team.kit;
+      form.forEach((f, i) => {
         const gk = i === 0, m = makePlayer(i + vs + t * 5, gk ? [team.gk, team.gk, team.gk] : kit, gk), s = sh(); s.scale.setScalar(0.42); m.root.add(s);
         const p = { t, i, gk, role: f[2], ax: f[0], az: f[1], x: 0, z: 0, vx: 0, vz: 0, face: 0, m, name: names[i].name, num: names[i].num, sta: 1, yel: 0, state: 'run', st: 0, cd: 0, human: -1, incoming: 0, think: R() * 0.3,
-          spd: (6.6 + rate * 0.016 + (f[2] === 'FW' ? 0.35 : f[2] === 'DF' ? -0.1 : 0.15) + (R() - 0.5) * 0.3), skill: rate + (R() - 0.5) * 8 };
-        p.baseSpd = p.spd; this.scene.add(m.root); this.players.push(p);
+          spd: (6.6 + rate * 0.016 + (f[2] === 'FW' ? 0.35 : f[2] === 'DF' ? -0.1 : 0.15) + (R() - 0.5) * 0.3) * this.wx.speed, skill: rate + (R() - 0.5) * 8 };
+        p.baseSpd = p.spd; m.root.scale.setScalar(this.pscale); if (this.shadowsOn) { m.root.traverse(o => { if (o.isMesh) o.castShadow = true; }); s.material.opacity = 0.12; } this.scene.add(m.root); this.players.push(p);
       });
-      this.bench[t] = names.slice(11).map(n => ({ ...n, used: false }));
+      this.bench[t] = lay.bench.map(n => ({ ...n, used: false }));
     }
     this.humans = (cfg.humans || []).map((h, n) => ({ ...h, n, sel: null, power: 0, charging: false }));
     const ring = (c) => { const m = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.8, 20), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = 0.04; this.scene.add(m); return m; };
@@ -75,6 +81,16 @@ export class Match {
     for (const o of this.players) { if (o.t === p.t || o.off) continue; const ox = (o.x - p.x) * d; if (ox < 0.5 || ox > dx + 1) continue; const dd = Math.hypot(ox, o.z - p.z), c = Math.atan2(o.z - p.z, ox), w = Math.asin(Math.min(1, (o.gk ? 1.1 : 0.55) / dd)), lo = Math.max(aL, c - w), hi = Math.min(aR, c + w); if (hi > lo) iv.push([lo, hi]); }
     iv.sort((x, y) => x[0] - y[0]); let blocked = 0, end = -9; for (const [lo, hi] of iv) { const st = Math.max(lo, end); if (hi > st) { blocked += hi - st; end = Math.max(end, hi); } }
     return { deg: a0 * 180 / Math.PI, open: clamp(1 - blocked / a0, 0, 1), dist: dx };
+  }
+  label(p) { // name tag above a player: shirt number + surname
+    if (p._lbl && p._lblName === p.name) return p._lbl; if (p._lbl) { p.m.root.remove(p._lbl); p._lbl.material.map.dispose(); p._lbl.material.dispose(); }
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '800 26px Arial'; const sur = p.name.split(' ').slice(-1)[0].toUpperCase().slice(0, 12), txt = `${p.num}  ${sur}`, w = Math.min(244, g.measureText(txt).width + 26);
+    const kc = '#' + new THREE.Color(this.teams[p.t].kit[0]).getHexString(); g.fillStyle = 'rgba(8,12,22,0.82)'; g.beginPath(); g.roundRect(128 - w / 2, 10, w, 40, 10); g.fill(); g.fillStyle = kc; g.fillRect(128 - w / 2, 14, 5, 32); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128 + 3, 31);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, fog: false })); sp.scale.set(5.6 / this.pscale, 1.4 / this.pscale, 1); sp.position.y = 2.55; sp.renderOrder = 10; p.m.root.add(sp); p._lbl = sp; p._lblName = p.name; return sp;
+  }
+  updateLabels() {
+    const mine = new Set(this.humans.map(h => h.sel)); const vis = this.labelMode !== 'off' && (this.phase === 'play' || this.phase === 'restart' || this.phase === 'kickoff' || this.phase === 'penaim');
+    for (const p of this.players) { const on = vis && !p.off && (this.labelMode === 'all' || mine.has(p) || (this.labelMode === 'sel' && this.ball.owner === p)); if (on) this.label(p).visible = true; else if (p._lbl) p._lbl.visible = false; }
   }
   updateAim() {
     const vis = this.phase === 'play' && !this.paused;
@@ -130,7 +146,7 @@ export class Match {
     if (best) { const lead = through ? 9 : 2.2; tx = best.x + best.vx * 0.5 + (through ? d * lead : 0); tz = best.z + best.vz * 0.5; best.incoming = this.time + 3; this.passTo = best; } else if (aim) { const q = Math.hypot(aim.x - p.x, aim.z - p.z) || 1, cap = Math.min(q, 40) / q; tx = p.x + (aim.x - p.x) * cap; tz = p.z + (aim.z - p.z) * cap; } else { tx = p.x + dx * 18; tz = p.z + dz * 18; }
     const ex = tx - p.x, ez = tz - p.z, dd = Math.hypot(ex, ez) || 1, err = (100 - p.skill) * 0.0025 * (R() - 0.5), sp = clamp(7.5 + dd * 0.78, 10, 27) * (through ? 1.08 : 1);
     const a = Math.atan2(ex, ez) + err; b.vx = Math.sin(a) * sp; b.vz = Math.cos(a) * sp; b.vy = dd > 26 ? 5.2 : through && aim && !best ? 3 + dd * 0.12 : 0.6; b.y = 0.12;
-    p.face = a; p.m.play('Pass', 0.05, true, 1.5); p.state = 'kick'; p.st = 0.28; this.release(p); this.A.sfx('kick', 0.5);
+    this.stats[p.t].passes++; p.n_p = (p.n_p || 0) + 1; p.face = a; p.m.play('Pass', 0.05, true, 1.5); p.state = 'kick'; p.st = 0.28; this.release(p); this.A.sfx('kick', 0.5);
   }
   shoot(p, power, aimZ, aim, curl, acc = 1) {
     const b = this.ball, gx = this.goalX(p.t), dgo = Math.abs(gx - p.x), skill = p.skill / 100, sg = Math.sign(gx); this.offP = null;
@@ -141,7 +157,7 @@ export class Match {
     const ex = tgx - p.x, ez = tz - p.z, dd = Math.hypot(ex, ez) || 1, sp = 17 + power * 15; let a = Math.atan2(ex, ez);
     b.curl = (curl || 0) * (0.55 + power * 0.8); a -= b.curl * 0.4;
     b.vx = Math.sin(a) * sp; b.vz = Math.cos(a) * sp; b.vy = tzAim != null && !direct && hg >= 0 && aim ? (1.2 + power * power * 6.5 * 0.8 + dd * 0.07) * (0.55 + 0.95 * hg) : 1.2 + power * power * 6.5 * (0.6 + R() * 0.7) + dd * 0.07; b.y = 0.14;
-    p.face = a; p.m.play('Shoot', 0.05, true, 1.4); p.state = 'kick'; p.st = 0.35; this.release(p, 0.5); this.stats[p.t].shots++; this.shotBy = p; this.shotT = this.time; this.A.sfx('kick', 1);
+    p.face = a; p.m.play('Shoot', 0.05, true, 1.4); p.state = 'kick'; p.st = 0.35; this.release(p, 0.5); this.stats[p.t].shots++; if (Math.abs(tz) < GW - 0.1 && (!direct)) this.stats[p.t].sot++; p.n_s = (p.n_s || 0) + 1; this.shotBy = p; this.shotT = this.time; this.A.sfx('kick', 1);
     if (dgo < 30) { if (R() < 0.5) this.A.say('shot'); if (R() < 0.6) this.A.cheer('chance'); }
   }
   punt(p, dx, dz, power) { // goalkeeper kick out of the hands
@@ -156,6 +172,7 @@ export class Match {
 
   // ---------- per-frame ----------
   update(dt) {
+    this.wclock += dt; this.weather.update(dt, this.cam, this.wclock);
     if (this.role === 'guest') return this.guestUpdate(dt);
     this.step(dt);
     if (this.role === 'host') this.sendSnap(dt);
@@ -202,11 +219,17 @@ export class Match {
   }
   finish() {
     if (this.done) return; this.done = true; audio.crowd(false);
-    const r = { score: this.score, pens: this.pens ? this.pens.score : null, stats: this.stats, events: this.events };
+    const r = { score: this.score, pens: this.pens ? this.pens.score : null, stats: this.stats, events: this.events, motm: this.motm() };
     const hs = this.humans.find(h => !h.remote), ws = r.pens ? (r.pens[0] > r.pens[1] ? 0 : 1) : this.score[0] + this.agg[0] > this.score[1] + this.agg[1] ? 0 : this.score[0] + this.agg[0] < this.score[1] + this.agg[1] ? 1 : -1;
     if (hs && ws === hs.side) this.A.decisive();
     if (this.role === 'host') { if (this.evq.length) this.net.send({ t: 'ev', e: this.evq }); this.evq = []; this.net.send({ t: 'end', r }); }
     this.cfg.onEnd && this.cfg.onEnd(r);
+  }
+  motm() { // man of the match: goals, shots, passing and tackling, with a nudge for the winners
+    let best = null, bs = -1e9; const goals = {}; for (const e of this.events) if (!e.card && !e.sub && !e.inj) goals[e.name] = (goals[e.name] || 0) + 1;
+    const lead = this.score[0] - this.score[1];
+    for (const p of this.players) { const sc = (goals[p.name] || 0) * 5 + (p.n_s || 0) * 0.7 + (p.n_p || 0) * 0.12 + (p.n_t || 0) * 0.7 - p.yel * 1.2 + (p.off ? -3 : 0) + (p.t === 0 ? lead : -lead) * 0.6 + (p.gk ? 1 + this.stats[1 - p.t].sot * 0.15 : 0) + R() * 0.3; if (sc > bs) { bs = sc; best = p; } }
+    if (!best) return null; const g = goals[best.name] || 0; return { name: best.name, num: best.num, t: best.t, line: [g ? g + (g > 1 ? ' goals' : ' goal') : '', (best.n_p || 0) + ' passes', best.n_t ? best.n_t + ' tackles won' : ''].filter(Boolean).join(' · ') };
   }
   finishWith(r) { if (this.done) return; this.done = true; audio.crowd(false); this.cfg.onEnd && this.cfg.onEnd(r); }
 
@@ -227,7 +250,7 @@ export class Match {
       const tired = this.players.filter(p => p.t === t && !p.gk && !p.off).sort((a, b) => a.sta - b.sta)[0]; if (tired && tired.sta < 0.92) this.makeSub(t, tired);
     }
   }
-  offside(p) { this.A.sfx('whistle'); this.A.say('offside'); this.setRestart('freekick', 1 - p.t, clamp(p.x, -PL + 1, PL - 1), clamp(p.z, -PW + 1, PW - 1)); this.say('OFFSIDE  –  ' + p.name, 2.2); }
+  offside(p) { this.stats[p.t].offsides++; this.A.sfx('whistle'); this.A.say('offside'); this.setRestart('freekick', 1 - p.t, clamp(p.x, -PL + 1, PL - 1), clamp(p.z, -PW + 1, PW - 1)); this.say('OFFSIDE  –  ' + p.name, 2.2); }
 
   // which player each human controls
   pickSel(h, force) {
@@ -311,7 +334,7 @@ export class Match {
   }
   standTackle(p, o) {
     if (p.cd > 0) return; p.cd = 0.7; const win = 0.5 + (p.skill - o.skill) / 150 + (p.human >= 0 ? 0.12 : (this.k - 0.95) * 1.2);
-    if (R() < win) { this.ball.owner = p; this.ball.last = p; this.offP = null; o.cd = 0.6; o.state = 'stun'; o.st = 0.35; if (R() < 0.3) this.A.say('tackle'); } else { p.state = 'stun'; p.st = 0.4; if (p.human < 0 && R() < 0.16) { o.state = 'down'; o.st = 0.9; o.m.play('Fall', 0.05, true, 1.5); this.foul(p, o); } }
+    if (R() < win) { this.stats[p.t].tackles++; p.n_t = (p.n_t || 0) + 1; this.ball.owner = p; this.ball.last = p; this.offP = null; o.cd = 0.6; o.state = 'stun'; o.st = 0.35; if (R() < 0.3) this.A.say('tackle'); } else { p.state = 'stun'; p.st = 0.4; if (p.human < 0 && R() < 0.16) { o.state = 'down'; o.st = 0.9; o.m.play('Fall', 0.05, true, 1.5); this.foul(p, o); } }
   }
 
   // AI decisions + movement integration for everyone
@@ -343,7 +366,7 @@ export class Match {
           if (l > 0.6) { const k = Math.min(1, l / 2.5); p.tvx = ex / l * sp * k; p.tvz = ez / l * sp * k; if (l > 1.2) p.face = Math.atan2(ex, ez); } else { p.tvx = p.tvz = 0; if (!p.gk) p.face = Math.atan2(b.x - p.x, b.z - p.z); }
           p.sprinting = l > 8;
         }
-        const acc = Math.min(1, 9 * dt); p.vx += ((p.tvx || 0) - p.vx) * acc; p.vz += ((p.tvz || 0) - p.vz) * acc;
+        const acc = Math.min(1, 9 * this.wx.accel * dt); p.vx += ((p.tvx || 0) - p.vx) * acc; p.vz += ((p.tvz || 0) - p.vz) * acc;
         p.x = clamp(p.x + p.vx * dt, -PL - 3, PL + 3); p.z = clamp(p.z + p.vz * dt, -PW - 3, PW + 3);
         if (!frozen) p.sta = Math.max(0, p.sta - dt * (p.sprinting ? 0.5 : 0.12) / (this.halfLen * 2));
         this.anim(p, dt);
@@ -357,7 +380,7 @@ export class Match {
     if (Math.hypot(b.x - p.x, b.z - p.z) < 1.15 && b.y < 0.8) { p.hit = true; if (o && o.t !== p.t) { o.state = 'down'; o.st = 0.9; o.m.play('Fall', 0.05, true, 1.5); const behind = Math.sin(p.face) * Math.sin(o.face) + Math.cos(p.face) * Math.cos(o.face) > 0.55; if (behind && R() < 0.6) return this.foul(p, o); if (R() < 0.35) this.A.say('tackle'); } if (!o || o.t !== p.t) this.loose(p, Math.sin(p.face) * 7 + (R() - 0.5) * 3, Math.cos(p.face) * 7 + (R() - 0.5) * 3); }
   }
   foul(p, o) {
-    this.A.sfx('whistle'); const d = this.dir[o.t], box = o.x * d > PL - 16.5 && Math.abs(o.z) < 20.16, r = R(); let card = null;
+    this.stats[p.t].fouls++; this.A.sfx('whistle'); const d = this.dir[o.t], box = o.x * d > PL - 16.5 && Math.abs(o.z) < 20.16, r = R(); let card = null;
     if (r < 0.05) card = 'red'; else if (r < 0.42) { p.yel++; card = p.yel >= 2 ? 'red' : 'yellow'; }
     if (card) this.events.push({ t: p.t, min: this.minute(), name: p.name, card: card === 'red' ? (p.yel >= 2 ? 'YR' : 'R') : 'Y' });
     if (box) this.setRestart('penalty', o.t, d * (PL - 11), 0); else this.setRestart('freekick', o.t, clamp(o.x, -PL + 1, PL - 1), clamp(o.z, -PW + 1, PW - 1));
@@ -399,8 +422,9 @@ export class Match {
     if (b.owner) { const o = b.owner; if (o.state === 'down') { this.loose(o, (R() - 0.5) * 5, (R() - 0.5) * 5); return; } const tx = o.x + Math.sin(o.face) * 0.62, tz = o.z + Math.cos(o.face) * 0.62, k = Math.min(1, 16 * dt); b.x += (tx - b.x) * k; b.z += (tz - b.z) * k; b.y = o.gk ? 1.0 : 0.11; b.vx = o.vx; b.vz = o.vz; b.vy = 0; b.curl = 0; if (this.passTo === o) this.passTo = null; }
     else {
       b.free += dt; b.vy -= 22 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      if (b.y > 0.4 && (this.wx.wind[0] || this.wx.wind[1])) { b.vx += this.wx.wind[0] * dt; b.vz += this.wx.wind[1] * dt; }
       if (b.curl) { if (b.y > 0.2) { const ca = b.curl * dt, cs = Math.cos(ca), sn = Math.sin(ca), vx = b.vx; b.vx = vx * cs + b.vz * sn; b.vz = -vx * sn + b.vz * cs; b.curl *= Math.exp(-0.9 * dt); } else b.curl = 0; }
-      if (b.y < 0.11) { b.y = 0.11; if (b.vy < -2.5) { b.vy = -b.vy * 0.5; } else b.vy = 0; const f = Math.exp(-0.75 * dt); b.vx *= f; b.vz *= f; }
+      if (b.y < 0.11) { b.y = 0.11; if (b.vy < -2.5) { b.vy = -b.vy * 0.5; } else b.vy = 0; const f = Math.exp(-0.75 * this.wx.fric * dt); b.vx *= f; b.vz *= f; }
       const sp = Math.hypot(b.vx, b.vz);
       // goal frame + goal check
       for (const s of [-1, 1]) {
@@ -413,7 +437,7 @@ export class Match {
       for (const g of this.players) { if (!g.gk || g.cd > 0 || g.off) continue; const dx = b.x - g.x, dz = b.z - g.z, reach = g.diveZ != null ? 2.1 * this.kReach(g) : 0.95;
         if (Math.abs(dx) < 0.9 && Math.abs(dz) < reach && b.y < 2.45 && (b.last ? b.last.t !== g.t || b.free > 0.5 : true)) {
           if (g.diveZ != null && Math.abs(dz) > 0.7) { g.m.play(dz * this.dir[g.t] > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight', 0.05, true, 1.4); g.state = 'kick'; g.st = 0.8; g.z += Math.sign(dz) * Math.min(1.2, Math.abs(dz)); }
-          if (sp < 19 || R() < 0.45) { b.owner = g; b.last = g; this.offP = null; g.m.play('KeeperCatch', 0.05, true, 1.2); if (sp > 12) { this.A.say(R() < 0.5 ? 'save' : 'catch', 'colour_save'); this.A.cheer('near'); } }
+          if ((sp < 19 || R() < 0.45) && !(sp > 11 && R() < this.wx.fumble)) { b.owner = g; b.last = g; this.offP = null; g.m.play('KeeperCatch', 0.05, true, 1.2); if (sp > 12) { this.A.say(R() < 0.5 ? 'save' : 'catch', 'colour_save'); this.A.cheer('near'); } }
           else { b.vx = -b.vx * 0.35 + (R() - 0.5) * 5; b.vz = (R() < 0.5 ? -1 : 1) * (6 + R() * 6); b.vy = 3 + R() * 3; g.cd = 0.6; b.last = g; this.A.say('save', 'colour_save'); this.A.cheer('near'); }
           return;
         } }
@@ -424,7 +448,7 @@ export class Match {
       if (Math.abs(b.z) > PW + 0.2) { const t = b.last ? 1 - b.last.t : 0; this.A.sfx('whistle'); this.setRestart('throw', t, clamp(b.x, -PL + 1, PL - 1), Math.sign(b.z) * PW); }
       else if (Math.abs(b.x) > PL + 0.2) { const s = Math.sign(b.x), def = this.dir[0] === -s ? 0 : 1, lastT = b.last ? b.last.t : def; this.A.sfx('whistle');
         if (this.shotBy && this.time - this.shotT < 3) { this.A.say('miss'); this.A.cheer('near'); this.shotBy = null; }
-        if (lastT === def) { this.A.say('corner'); this.setRestart('corner', 1 - def, s * (PL - 0.4), Math.sign(b.z || 1) * (PW - 0.4)); } else this.setRestart('goalkick', def, s * (PL - 5.5), 0); }
+        if (lastT === def) { this.A.say('corner'); this.stats[1 - def].corners++; this.setRestart('corner', 1 - def, s * (PL - 0.4), Math.sign(b.z || 1) * (PW - 0.4)); } else this.setRestart('goalkick', def, s * (PL - 5.5), 0); }
     }
   }
   kReach(g) { return clamp(0.86 + (g.skill - 70) * 0.012 + (this.k - 0.95) * 0.8 * (this.humans.some(h => h.side === g.t) ? -1 : 1), 0.5, 1.2); }
@@ -578,19 +602,19 @@ export class Match {
   sync(dt) {
     const b = this.ball, c = this.cam; this.ballMesh.position.set(b.x, b.y + 0.04, b.z); this.ballMesh.rotation.x += b.vz * dt * 3; this.ballMesh.rotation.z -= b.vx * dt * 3;
     this.ballSh.position.set(b.x, 0.03, b.z); this.ballSh.scale.setScalar(0.2 + Math.min(1, b.y * 0.05));
-    this.humans.forEach((h, n) => { const r = this.rings[n], p = h.sel; r.visible = !!p && this.phase !== 'pens' && this.phase !== 'penaim'; if (p) r.position.set(p.x, 0.04, p.z); }); this.updateAim();
+    this.humans.forEach((h, n) => { const r = this.rings[n], p = h.sel; r.visible = !!p && this.phase !== 'pens' && this.phase !== 'penaim'; if (p) r.position.set(p.x, 0.04, p.z); }); this.updateAim(); this.updateLabels();
     const pt = this.passTo; this.tgtRing.visible = !!pt && !b.owner && this.phase === 'play'; if (pt) this.tgtRing.position.set(pt.x, 0.05, pt.z);
     // broadcast camera
     const pens = this.phase === 'pens', pa = this.phase === 'penaim' && this.penAim, cel = this.phase === 'goal' && this.celeb; this.zoom += ((this.phase === 'goal' ? 1 : this.phase === 'replay' ? 0.6 : 0) - this.zoom) * Math.min(1, 2 * dt);
     const fx = cel ? this.celeb.p.x : this.phase === 'intro' ? Math.sin(this.phaseT * 0.45) * 30 : b.x, fz = cel ? this.celeb.p.z : b.z, tx = pens ? PL - 16 : clamp(fx * 0.86, -PL + 14, PL - 14), tz = pens ? 0 : fz * 0.42; this.camX += (tx - this.camX) * Math.min(1, 3 * dt); this.camZ += (tz - this.camZ) * Math.min(1, 3 * dt);
     if (pens) { c.position.set(PL - 34, 9, 0.01); c.lookAt(PL, 1.2, 0); c.fov = 32; }
     else if (pa) { const d = this.dir[pa.p.t]; c.position.set(d * (PL - 34), 9, 0.01); c.lookAt(d * PL, 1.2, 0); c.fov = 32; }
-    else { c.position.set(this.camX, 27 - this.zoom * 11, 50 + this.camZ * 0.55 - this.zoom * 16); c.lookAt(this.camX, 0, this.camZ * 0.9 + 3); c.fov = 38 - this.zoom * 8; }
+    else { const cp = CAMS[this.camMode] || CAMS.broadcast; c.position.set(this.camX, cp.y - this.zoom * 11 * cp.y / 27, cp.z + this.camZ * 0.55 - this.zoom * 16 * cp.z / 50); c.lookAt(this.camX, 0, this.camZ * 0.9 + cp.look); c.fov = cp.fov - this.zoom * 8; }
     c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix();
   }
   render(renderer) { renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight); renderer.render(this.scene, this.cam); }
   dispose() {
-    this.stadium.dispose(); for (const p of this.players) { this.scene.remove(p.m.root); p.m.dispose(); }
+    this.stadium.dispose(); this.weather.dispose(); audio.weatherSound(null); for (const p of this.players) { this.scene.remove(p.m.root); p.m.dispose(); }
     this.scene.remove(this.ballMesh, this.ballSh, this.tgtRing, ...this.rings, this.penRet.s, this.penRet.k); for (const a of this.aimV) this.scene.remove(a.pivot, a.ret, a.rcv); audio.crowd(false);
     if (this.net) for (const k in this.h) this.net.off(k, this.h[k]);
   }

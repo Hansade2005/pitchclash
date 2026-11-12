@@ -3,10 +3,13 @@ import * as THREE from 'three';
 import { loadAll } from './assets.js';
 import { Match } from './match.js';
 import { PL, PW } from './pitch.js';
-import { TEAMS, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, save, persist, applyEdits, cleanEdits } from './data.js';
+import { TEAMS, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, FORMATION_IDS, save, persist, applyEdits, cleanEdits } from './data.js';
 import { compDef, startComp, stageName, myFixture, playRound, simulateRest, standings } from './comp.js';
 import { flagURL } from './flags.js';
 import { Net } from './net.js';
+import { STADIUMS, stadiumById, homeStadium } from './stadiums.js';
+import { WEATHER, WEATHER_IDS, randomWeather } from './weather.js';
+import { CAM_IDS } from './match.js';
 import * as input from './input.js';
 import * as audio from './audio.js';
 import * as ui from './ui.js';
@@ -14,8 +17,8 @@ import * as ui from './ui.js';
 const S = save.settings, $ = id => document.getElementById(id); input.opts.mouse = S.mouse !== false;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: S.quality === 'high', powerPreference: 'high-performance', stencil: false });
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-const game = { renderer, scene: new THREE.Scene(), match: null, togglePause };
+renderer.outputColorSpace = THREE.SRGBColorSpace; const shadowsOn = S.quality !== 'low'; renderer.shadowMap.enabled = shadowsOn; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const game = { renderer, scene: new THREE.Scene(), match: null, togglePause, shadows: shadowsOn };
 let resScale = S.quality === 'low' ? 0.7 : S.quality === 'high' ? 1 : 0.85;
 function resize() { renderer.setPixelRatio(Math.min(devicePixelRatio || 1, S.quality === 'high' ? 1.5 : 1) * resScale); renderer.setSize(innerWidth, innerHeight, false); }
 addEventListener('resize', resize); resize();
@@ -25,12 +28,20 @@ const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { cons
 const flag = (t, cls = '') => `<img class="${cls}" src="${esc(flagURL(t))}" alt="">`;
 
 // ---------------- match lifecycle ----------------
+// ---- venue: stadium, time of day and weather for a match (settings can force one, otherwise it is the home ground + a random sky)
+const TODS = ['day', 'dusk', 'night'];
+function envFor(home) {
+  const st = S.stadium === 'random' ? STADIUMS[Math.floor(Math.random() * STADIUMS.length)] : S.stadium && S.stadium !== 'auto' ? stadiumById(S.stadium) : homeStadium(home), r = Math.random();
+  const tod = S.tod && S.tod !== 'auto' ? S.tod : r < 0.5 ? 'day' : r < 0.72 ? 'dusk' : 'night', weather = S.weather && S.weather !== 'auto' ? S.weather : randomWeather();
+  return { stadium: st.id, tod, weather };
+}
+const optsFor = () => ({ camera: S.camera || 'broadcast', psize: S.psize || 'large', labels: S.labels || 'sel' });
 function endMatch() { if (game.match) { game.match.dispose(); game.match = null; } $('hud').style.display = 'none'; }
-function demo() { endMatch(); const [a, b] = shuffle(ALL()).slice(0, 2); game.match = new Match(game, { home: a, away: b, humans: [], half: 99, diff: 'normal', night: Math.random() < 0.5, demo: true }); audio.crowd(false); }
+function demo() { endMatch(); const [a, b] = shuffle(ALL()).slice(0, 2); game.match = new Match(game, { home: a, away: b, humans: [], half: 99, diff: 'normal', ...envFor(a), ...optsFor(), labels: 'off', demo: true }); audio.crowd(false); }
 function play(cfg) {
   ui.hideMenu(); ui.loading(0.5, 'Walking out of the tunnel…');
   setTimeout(() => {
-    endMatch(); game.match = new Match(game, { half: S.half, diff: S.diff, night: Math.random() < 0.4, ...cfg }); ui.loading(1);
+    endMatch(); game.match = new Match(game, { half: S.half, diff: S.diff, ...envFor(cfg.home), ...optsFor(), formations: [S.form || '4-4-2', FORMATION_IDS[Math.floor(Math.random() * 3)]], ...cfg }); ui.loading(1); setVenue(game.match);
     $('hud').style.display = 'block'; $('f0').src = flagURL(cfg.home); $('f1').src = flagURL(cfg.away); $('n0').textContent = code(cfg.home); $('n1').textContent = code(cfg.away); radarBase = null; hudC = {};
   }, 40);
 }
@@ -58,6 +69,7 @@ function benchMenu(side, out) {
 }
 
 // ---------------- HUD ----------------
+function setVenue(m) { const w = WEATHER[m.wkey]; $('venue').textContent = `${m.stad.name} · ${m.stad.city}  ·  ${w.name}  ·  ${{ day: 'Day', dusk: 'Dusk', night: 'Night' }[m.tod]}`; $('venue').classList.remove('fade'); void $('venue').offsetWidth; $('venue').classList.add('fade'); }
 let radarBase = null, hudC = {};
 function hud() {
   const m = game.match; if (!m || m.cfg.demo) return; const set = (k, el, v) => { if (hudC[k] !== v) { hudC[k] = v; el.textContent = v; } };
@@ -104,6 +116,11 @@ function kickMenu(pens) {
     opt('Opponent', B.name, d => { k.b = cyc(ids, k.b, d); if (k.a === k.b) k.b = cyc(ids, k.b, d); }),
     opt('Players', playersLabel(k.players), d => k.players = cyc(['1', 'vs', 'coop', 'custom'], k.players, d)),
     k.players === 'custom' ? { label: 'Choose controllers & teams', value: slots().filter(x => x.on).length + ' joined', onClick: playersMenu } : null,
+    opt('Stadium', S.stadium === 'random' ? 'Random' : S.stadium && S.stadium !== 'auto' ? stadiumById(S.stadium).name : 'Home ground (' + homeStadium(A).name + ')', d => { const o = ['auto', 'random', ...STADIUMS.map(x => x.id)]; S.stadium = cyc(o, S.stadium || 'auto', d); persist(); }),
+    opt('Weather', S.weather && S.weather !== 'auto' ? WEATHER[S.weather].name : 'Auto', d => { S.weather = cyc(['auto', ...WEATHER_IDS], S.weather || 'auto', d); persist(); }),
+    opt('Time of day', S.tod && S.tod !== 'auto' ? { day: 'Day', dusk: 'Dusk', night: 'Night' }[S.tod] : 'Auto', d => { S.tod = cyc(['auto', ...TODS], S.tod || 'auto', d); persist(); }),
+    opt('Formation – ' + A.name, S.form || '4-4-2', d => { S.form = cyc(FORMATION_IDS, S.form || '4-4-2', d); persist(); }),
+    opt('Formation – ' + B.name, S.formB || '4-4-2', d => { S.formB = cyc(FORMATION_IDS, S.formB || '4-4-2', d); persist(); }),
     k.pens ? null : opt('Half length', S.half + ' min', d => { S.half = cyc([2, 3, 4, 5, 8], S.half, d); persist(); }),
     opt('Difficulty', S.diff, d => { S.diff = cyc(Object.keys(DIFFS), S.diff, d); persist(); }),
     { label: 'KICK OFF', cls: 'primary', onClick: () => friendly() },
@@ -141,7 +158,7 @@ function playersMenu() {
 function firstPad(n, fallback) { const p = input.pads(); return p[n] ? 'pad' + p[n].index : fallback; }
 function friendly() {
   const A = teamById(k.a), B = teamById(k.b);
-  play({ home: A, away: B, humans: humansFor(k.players), mustWin: k.pens, pensOnly: k.pens, onEnd: r => resultMenu(A, B, r, { again: friendly, next: mainMenu }) });
+  play({ home: A, away: B, humans: humansFor(k.players), formations: [S.form || '4-4-2', S.formB || '4-4-2'], mustWin: k.pens, pensOnly: k.pens, onEnd: r => resultMenu(A, B, r, { again: friendly, next: mainMenu }) });
 }
 const evIcon = e => e.card ? (e.card === 'Y' ? '🟨' : e.card === 'YR' ? '🟨🟥' : '🟥') : e.sub ? '🔁' : e.inj ? '🩹' : '⚽';
 function resultMenu(A, B, r, o) {
@@ -153,7 +170,8 @@ function resultMenu(A, B, r, o) {
   const ev = r.events.map(e => `<div class="res"><b>${e.min}'</b><span>${evIcon(e)} ${esc(e.name)}${e.sub ? ' <small>for ' + esc(e.off) + '</small>' : ''}</span><em>${esc(code(e.t ? B : A))}</em></div>`).join('');
   ui.menu({ id: 'result', title: o.title || (won ? 'You win!' : drew ? 'Draw' : 'Defeat'), sub: o.sub, items: [
     { html: `<div class="vs"><div>${flag(A)}</div><div>${esc(A.name)} &nbsp;${r.score[0]} - ${r.score[1]}&nbsp; ${esc(B.name)}${agg ? `<small>aggregate ${agg[0]} - ${agg[1]}</small>` : ''}${r.pens ? `<small>penalties ${r.pens[0]} - ${r.pens[1]}</small>` : ''}</div><div>${flag(B)}</div></div>` },
-    { html: `<div class="reslist">${ev}</div><div class="statrow"><div><b>${r.stats[0].shots} - ${r.stats[1].shots}</b>shots</div><div><b>${Math.round(r.stats[0].poss / tot * 100)}% - ${Math.round(r.stats[1].poss / tot * 100)}%</b>possession</div></div>` },
+    { html: `<div class="reslist">${ev}</div><div class="statrow"><div><b>${r.stats[0].shots} - ${r.stats[1].shots}</b>shots</div><div><b>${Math.round(r.stats[0].poss / tot * 100)}% - ${Math.round(r.stats[1].poss / tot * 100)}%</b>possession</div></div>${r.stats[0].passes != null ? `<div class="statrow"><div><b>${r.stats[0].sot} - ${r.stats[1].sot}</b>on target</div><div><b>${r.stats[0].passes} - ${r.stats[1].passes}</b>passes</div><div><b>${r.stats[0].fouls} - ${r.stats[1].fouls}</b>fouls</div><div><b>${r.stats[0].corners} - ${r.stats[1].corners}</b>corners</div></div>` : ''}` },
+    r.motm ? { html: `<div class="motm"><span>MAN OF THE MATCH</span><b>${esc(r.motm.num)}  ${esc(r.motm.name)}</b><em>${esc(code(r.motm.t ? B : A))} · ${esc(r.motm.line)}</em></div>` } : null,
     o.extra ? { html: o.extra } : null,
     { label: o.nextLabel || 'Continue', cls: 'primary', onClick: () => { demo(); o.next(); } }, o.again ? { label: 'Rematch', onClick: o.again } : null,
     ...(o.more || []),
@@ -247,12 +265,12 @@ function lobby() {
     { html: `<div class="vs"><div>${flag(mine)}<small>you</small></div><div>${esc(mine.name)}<br><small>vs</small>${other ? esc(teamById(other.veh) ? teamById(other.veh).name : '?') : 'waiting…'}</div><div>${other && teamById(other.veh) ? flag(teamById(other.veh)) : ''}<small>${other ? 'friend' : ''}</small></div></div>` },
     { label: 'Your team', value: mine.name, cycle: true, onClick: () => setTeam(1), onLeft: () => setTeam(-1) },
     host ? { label: 'Half length', value: S.half + ' min', cycle: true, onClick: () => { S.half = cyc([2, 3, 4, 5, 8], S.half, 1); persist(); lobby(); }, onLeft: () => { S.half = cyc([2, 3, 4, 5, 8], S.half, -1); persist(); lobby(); } } : null,
-    host ? { label: 'KICK OFF', cls: 'primary', disabled: !other, onClick: () => { const cfg = { home: me.veh, away: other.veh, half: S.half, night: Math.random() < 0.4 }; net.send({ t: 'start', cfg }); startOnline(cfg, true); } } : { text: 'Waiting for the host to kick off…', cls: 'dim' },
+    host ? { label: 'KICK OFF', cls: 'primary', disabled: !other, onClick: () => { const cfg = { home: me.veh, away: other.veh, half: S.half, ...envFor(teamById(me.veh)) }; net.send({ t: 'start', cfg }); startOnline(cfg, true); } } : { text: 'Waiting for the host to kick off…', cls: 'dim' },
   ], back: () => { if (net) { net.leave(); net = null; } onlineMenu(); } });
 }
 function startOnline(cfg, isHost) {
   const A = teamById(cfg.home), B = teamById(cfg.away); if (!A || !B) return ui.toast('Unknown team in this room.');
-  play({ home: A, away: B, half: cfg.half, night: cfg.night, diff: 'normal', net, role: isHost ? 'host' : 'guest',
+  play({ home: A, away: B, half: cfg.half, stadium: cfg.stadium, tod: cfg.tod, weather: cfg.weather, diff: 'normal', net, role: isHost ? 'host' : 'guest',
     humans: isHost ? [{ side: 0, device: 'all' }, { side: 1, remote: true }] : [{ side: 1, device: 'all' }, { side: 0, remote: true }],
     onEnd: r => resultMenu(A, B, r, { side: isHost ? 0 : 1, next: () => lobby(), nextLabel: 'Back to the room' }) });
 }
@@ -302,6 +320,9 @@ function settingsMenu() {
   ui.menu({ id: 'settings', title: 'Settings', items: [
     opt('Difficulty', S.diff, d => S.diff = cyc(Object.keys(DIFFS), S.diff, d)), opt('Half length', S.half + ' minutes', d => S.half = cyc([2, 3, 4, 5, 8], S.half, d)),
     opt('Friends in competitions', S.compFriends ? 'On – Players screen joins your team' : 'Off', d => S.compFriends = !S.compFriends, 'Choose the controllers in Kick-off → Players'),
+    opt('Camera', S.camera || 'broadcast', d => S.camera = cyc(CAM_IDS, S.camera || 'broadcast', d), 'Press V during a match to change it'),
+    opt('Player size', { normal: 'Normal', large: 'Large', xl: 'Extra large' }[S.psize || 'large'], d => S.psize = cyc(['normal', 'large', 'xl'], S.psize || 'large', d), 'Bigger players are easier to see'),
+    opt('Name labels', { sel: 'Ball carrier & your players', all: 'Everyone', off: 'Off' }[S.labels || 'sel'], d => S.labels = cyc(['sel', 'all', 'off'], S.labels || 'sel', d)),
     opt('Mouse aiming', S.mouse === false ? 'Off' : 'On', d => { S.mouse = S.mouse === false; input.opts.mouse = S.mouse !== false; }, 'Point to pass · click to pass · hold to shoot'),
     opt('Graphics', S.quality, d => S.quality = cyc(['auto', 'low', 'medium', 'high'], S.quality, d), 'Restart the game to apply'),
     opt('Music', Math.round((S.music ?? 0.5) * 100) + '%', d => S.music = cyc(vols, near(S.music ?? 0.5), d)), opt('Commentary', Math.round(S.commentary * 100) + '%', d => S.commentary = cyc(vols, near(S.commentary), d)), opt('Crowd & effects', Math.round(S.sfx * 100) + '%', d => S.sfx = cyc(vols, near(S.sfx), d)),
@@ -313,7 +334,7 @@ function howMenu() {
     <tr><td>Shoot – hold for power · (defending: slide tackle)</td><td>X or B</td><td>K</td><td>.</td></tr><tr><td>Through ball · (defending: standing tackle)</td><td>Y</td><td>L</td><td>/</td></tr>
     <tr><td>Sprint</td><td>RT / RB</td><td>Shift or Space</td><td>Right Shift</td></tr><tr><td>Switch player</td><td>LB</td><td>Q</td><td>M</td></tr>
     <tr><td>Goalkeeper mode on / off</td><td>LT / Select</td><td>G</td><td>N</td></tr><tr><td>Aim pass &amp; shot</td><td>Right stick</td><td>Mouse</td><td>—</td></tr>
-    <tr><td>Curl a shot or free kick</td><td>—</td><td>E (right) / R (left)</td><td>—</td></tr><tr><td>Pause · substitutions</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
+    <tr><td>Curl a shot or free kick</td><td>—</td><td>E (right) / R (left)</td><td>—</td></tr><tr><td>Change camera · screenshot</td><td>—</td><td>V · F12</td><td>—</td></tr><tr><td>Pause · substitutions</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
     <p class="tip"><b>Mouse:</b> move the pointer – a line shows where the ball will go and the team-mate it finds. <b>Click</b> = pass to the pointer · <b>hold &amp; release</b> = shoot (longer = harder) · <b>right-click</b> = through ball / lob · <b>click a team-mate</b> (when defending) = switch to him, click elsewhere = slide tackle · <b>middle-click</b> = auto-switch. Aim past the goal line for a high shot into the top corner; the read-out shows the shot angle and how much of the goal is still open. A controller's right stick aims the same way.</p>
     <p class="tip"><b>Goalkeeper:</b> press G (LT) to take over your keeper – move him across the area, Shoot / click to dive towards the pointer or stick, Pass to throw and hold Shoot for a long kick. Free kicks: aim with the pointer and curl the ball with E / R.</p>
     <p class="tip"><b>Two players:</b> Kick-off → Players. Keyboard + mouse vs controller, two controllers, or both on one team against the CPU. During a penalty, aim with the mouse or stick (up = high corner); the keeper picks a side to dive.</p>
@@ -323,12 +344,13 @@ function howMenu() {
 }
 
 // ---------------- loop ----------------
-let last = performance.now(), fpsT = 0, fpsN = 0;
+let last = performance.now(), fpsT = 0, fpsN = 0, shotReq = false;
+addEventListener('keydown', e => { if (e.repeat || e.target instanceof HTMLInputElement) return; if (e.code === 'F12' || e.code === 'F9') { shotReq = true; e.preventDefault(); } if (e.code === 'KeyV' && game.match && !game.match.cfg.demo) { const m = game.match; m.camMode = cyc(CAM_IDS, m.camMode, 1); S.camera = m.camMode; persist(); ui.toast('Camera: ' + m.camMode); } });
 function frame(now) {
   requestAnimationFrame(frame); const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (ui.menuId() === 'players') { for (const d of input.pollJoin()) { const sl = slots(); if (sl.some(x => x.on && x.dev === d)) continue; const f = sl.find(x => !x.on); if (f) { f.on = true; f.dev = d; f.side = sl.filter(x => x.on && x !== f && !x.side).length <= sl.filter(x => x.on && x !== f && x.side).length ? 0 : 1; persist(); playersMenu(); } } }
   for (const ev of input.pollNav(now)) { if (ev === 'start') { if (game.match && game.match.paused) togglePause(); } else ui.nav(ev); }
-  const m = game.match; if (m) { m.update(dt); m.render(renderer); hud(); if (m.cfg.demo && m.time > 150) demo(); }
+  const m = game.match; if (m) { m.update(dt); m.render(renderer); hud(); if (shotReq) { shotReq = false; $('game').toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'goal-nation-' + Date.now() + '.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); ui.toast('Screenshot saved'); }); } if (m.cfg.demo && m.time > 150) demo(); }
   input.endFrame(); fpsT += dt; fpsN++; if (fpsT >= 1.5) { const fps = fpsN / fpsT; fpsT = 0; fpsN = 0; if (S.quality === 'auto' && document.hasFocus()) { const o = resScale; if (fps < 45) resScale = Math.max(0.5, resScale - 0.1); else if (fps > 57) resScale = Math.min(1, resScale + 0.05); if (o !== resScale) resize(); } }
 }
 (async function boot() {

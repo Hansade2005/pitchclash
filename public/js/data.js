@@ -60,6 +60,24 @@ export function squad(team) { // 11 starters + 5 substitutes, stable per team (E
 }
 // 4-4-2: x from own goal (-1) to opponent goal (+1), z across the pitch
 export const FORMATION = [[-0.95, 0, 'GK'], [-0.62, -0.62, 'DF'], [-0.7, -0.22, 'DF'], [-0.7, 0.22, 'DF'], [-0.62, 0.62, 'DF'], [-0.2, -0.68, 'MF'], [-0.3, -0.22, 'MF'], [-0.3, 0.22, 'MF'], [-0.2, 0.68, 'MF'], [0.28, -0.2, 'FW'], [0.28, 0.2, 'FW']];
+// Formations: [x from own goal (-1) to the opponent goal (+1), z across the pitch, line]. The first entry is always the keeper.
+const GKS = [-0.95, 0, 'GK'], D4 = [[-0.62, -0.62, 'DF'], [-0.7, -0.22, 'DF'], [-0.7, 0.22, 'DF'], [-0.62, 0.62, 'DF']];
+export const FORMATIONS = {
+  '4-4-2': FORMATION,
+  '4-3-3': [GKS, ...D4, [-0.3, -0.42, 'MF'], [-0.36, 0, 'MF'], [-0.3, 0.42, 'MF'], [0.22, -0.55, 'FW'], [0.32, 0, 'FW'], [0.22, 0.55, 'FW']],
+  '4-2-3-1': [GKS, ...D4, [-0.38, -0.2, 'MF'], [-0.38, 0.2, 'MF'], [-0.02, -0.6, 'MF'], [0.02, 0, 'MF'], [-0.02, 0.6, 'MF'], [0.32, 0, 'FW']],
+  '3-5-2': [GKS, [-0.72, -0.45, 'DF'], [-0.78, 0, 'DF'], [-0.72, 0.45, 'DF'], [-0.12, -0.78, 'MF'], [-0.3, -0.3, 'MF'], [-0.38, 0, 'MF'], [-0.3, 0.3, 'MF'], [-0.12, 0.78, 'MF'], [0.28, -0.2, 'FW'], [0.28, 0.2, 'FW']],
+  '5-3-2': [GKS, [-0.55, -0.78, 'DF'], [-0.68, -0.4, 'DF'], [-0.76, 0, 'DF'], [-0.68, 0.4, 'DF'], [-0.55, 0.78, 'DF'], [-0.25, -0.38, 'MF'], [-0.3, 0, 'MF'], [-0.25, 0.38, 'MF'], [0.28, -0.2, 'FW'], [0.28, 0.2, 'FW']],
+  '3-4-3': [GKS, [-0.72, -0.45, 'DF'], [-0.78, 0, 'DF'], [-0.72, 0.45, 'DF'], [-0.25, -0.6, 'MF'], [-0.32, -0.2, 'MF'], [-0.32, 0.2, 'MF'], [-0.25, 0.6, 'MF'], [0.22, -0.55, 'FW'], [0.32, 0, 'FW'], [0.22, 0.55, 'FW']],
+  '4-1-4-1': [GKS, ...D4, [-0.42, 0, 'MF'], [-0.1, -0.68, 'MF'], [-0.14, -0.22, 'MF'], [-0.14, 0.22, 'MF'], [-0.1, 0.68, 'MF'], [0.3, 0, 'FW']],
+};
+export const FORMATION_IDS = Object.keys(FORMATIONS);
+// Puts the 16 squad names into a formation: defenders from the defender slots, midfielders from the midfielders, ... spare shirts fill gaps.
+export function layoutXI(names, form) {
+  const g = { GK: names.slice(0, 1), DF: names.slice(1, 5), MF: names.slice(5, 9), FW: names.slice(9, 11) }, spare = names.slice(11), xi = [];
+  for (const f of form) xi.push(g[f[2]].shift() || spare.shift());
+  return { xi, bench: [...g.GK, ...g.DF, ...g.MF, ...g.FW, ...spare] };
+}
 export const DIFFS = { easy: 0.86, normal: 0.95, hard: 1.03 };
 
 const KEY = 'goalnation.save.v1';
