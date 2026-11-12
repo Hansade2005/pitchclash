@@ -53,7 +53,7 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 ## What's in the game
 
 - **Six racing classes** – cars, bikes, boats (city canals), helicopters and planes (ring gates above the streets) and spaceships (a neon track among asteroids).
-- **World Tour** – 15 countries (Cameroon, USA, Brazil, France, UK, UAE, Japan, Italy), 30 circuits, 4 levels per country for every class: 360 levels. Each country has its own flag, landmark, trees, buildings and scenery. Win a race and your driver raises the flag.
+- **World Tour** – 15 countries (Cameroon, USA, Brazil, France, UK, UAE, Japan, Italy, Nigeria, Mexico, Germany, South Africa, Egypt, China, Australia), 30 circuits, 4 levels per country for every class: 360 levels. Each country has its own flag, landmark, trees, buildings and scenery. Win a race and your driver raises the flag.
 - **Race types** – Sprint, Combat Race, Police Chase, City Rush, Land & Sea Relay, Elimination, Orb Rush, Time Trial.
   - *Combat*: weapon crates give a machine gun, homing rockets, mines, a shield or turbo. Firing guns alerts the police.
   - *Police Chase*: cops ram you and set up roadblocks; stop beside one for too long and you are busted.
