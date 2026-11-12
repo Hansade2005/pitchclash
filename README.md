@@ -3,14 +3,14 @@
 11 v 11 stadium football for Windows, tuned to run on integrated graphics.
 
 - **Kick-off** friendlies between any of 20 national teams and 32 clubs, for 1 or 2 players (versus or same team).
-- **Competitions**: European Champions Cup (groups home and away, two-legged knockouts, one-off final), World Nations Cup (groups and knockout), Africa Nations Cup, Africa Champions Cup (two-legged) and four home-and-away club leagues with tables.
+- **Competitions**: UEFA Champions League (groups home and away, two-legged knockouts, one-off final), FIFA World Cup (groups and knockout), Africa Cup of Nations, African Club Champions Cup (two-legged) and four home-and-away club leagues with tables.
 - **Rules**: offside, fouls, yellow and red cards, penalties for fouls in the box, injuries, 5 substitutions with player fitness, extra time and penalty shoot-outs, aggregate scores.
 - **Online match**: play a friend on the same Wi-Fi / LAN (one hosts a room, the other joins with a 4-digit code).
 - **Edit mode**: rename teams, short names, squads and competitions, change kit colours, import your own badge images, and export/import the edit file. Edits stay on your PC.
 - **Match day**: two-voice recorded commentary (lead and colour commentator, team names for every side), crowd recordings, chants when a team attacks, kick-off jingle, walk-out music, goal celebrations with a slow-motion replay, original generative music in the menus, broadcast camera and radar.
 - 16 different player models.
 
-All clubs, squads and competitions are fictional out of the box; national teams use country names and flag colours only.
+Clubs, leagues and competitions use their real names; squads are generated. National teams use country names and flag colours only.
 
 ## Run
 

@@ -11,8 +11,8 @@ LICENCE
   provided as is, without warranty of any kind.
 
 ABOUT THE CONTENT
-  All clubs, squads, player names and competitions in this game are
-  fictional. National teams use country names and flag colours only.
+  Clubs and competitions in this game use real names; squads are generated.
+  National teams use country names and flag colours only.
   This game is not affiliated with or endorsed by any football
   federation, league, club or video-game publisher.
 
