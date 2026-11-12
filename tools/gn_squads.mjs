@@ -26,7 +26,7 @@ function place(roster) {
     const c = pool.find((x) => !x.used && x.pos === sp);
     if (!c) return null; c.used = true; return c.name; });
   // slots a position could not fill take any unused player (empty string = generated name in game)
-  return res.map((n) => n || (pool.find((x) => !x.used && (x.used = true)) || {}).name || '');
+  return res.map((n, i) => n || (pool.find((x) => !x.used && (SLOTS[i] !== 'GK' || x.pos === 'GK') && (x.used = true)) || {}).name || '');
 }
 const out = {};
 for (const t of [...gn.TEAMS, ...gn.CLUBS]) {

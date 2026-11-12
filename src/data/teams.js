@@ -1486,7 +1486,7 @@ function assignReal(teamId) {
       let best = null, bs = 0;
       for (const c of pool) {
         if (c.used) continue;
-        const s = c.pos === slotPos ? 3 : !c.pos ? 1 : POS_LINE[c.pos] === POS_LINE[slotPos] ? 2 : 0;
+        const s = c.pos === slotPos ? 3 : !c.pos ? (slotPos === 'GK' ? 0 : 1) : POS_LINE[c.pos] === POS_LINE[slotPos] ? 2 : 0;
         if (s > bs) { bs = s; best = c; }
       }
       if (!best) return null; best.used = true; return best.name;

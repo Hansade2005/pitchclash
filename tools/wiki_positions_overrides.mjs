@@ -60,7 +60,9 @@ for (const t of todo) {
     const txt = await raw(title); await sleep(200);
     const r0 = parseRoster(txt);
     const c = (p) => r0.filter((x) => x[1] === p).length;
-    const r = sane(r0) ? r0 : await rosterOf(title);
+    const lenient = (x) => x.length >= 14 && x.filter((p) => p[1] === 'GK').length <= 12 && x.filter((p) => p[1] === 'DF').length >= 3 && x.filter((p) => p[1] === 'FW').length >= 1;
+    let r = sane(r0) ? r0 : await rosterOf(title);
+    if (!r && lenient(r0)) r = r0;
     console.log('DIAG', t.id, title, txt.length, 'players', r0.length, 'GK', c('GK'), 'DF', c('DF'), 'MF', c('MF'), 'FW', c('FW'), r ? 'sane' : 'NOT-sane', r ? (overlapOk(t, r) ? 'overlap-ok' : 'overlap-low') : '');
     if (r && (overlapOk(t, r) || (REAL_SQUADS[t.id] || []).length < 5 || !process.env.STRICT)) { result[t.id] = r; break; }
   }
