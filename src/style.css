@@ -257,3 +257,86 @@ tr.nav { transition: background .08s; } tr.nav:hover, tr.nav.focus { background:
 #wipe.go { animation: wipe .5s ease-in-out; } @keyframes wipe { from { transform: translateX(-130%); } 55% { transform: translateX(0); } to { transform: translateX(130%); } }
 
 #title .tag { transform: none !important; left: auto !important; top: auto !important; text-align: center; }
+
+/* =====================================================================================
+   Pro UI layer: depth, glass, vector icons, tilt. Applies to every menu in the game.
+   ===================================================================================== */
+:root { --accent: #6ee7a8; --accent2: #38bdf8; --glass: rgba(14,26,40,.72); --edge: rgba(255,255,255,.16); }
+
+#menu { background: radial-gradient(ellipse 80% 70% at 30% 40%, rgba(8,28,44,.5), rgba(0,0,0,.9) 75%); }
+#menu.mainbg { background:
+  radial-gradient(ellipse 60% 80% at 12% 55%, rgba(16,70,90,.55), transparent 70%),
+  linear-gradient(90deg, rgba(2,8,16,.94) 0%, rgba(2,8,16,.72) 42%, rgba(2,8,16,.08) 100%); }
+#menu.mainbg::after { content: ""; position: fixed; left: 0; top: 0; bottom: 0; width: 6px; background: linear-gradient(180deg, transparent, var(--accent), var(--accent2), transparent); opacity: .8; box-shadow: 0 0 24px var(--accent); pointer-events: none; }
+
+/* 3D extruded logo */
+.logo { transform: perspective(900px) rotateX(10deg) rotateY(-6deg) skewX(-4deg); transform-origin: left center;
+  background: linear-gradient(180deg, #ffffff 10%, #cfd9e4 55%, #8da0b4 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 #dfe8f1) drop-shadow(0 2px 0 #a8b6c6) drop-shadow(0 3px 0 #6b7c90) drop-shadow(0 4px 0 #3b4857) drop-shadow(0 5px 0 #1e2733) drop-shadow(0 18px 18px rgba(0,0,0,.7)); }
+.logo span { background: linear-gradient(180deg, #d8fff0 5%, #6ee7a8 50%, #16a36a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sub { color: #b9cbe0; letter-spacing: 5px; }
+.title { text-shadow: 0 2px 0 #0b2a1f, 0 6px 14px rgba(0,0,0,.6); background: linear-gradient(180deg, #fff, #b9ffd9); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
+
+/* icons */
+.ico { width: 1.18em; height: 1.18em; vertical-align: -.22em; margin-right: .4em; flex: none; overflow: visible; }
+.btn .ico, .opt .ico { color: var(--accent); filter: drop-shadow(0 0 7px rgba(110,231,168,.55)) drop-shadow(0 2px 2px rgba(0,0,0,.6)); }
+.btn.big .ico { width: 1.3em; height: 1.3em; }
+.btn small .ico { width: 1em; height: 1em; }
+.ico-wrap { display: inline; }
+
+/* beveled glass buttons that lift and tilt toward the pointer */
+.btn, .opt { position: relative; overflow: hidden; transform-style: preserve-3d; will-change: transform;
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04) 46%, rgba(0,0,0,.22)), var(--glass);
+  border: 1px solid var(--edge);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -3px 0 rgba(0,0,0,.4), 0 10px 22px rgba(0,0,0,.45), 0 2px 0 rgba(0,0,0,.6);
+  backdrop-filter: blur(10px) saturate(1.2); transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s, background .16s, border-color .16s; }
+.btn::before, .opt::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--accent), var(--accent2)); opacity: .55; }
+.btn::after, .opt::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .15s;
+  background: radial-gradient(circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,.28), transparent 55%); }
+.btn.tilting::after, .opt.tilting::after, .teamcard.tilting::after, .card.tilting::after { opacity: 1; }
+.btn.nav.focus, .btn.nav:hover, .opt.focus, .opt:hover {
+  border-color: var(--accent) !important;
+  background: linear-gradient(180deg, rgba(110,231,168,.4), rgba(110,231,168,.1) 50%, rgba(0,0,0,.2)), var(--glass) !important;
+  transform: perspective(820px) translateX(8px) translateZ(16px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -3px 0 rgba(0,0,0,.35), 0 18px 34px rgba(0,0,0,.55), 0 0 26px rgba(110,231,168,.35); }
+.btn.nav.focus::before, .btn.nav:hover::before, .opt.focus::before { opacity: 1; width: 6px; box-shadow: 0 0 14px var(--accent); }
+.btn.big { box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -4px 0 rgba(0,0,0,.45), 0 14px 28px rgba(0,0,0,.5), 0 3px 0 rgba(0,0,0,.6); }
+.btn small { color: #b6c7da; opacity: 1; }
+.opt .val { color: var(--accent); text-shadow: 0 0 10px rgba(110,231,168,.5); }
+.opt.go { background: linear-gradient(180deg, rgba(110,231,168,.35), rgba(110,231,168,.1)), var(--glass); }
+
+/* glass cards and team tiles */
+.card, .teamcard, .panel.wide > .card { position: relative; transform-style: preserve-3d;
+  background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.03) 55%, rgba(0,0,0,.18)), var(--glass);
+  border: 1px solid var(--edge); border-radius: 16px; backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 16px 34px rgba(0,0,0,.5); transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s, border-color .18s; }
+.card::after, .teamcard::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .15s;
+  background: radial-gradient(circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,.2), transparent 55%); }
+.card.tilting, .teamcard.tilting { transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(6px); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 26px 44px rgba(0,0,0,.55); }
+.card h3 { color: var(--accent); opacity: 1; text-shadow: 0 0 12px rgba(110,231,168,.35); }
+.teamcard { border-width: 2px; }
+.teamcard.active { border-color: var(--accent); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 1px rgba(110,231,168,.25), 0 22px 44px rgba(0,0,0,.55), 0 0 36px rgba(110,231,168,.28); transform: perspective(1000px) translateZ(10px); }
+.crest.img img { filter: drop-shadow(0 10px 10px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(255,255,255,.12)); animation: crestFloat 4.5s ease-in-out infinite; }
+@keyframes crestFloat { 0%, 100% { transform: translateY(0) rotateY(-6deg); } 50% { transform: translateY(-5px) rotateY(6deg); } }
+.vs { text-shadow: 0 3px 0 rgba(0,0,0,.5), 0 0 20px rgba(110,231,168,.4); opacity: .9; }
+.key { background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.1)); box-shadow: inset 0 -2px 0 rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.2); }
+.modepill { background: linear-gradient(180deg, #9ff3c8, #4cd696); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 8px 18px rgba(0,0,0,.45), 0 0 22px rgba(110,231,168,.35); }
+.hint { color: #a9bccf; }
+
+@media (prefers-reduced-motion: reduce) { .crest.img img { animation: none; } .btn, .opt, .card, .teamcard { transition: none; } }
+
+/* fit shorter windows: never clip the logo or last button */
+#menu { align-items: safe center; }
+@media (max-height: 860px) {
+  .panel.main .logo { font-size: 60px; }
+  .panel.main .sub { margin: 2px 0 12px; font-size: 13px; letter-spacing: 4px; }
+  .menu-list { gap: 6px; }
+  .btn { padding: 9px 20px; font-size: 18px; border-radius: 11px; }
+  .btn.big { padding: 11px 22px; font-size: 22px; }
+  .btn small { font-size: 12px; margin-top: 1px; }
+  .panel.main .hint { margin-top: 10px; font-size: 12px; }
+  .opt { padding: 9px 18px; font-size: 17px; }
+}
+@media (max-height: 640px) { .panel.main .logo { font-size: 46px; } .btn.big { padding: 8px 20px; font-size: 19px; } .btn small { display: none; } }
+.panel.main .logo { margin-bottom: 10px; }
+.title { text-shadow: none; background: linear-gradient(180deg, #ffffff 15%, #b9ffd9 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 #0b3a28) drop-shadow(0 6px 8px rgba(0,0,0,.6)); }

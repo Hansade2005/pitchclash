@@ -9,6 +9,8 @@ import { STADIUMS, homeStadium, venueFor } from './data/stadiums.js';
 import * as Bet from './ui_bet.js';
 import * as Career from './ui_career.js';
 import { Bank } from './economy.js';
+import { startIcons } from './icons.js';
+import { startFx } from './ui_fx.js';
 
 const $ = id => document.getElementById(id);
 const menuEl = $('menu'), hudEl = $('hud');
@@ -1204,6 +1206,7 @@ async function boot() {
   Career.init({ show, setFocus, renderScreen, mainMenu, kitSwatch, stars, sideSelect, matchSettings, teamManagement, venueFor, sportsbook: () => Bet.sportsbook() });
   Bet.init({ show, setFocus, renderScreen, mainMenu, kitSwatch }, { hasCareer: () => Career.hasCareer(), fund: id => Career.fundScreen(id) });
   Comp.init({ show, renderScreen, setFocus, mainMenu, sideSelect, matchSettings, startMatch, teamById, stars, CATEGORIES, esc, kitSwatch, settings });
+  startIcons(); startFx();
   mainMenu();
   if (window.Music) Music.onTrackChange = d => { const el = $('nowplaying'); if (!el || !d) return; el.innerHTML = `♪ <b>${esc(d.title)}</b> — ${esc(d.artist)}`; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 4500); };
   window.__pc = { get M() { return M; }, get run() { return run; }, get extras() { return extras; }, renderer, settings, startMatch, teamById, NATIONS, CLUBS, matchSettings, teamManagement, Career, Bet };
