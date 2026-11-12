@@ -102,7 +102,7 @@ function mainMenu() {
   const stars = k => Object.values(save.tour[k]).reduce((a, b) => a + b, 0), tot = Object.keys(KINDS).reduce((a, k) => a + stars(k), 0), car = myVeh('car');
   ui.menu({ id: 'main', title: 'APEX CLASH', logo: true, sub: `Welcome, ${save.name}  ·  ${save.credits.toLocaleString()} credits`, cls: 'main', items: [
     { html: xpBar() },
-    { card: true, key: 'tour', label: 'World Tour', hint: '6 classes · 8 countries · 192 levels', icon: 'globe', accent: '#ff7a1a', img: vehicleThumb(car, paintOf(car)), badge: `${ui.stars(1, 1)} ${tot}/576`, onClick: () => tourMenu('car') },
+    { card: true, key: 'tour', label: 'World Tour', hint: `6 classes · ${COUNTRIES.length} countries · ${COUNTRIES.length * 4 * 6} levels`, icon: 'globe', accent: '#ff7a1a', img: vehicleThumb(car, paintOf(car)), badge: `${ui.stars(1, 1)} ${tot}/${COUNTRIES.length * 4 * 6 * 3}`, onClick: () => tourMenu('car') },
     { card: true, key: 'quick', label: 'Quick Race', hint: '11 race types · police · weather', icon: 'bolt', accent: '#35f0ff', img: vehicleThumb(myVeh('bike'), paintOf(myVeh('bike'))), onClick: quickMenu },
     { card: true, key: 'clash', label: 'MultiClash', hint: 'Friends: split-screen or Wi-Fi', icon: 'users', accent: '#ff3fa0', img: vehicleThumb('kestrel', 0xff3fa0), onClick: clashMenu },
     { card: true, key: 'garage', label: 'Garage', hint: 'Buy, upgrade and paint', icon: 'wrench', accent: '#3df58a', img: vehicleThumb(myVeh('space'), paintOf(myVeh('space'))), badge: `${save.credits.toLocaleString()} cr`, onClick: () => garageMenu('car') },
@@ -194,7 +194,7 @@ function tourMenu(kind) {
   ui.menu({ id: 'tour', title: 'World Tour', sub: `${KINDS[kind]}  ·  ${total}/96 stars  ·  ${save.credits.toLocaleString()} credits  ·  Driving: ${VEHICLES[myVeh(kind)].name}`, items: [
     { row: [{ key: 'class', label: 'Class', value: KINDS[kind], cycle: true, onClick: () => tourMenu(cyc(Object.keys(KINDS), kind, 1)), onLeft: () => tourMenu(cyc(Object.keys(KINDS), kind, -1)) }, { label: 'Garage', cls: 'tab', onClick: () => garageMenu(kind) }] },
     { html: `<div class="crow"><img class="flag" src="${flagURL(c.id)}" alt=""><div><b>${ci + 1}. ${c.name}</b><span>${open ? countryStars(kind, ci) + '/12 stars' : 'Locked – win a star in the ' + COUNTRIES[ci - 1].name + ' Grand Final'}</span></div><img class="map" src="${trackMap(c.tracks[0]).url}" alt=""></div>` },
-    { key: 'country', label: 'Country', value: `${c.name}  (${ci + 1}/8)`, cycle: true, onClick: () => { tsel[kind] = (ci + 1) % 8; re(); }, onLeft: () => { tsel[kind] = (ci + 7) % 8; re(); } },
+    { key: 'country', label: 'Country', value: `${c.name}  (${ci + 1}/${COUNTRIES.length})`, cycle: true, onClick: () => { tsel[kind] = (ci + 1) % COUNTRIES.length; re(); }, onLeft: () => { tsel[kind] = (ci + COUNTRIES.length - 1) % COUNTRIES.length; re(); } },
     ...ev.map((e, i) => {
       const ok = open && (i === 0 || (st[ev[i - 1].id] || 0) > 0), s = st[e.id] || 0;
       return { key: 'ev' + i, label: `${i + 1}. ${e.name}`, hint: `${trackName(e.track)} · ${RULES[e.rule]}${e.traffic ? ' · traffic' : ''} · ${e.ai} rivals · ${e.prize.toLocaleString()} cr`, valueHtml: ok ? ui.stars(s) : `${ui.icon('lock')}`, icon: ok ? ({ sprint: 'flag', versus: 'users', knockdown: 'car', toxic: 'bolt', gates: 'refresh', catch: 'timer', pursuit: 'exit' }[e.rule] || 'flag') : 'lock', disabled: !ok, cls: ok && !s ? 'primary' : '', onClick: () => startTour(kind, ci, i) };

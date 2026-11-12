@@ -33,6 +33,20 @@ export const TRACKS = [
   G('fuji', 'Fuji Speedway', 'jp', 'day', 117, 280, 1.5, 0.3, 17),
   G('roma', 'Roma Classica', 'it', 'sunset', 118, 235, 1.3, 0.4),
   G('monza', 'Monza Royale', 'it', 'day', 121, 320, 1.6, 0.26, 18),
+  G('lagos', 'Lagos Lights', 'ng', 'night', 1014, 260, 1.5, 0.34),
+  G('abuja', 'Abuja Ring', 'ng', 'day', 1409, 280, 1.45, 0.3),
+  G('mexico', 'Mexico City Fiesta', 'mx', 'sunset', 1873, 265, 1.45, 0.36),
+  G('cancun', 'Cancún Coast', 'mx', 'day', 340, 275, 1.55, 0.3),
+  G('berlin', 'Berlin Gate', 'de', 'overcast', 2245, 260, 1.45, 0.34),
+  G('blackforest', 'Black Forest Ring', 'de', 'day', 387, 290, 1.4, 0.36),
+  G('capetown', 'Cape Town Coast', 'za', 'day', 430, 270, 1.45, 0.34),
+  G('joburg', 'Johannesburg Gold', 'za', 'sunset', 2654, 265, 1.45, 0.34),
+  G('cairo', 'Cairo Pyramids', 'eg', 'day', 595, 255, 1.4, 0.32),
+  G('nile', 'Nile Nights', 'eg', 'night', 735, 245, 1.5, 0.34),
+  G('shanghai', 'Shanghai Bund', 'cn', 'night', 3027, 265, 1.4, 0.36),
+  G('greatwall', 'Great Wall Pass', 'cn', 'day', 608, 300, 1.5, 0.34),
+  G('sydney', 'Sydney Harbour', 'au', 'day', 884, 255, 1.4, 0.36),
+  G('outback', 'Outback Blaze', 'au', 'sunset', 682, 310, 1.5, 0.28),
 ];
 export const trackById = id => TRACKS.find(t => t.id === id);
 

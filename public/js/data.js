@@ -56,7 +56,7 @@ export const RULE_HELP = {
   trial: 'Just you and the clock. Set your best lap on this track.',
 };
 
-// ---- World Tour: 8 countries, 2 circuits each. env drives the look of the generated city.
+// ---- World Tour: 15 countries, 2 circuits each. env drives the look of the generated city.
 export const COUNTRIES = [
   { id: 'cm', name: 'Cameroon', tracks: ['douala', 'yaounde'], ground: 0x8f5d3c, tree: 'palm', bh: [8, 34], towers: 0.06, density: 0.8, wall: [1.0, 0.9, 0.78], landmark: 'monument', scenery: 'hills', hill: 0x2e6d3c, ads: ['DOUALA MOTORS', 'LION POWER', 'MAKOSSA FM'] },
   { id: 'us', name: 'USA', tracks: ['downtown', 'harbor'], ground: 0x6f7378, tree: 'round', bh: [14, 70], towers: 0.2, density: 1, wall: [1, 1, 1], landmark: 'stepped', ads: ['NITRO+', 'TURBO COLA', 'LIBERTY TYRES'] },
@@ -66,12 +66,23 @@ export const COUNTRIES = [
   { id: 'ae', name: 'UAE', tracks: ['skyline', 'desert'], ground: 0xc9a86a, tree: 'palm', bh: [20, 90], towers: 0.35, density: 1, wall: [0.95, 0.98, 1.05], landmark: 'spire', hill: 0xd4b071, ads: ['OASIS ENERGY', 'FALCON AIR', 'GOLD SOUK'] },
   { id: 'jp', name: 'Japan', tracks: ['neon', 'fuji'], ground: 0x60646c, tree: 'sakura', bh: [12, 62], towers: 0.2, density: 1, wall: [0.95, 0.97, 1.02], landmark: 'pagoda', hill: 0x4f7a55, ads: ['SAKURA SPEED', 'SHOGUN OIL', 'NEO TOKYO'] },
   { id: 'it', name: 'Italy', tracks: ['roma', 'monza'], ground: 0x8f8068, tree: 'cypress', bh: [10, 28], towers: 0.0, density: 0.95, wall: [1.05, 0.92, 0.76], landmark: 'arena', hill: 0x5d7a45, ads: ['SCUDERIA ROSSA', 'VELOCE', 'ESPRESSO GP'] },
+  { id: 'ng', name: 'Nigeria', tracks: ['lagos', 'abuja'], ground: 0x8a6a4a, tree: 'palm', bh: [10, 48], towers: 0.12, density: 0.9, wall: [1.0, 0.95, 0.85], landmark: 'dome', scenery: 'hills', hill: 0x3d7a42, ads: ['NAIJA NITRO', 'EKO SPEED', 'AFRO BEATS FM'] },
+  { id: 'mx', name: 'Mexico', tracks: ['mexico', 'cancun'], ground: 0x9a8566, tree: 'palm', bh: [8, 36], towers: 0.06, density: 0.9, wall: [1.05, 0.95, 0.82], landmark: 'temple', hill: 0x5b7a44, ads: ['FIESTA FUEL', 'AZTECA MOTOR', 'SOL TYRES'] },
+  { id: 'de', name: 'Germany', tracks: ['berlin', 'blackforest'], ground: 0x666b62, tree: 'cypress', bh: [14, 34], towers: 0.04, density: 1, wall: [0.95, 0.95, 0.95], landmark: 'gate', hill: 0x3f5f3a, ads: ['AUTOBAHN', 'SCHNELL OIL', 'BLITZ REIFEN'] },
+  { id: 'za', name: 'South Africa', tracks: ['capetown', 'joburg'], ground: 0x8c7a5a, tree: 'round', bh: [10, 44], towers: 0.1, density: 0.85, wall: [1.0, 0.96, 0.88], landmark: 'needle', scenery: 'mesa', hill: 0x6a6a52, ads: ['CAPE THUNDER', 'GOLD REEF', 'SPRINGBOK OIL'] },
+  { id: 'eg', name: 'Egypt', tracks: ['cairo', 'nile'], ground: 0xc7a873, tree: 'palm', bh: [8, 30], towers: 0.04, density: 0.8, wall: [1.06, 0.98, 0.84], landmark: 'pyramid', scenery: 'dunes', hill: 0xd8b878, ads: ['PHARAOH FUEL', 'NILE SPEED', 'SPHINX TYRES'] },
+  { id: 'cn', name: 'China', tracks: ['shanghai', 'greatwall'], ground: 0x676a6e, tree: 'round', bh: [16, 80], towers: 0.3, density: 1, wall: [1.0, 0.96, 0.96], landmark: 'pearl', hill: 0x4f7448, ads: ['DRAGON POWER', 'JADE MOTORS', 'PANDA OIL'] },
+  { id: 'au', name: 'Australia', tracks: ['sydney', 'outback'], ground: 0x8a8068, tree: 'round', bh: [10, 52], towers: 0.12, density: 0.9, wall: [1.0, 0.98, 0.92], landmark: 'sails', hill: 0x5a7046, ads: ['ROO FUEL', 'OUTBACK OIL', 'BONDI BOOST'] },
 ];
 // per-track tweaks on top of the country look
 export const TRACK_ENV = {
   london: { weather: 'rain' }, highlands: { scenery: 'hills', density: 0.2, weather: 'snow' }, saopaulo: { weather: 'rain' },
   yaounde: { scenery: 'hills', density: 0.6 }, riviera: { scenery: 'hills', density: 0.5, tree: 'palm' },
-  desert: { scenery: 'dunes', density: 0.1 }, fuji: { scenery: 'fuji', density: 0.4 }, monza: { scenery: 'hills', density: 0.3, tree: 'round' }, rio: { scenery: 'domes' },
+  desert: { scenery: 'dunes', density: 0.1 },
+  abuja: { density: 0.7 }, cancun: { scenery: 'hills', density: 0.5 }, berlin: { weather: 'rain' }, blackforest: { scenery: 'hills', density: 0.25, weather: 'rain' },
+  capetown: { density: 0.6 }, joburg: { scenery: 'hills', landmark: 'needle' }, cairo: { density: 0.55 }, nile: { scenery: null, density: 0.8 },
+  greatwall: { scenery: 'hills', density: 0.2, weather: 'snow', landmark: 'wall' }, sydney: { density: 0.85 },
+  outback: { scenery: 'dunes', density: 0.08, ground: 0xb5653a, hill: 0xc0703f, tree: 'round', landmark: 'rock' }, fuji: { scenery: 'fuji', density: 0.4 }, monza: { scenery: 'hills', density: 0.3, tree: 'round' }, rio: { scenery: 'domes' },
 };
 export const countryById = id => COUNTRIES.find(c => c.id === id);
 
@@ -79,7 +90,7 @@ export const countryById = id => COUNTRIES.find(c => c.id === id);
 function tourFor(kind) {
   const road0 = kind === 'car' || kind === 'bike', special = road0 ? ['orbs', 'elim', 'gates', 'knockdown', 'toxic', 'combat'] : ['orbs', 'elim', 'combat'], out = [];
   COUNTRIES.forEach((c, ci) => {
-    const [a, b] = c.tracks, sk = 0.72 + ci * 0.034, pz = 2000 + ci * 1500, k = kind === 'bike' ? 0.9 : kind === 'car' ? 1 : 1.1, ai = Math.min(7, 3 + Math.ceil(ci / 2));
+    const [a, b] = c.tracks, sk = 0.72 + ci * 0.24 / (COUNTRIES.length - 1), pz = 2000 + ci * 1000, k = kind === 'bike' ? 0.9 : kind === 'car' ? 1 : 1.1, ai = Math.min(7, 3 + Math.ceil(ci / 2));
     const road = kind === 'car' || kind === 'bike', third = !road ? (ci % 2 ? 'combat' : 'versus') : ['pursuit', 'rush', 'relay', 'catch', 'versus', 'combat'][ci % 6];
     out.push([
       { name: 'Street Opener', track: a, rule: 'sprint', laps: 2, ai, skill: sk, prize: pz },

@@ -154,7 +154,16 @@ function landmark(kind, th) {
   else if (kind === 'monument') { add(new THREE.CylinderGeometry(15, 20, 6, 10), 0xcfc7b8, 0, 3); add(new THREE.ConeGeometry(10, 46, 10), 0xe3dccc, 0, 29); for (let i = 0; i < 9; i++) { const a = i * 0.75; add(new THREE.BoxGeometry(5, 1.2, 2.4), 0xb8ad98, Math.cos(a) * (10 - i * 0.95), 8 + i * 4.3, Math.sin(a) * (10 - i * 0.95)).rotation.y = -a; } add(new THREE.SphereGeometry(2.2, 8, 6), 0xd9b23a, 0, 53.5); }
   else if (kind === 'stepped') { add(new THREE.BoxGeometry(34, 60, 30), 0x9aa3b0, 0, 30); add(new THREE.BoxGeometry(24, 46, 21), 0xa5aebb, 0, 83); add(new THREE.BoxGeometry(14, 30, 12), 0xb0b9c6, 0, 121); add(new THREE.CylinderGeometry(0.4, 1.6, 34, 5), 0xc9d1dc, 0, 153); }
   else if (kind === 'peak') { add(new THREE.SphereGeometry(42, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0x5b6b58, 0, 0).scale.set(1, 2.3, 0.85); add(new THREE.BoxGeometry(1.2, 9, 1.2), 0xe8e8e8, 0, 100); add(new THREE.BoxGeometry(7, 1.2, 1.2), 0xe8e8e8, 0, 102); }
-  if (th.night && kind !== 'arena') { const b = new THREE.Mesh(new THREE.SphereGeometry(1.6, 6, 5), glowM); b.position.y = kind === 'spire' ? 209 : kind === 'stepped' ? 170 : kind === 'lattice' ? 119 : 100; g.add(b); }
+  else if (kind === 'dome') { add(new THREE.CylinderGeometry(20, 22, 18, 16), 0xe6e0d2, 0, 9); add(new THREE.SphereGeometry(20, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xd4a93a, 0, 18); add(new THREE.CylinderGeometry(0.4, 1.4, 10, 5), 0xd4a93a, 0, 43); for (const [x, z] of [[-34, -34], [34, -34], [-34, 34], [34, 34]]) { add(new THREE.CylinderGeometry(2, 2.6, 62, 8), 0xece6d8, x, 31, z); add(new THREE.ConeGeometry(2.6, 8, 8), 0x2f8a52, x, 66, z); } }
+  else if (kind === 'temple') { for (let i = 0; i < 5; i++) add(new THREE.BoxGeometry(56 - i * 10, 9, 56 - i * 10), i % 2 ? 0x9c8a6a : 0xb09c78, 0, 4.5 + i * 9); add(new THREE.BoxGeometry(9, 45, 30), 0x8a7a5c, 0, 22, 18).rotation.x = -0.72; add(new THREE.BoxGeometry(12, 9, 12), 0x7a3a2a, 0, 49.5); }
+  else if (kind === 'gate') { for (let i = 0; i < 6; i++) add(new THREE.CylinderGeometry(1.7, 1.9, 24, 10), 0xd8cfb8, -25 + i * 10, 12); add(new THREE.BoxGeometry(62, 6, 12), 0xcfc5ac, 0, 27); add(new THREE.BoxGeometry(48, 4, 10), 0xc4b99e, 0, 32); add(new THREE.BoxGeometry(10, 5, 4), 0x3f6a5a, 0, 36.5); for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(1.2, 4, 2), 0x3f6a5a, -4.5 + i * 3, 33, -3); }
+  else if (kind === 'needle') { add(new THREE.CylinderGeometry(3.5, 7, 150, 8), 0xd7d9dc, 0, 75); add(new THREE.CylinderGeometry(12, 9, 12, 12), 0x8f99a6, 0, 150); add(new THREE.CylinderGeometry(10, 12, 6, 12), 0x6f7a88, 0, 159); add(new THREE.CylinderGeometry(0.4, 1.8, 40, 5), 0xe0e3e8, 0, 182); }
+  else if (kind === 'pyramid') { for (const [s2, x, z] of [[1, 0, 0], [0.7, 62, 40], [0.45, -70, 55]]) { const p = add(new THREE.ConeGeometry(55 * s2, 75 * s2, 4), 0xd2b47a, x, 37.5 * s2, z); p.rotation.y = Math.PI / 4; } }
+  else if (kind === 'pearl') { add(new THREE.CylinderGeometry(2.6, 2.6, 190, 8), 0xc9ccd4, 0, 95); for (const a of [0, 2.1, 4.2]) add(new THREE.CylinderGeometry(1.6, 2.4, 60, 6), 0xbfc3cc, Math.cos(a) * 9, 30, Math.sin(a) * 9).rotation.set(Math.sin(a) * 0.15, 0, -Math.cos(a) * 0.15); add(new THREE.SphereGeometry(16, 14, 10), 0xd0407a, 0, 72); add(new THREE.SphereGeometry(10, 12, 8), 0xd0407a, 0, 140); add(new THREE.SphereGeometry(4, 10, 6), 0xd0407a, 0, 178); add(new THREE.CylinderGeometry(0.3, 1.3, 30, 5), 0xe0e3e8, 0, 205); }
+  else if (kind === 'sails') { add(new THREE.BoxGeometry(110, 8, 50), 0xc9b9a0, 0, 4); for (const [x, s2] of [[-36, 1], [-14, 0.85], [6, 0.7], [26, 0.95], [44, 0.75]]) { const sh = add(new THREE.SphereGeometry(18 * s2, 10, 8, 0, Math.PI, 0, Math.PI / 2), 0xf4f2ec, x, 8, 0); sh.scale.set(0.7, 2.2, 1); sh.rotation.y = -Math.PI / 2; } }
+  else if (kind === 'wall') { for (let i = 0; i < 7; i++) { const seg = add(new THREE.BoxGeometry(38, 9, 7), 0x9a8f7c, i * 34 - 102, 4.5 + Math.sin(i * 0.9) * 10, 0); seg.rotation.z = Math.cos(i * 0.9) * 0.25; if (i % 3 === 0) add(new THREE.BoxGeometry(11, 17, 11), 0x8c8170, i * 34 - 102, 8.5 + Math.sin(i * 0.9) * 10, 0); } }
+  else if (kind === 'rock') { const r = add(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xb4532a, 0, -1); r.scale.set(140, 38, 60); }
+  if (th.night && kind !== 'arena') { const b = new THREE.Mesh(new THREE.SphereGeometry(1.6, 6, 5), glowM); b.position.y = { spire: 209, stepped: 170, lattice: 119, needle: 202, pearl: 220, dome: 48, temple: 54, gate: 39, pyramid: 95, sails: 40, wall: 26, rock: 37 }[kind] || 100; g.add(b); }
   return g;
 }
 
@@ -350,18 +359,19 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
   // --- landmark: a recognisable silhouette near the start line
   let lm = null;
   if (env.landmark) {
-    let bs = 1e9; for (let gx = minX - 60; gx < maxX + 60; gx += 14) for (let gz = minZ - 60; gz < maxZ + 60; gz += 14) { const d = dist(gx, gz); if (d < 78 || d > 150) continue; const sc = Math.hypot(gx - T.x[60 % T.N], gz - T.z[60 % T.N]) + Math.abs(d - 100); if (sc < bs) { bs = sc; lm = { x: gx, z: gz }; } }
-    if (lm) { const L = landmark(env.landmark, th); L.position.set(lm.x, 0, lm.z); group.add(L); }
+    const far = ['pyramid', 'wall', 'rock', 'temple'].includes(env.landmark), m0 = far ? 200 : 60, d0 = far ? 165 : 78, d1 = far ? 300 : 150, dm = far ? 210 : 100;
+    let bs = 1e9; for (let gx = minX - m0; gx < maxX + m0; gx += 14) for (let gz = minZ - m0; gz < maxZ + m0; gz += 14) { const d = dist(gx, gz); if (d < d0 || d > d1) continue; const sc = Math.hypot(gx - T.x[60 % T.N], gz - T.z[60 % T.N]) + Math.abs(d - dm); if (sc < bs) { bs = sc; lm = { x: gx, z: gz }; } }
+    if (lm) { const L = landmark(env.landmark, th); L.position.set(lm.x, 0, lm.z); group.add(L); group.userData.lm = lm; }
   }
   // --- far scenery
   const hillMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(env.hill ?? 0x4a6a45).multiplyScalar(th.night ? 0.35 : 1), flatShading: true });
-  if (env.scenery === 'hills' || env.scenery === 'domes' || env.scenery === 'dunes') {
-    const dunes = env.scenery === 'dunes', n = dunes ? 46 : env.scenery === 'domes' ? 12 : 30, geo = env.scenery === 'hills' ? new THREE.ConeGeometry(1, 1, 7) : new THREE.SphereGeometry(1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  if (env.scenery === 'hills' || env.scenery === 'domes' || env.scenery === 'dunes' || env.scenery === 'mesa') {
+    const dunes = env.scenery === 'dunes', mesa = env.scenery === 'mesa', n = dunes ? 46 : env.scenery === 'domes' ? 12 : mesa ? 9 : 30, geo = mesa ? new THREE.CylinderGeometry(0.62, 1, 1, 9) : env.scenery === 'hills' ? new THREE.ConeGeometry(1, 1, 7) : new THREE.SphereGeometry(1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2);
     const im = new THREE.InstancedMesh(geo, hillMat, n); let c = 0;
     for (let k = 0; k < n * 6 && c < n; k++) {
-      const a = R() * Math.PI * 2, rr = (dunes ? 0.35 : 0.75) + R() * 0.6, x = cx + Math.cos(a) * (maxX - minX) * rr, z = cz + Math.sin(a) * (maxZ - minZ) * rr, w = dunes ? 30 + R() * 60 : 90 + R() * 110, hgt = dunes ? 6 + R() * 12 : env.scenery === 'domes' ? 110 + R() * 90 : 70 + R() * 120;
+      const a = R() * Math.PI * 2, rr = (dunes ? 0.35 : 0.75) + R() * 0.6, x = cx + Math.cos(a) * (maxX - minX) * rr, z = cz + Math.sin(a) * (maxZ - minZ) * rr, w = dunes ? 30 + R() * 60 : mesa ? 170 + R() * 120 : 90 + R() * 110, hgt = dunes ? 6 + R() * 12 : env.scenery === 'domes' ? 110 + R() * 90 : mesa ? 90 + R() * 50 : 70 + R() * 120;
       if (dist(x, z) < w + (dunes ? 26 : 190)) continue;
-      dummy.position.set(x, env.scenery === 'hills' ? hgt / 2 - 2 : -1, z); dummy.rotation.set(0, R() * 6, 0); dummy.scale.set(w, hgt, w * (0.7 + R() * 0.6)); dummy.updateMatrix(); im.setMatrixAt(c++, dummy.matrix);
+      dummy.position.set(x, env.scenery === 'hills' || mesa ? hgt / 2 - 2 : -1, z); dummy.rotation.set(0, R() * 6, 0); dummy.scale.set(w, hgt, w * (0.7 + R() * 0.6)); dummy.updateMatrix(); im.setMatrixAt(c++, dummy.matrix);
     }
     im.count = c; group.add(im); disposables.push(geo, hillMat);
   } else if (env.scenery === 'fuji') {

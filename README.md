@@ -30,6 +30,12 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 **Settings → Driving help: Easy** (default) brakes for corners and steers you off walls.
 **Auto-accelerate** makes it steer-only.
 
+## What's new in 3.2
+
+- **World Tour grows to 15 countries and 30 circuits (360 levels).** New: Nigeria (Lagos Lights, Abuja Ring), Mexico (Mexico City Fiesta, Cancún Coast), Germany (Berlin Gate, Black Forest Ring), South Africa (Cape Town Coast, Johannesburg Gold), Egypt (Cairo Pyramids, Nile Nights), China (Shanghai Bund, Great Wall Pass) and Australia (Sydney Harbour, Outback Blaze).
+- Every new circuit has a flyover, a river bridge, a shortcut, stunt ramps and a tunnel. Each country has its own flag, sponsors, trees and landmark (domed mosque, Aztec temple, Brandenburg-style gate, TV tower, pyramids, pearl tower, Great Wall, opera-house sails, a giant red rock). Berlin and the Black Forest default to rain, the Great Wall to snow.
+- Quick Race and online/split-screen MultiClash can use all 30 circuits.
+
 ## What's new in 3.1
 
 - **Reward chain**: near misses, takedowns (+ free boost), 20 s of clean driving (+ nitro, boost and extra top speed), slipstream and slingshot, perfect starts, long drifts, big air, overtakes and taking the lead. Quick successions build a ×2–×5 chain worth bonus credits. Rewards appear in a feed on the right; a green bar under the nitro meter tracks clean driving.
@@ -47,7 +53,7 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 ## What's in the game
 
 - **Six racing classes** – cars, bikes, boats (city canals), helicopters and planes (ring gates above the streets) and spaceships (a neon track among asteroids).
-- **World Tour** – 8 countries (Cameroon, USA, Brazil, France, UK, UAE, Japan, Italy), 16 circuits, 4 levels per country for every class: 192 levels. Each country has its own flag, landmark, trees, buildings and scenery. Win a race and your driver raises the flag.
+- **World Tour** – 15 countries (Cameroon, USA, Brazil, France, UK, UAE, Japan, Italy), 30 circuits, 4 levels per country for every class: 360 levels. Each country has its own flag, landmark, trees, buildings and scenery. Win a race and your driver raises the flag.
 - **Race types** – Sprint, Combat Race, Police Chase, City Rush, Land & Sea Relay, Elimination, Orb Rush, Time Trial.
   - *Combat*: weapon crates give a machine gun, homing rockets, mines, a shield or turbo. Firing guns alerts the police.
   - *Police Chase*: cops ram you and set up roadblocks; stop beside one for too long and you are busted.
