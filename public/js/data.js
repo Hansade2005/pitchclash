@@ -1,4 +1,5 @@
 // Teams (national sides), formation and save data. Club and competition names are real.
+import { REAL } from './real_squads.js';
 // kit: [shirt, shorts, socks], gk: keeper shirt, rating: overall strength.
 export const TEAMS = [
   { id: 'cmr', name: 'Cameroon', kit: [0x0a7a3c, 0xce1126, 0xfcd116], gk: 0x222222, rating: 80, flag: ['v', '#007a5e', '#ce1126', '#fcd116'], star: '#fcd116', names: 'af' },
@@ -46,15 +47,15 @@ export const COMPS = [
   ...LEAGUES.map(l => ({ id: 'lg_' + l.id, name: l.name, format: 'league', hint: '8 clubs · 14 match days, home & away', pool: () => CLUBS.filter(c => c.league === l.id).map(c => c.id) })),
 ];
 const POOL = {
-  af: ['Ndongo', 'Mbala', 'Etame', 'Okoro', 'Adeyemi', 'Mensah', 'Diallo', 'Traore', 'Kone', 'Sarr', 'Ngassa', 'Fotso', 'Bello', 'Owusu', 'Camara', 'Tchami', 'Zongo', 'Salah', 'Hassan', 'Amrani', 'Mokoena', 'Dlamini', 'Yeboah', 'Bassong'],
-  la: ['Silva', 'Costa', 'Rocha', 'Moreno', 'Vargas', 'Herrera', 'Castro', 'Ramos', 'Molina', 'Pereira', 'Santos', 'Navarro', 'Reyes', 'Fuentes', 'Lima', 'Cardoso', 'Torres', 'Mendez', 'Ibarra', 'Souza', 'Paz', 'Luna', 'Rivas', 'Campos'],
-  eu: ['Laurent', 'Moreau', 'Weber', 'Keller', 'Rossi', 'Conti', 'De Vries', 'Bakker', 'Girard', 'Vogel', 'Ricci', 'Jansen', 'Marchand', 'Hartmann', 'Greco', 'Visser', 'Lambert', 'Brandt', 'Fabbri', 'Mulder', 'Roux', 'Kraus', 'Gallo', 'Smit'],
-  en: ['Carter', 'Hughes', 'Bennett', 'Cole', 'Parker', 'Reed', 'Hayes', 'Brooks', 'Foster', 'Ward', 'Mason', 'Ellis', 'Price', 'Shaw', 'Grant', 'Webb', 'Turner', 'Miles', 'Rhodes', 'Dean', 'Fox', 'Blake', 'Marsh', 'Lane'],
-  as: ['Sato', 'Tanaka', 'Ito', 'Mori', 'Hayashi', 'Kato', 'Endo', 'Fujita', 'Ono', 'Ueda', 'Hara', 'Kubo', 'Noda', 'Abe', 'Sakai', 'Maeda', 'Ishii', 'Okada', 'Arai', 'Nomura', 'Goto', 'Seki', 'Baba', 'Miya'],
+  af: ['Diallo', 'Traoré', 'Keita', 'Coulibaly', 'Ouattara', 'Koné', 'Sow', 'Ndiaye', 'Diop', 'Mensah', 'Owusu', 'Asante', 'Boateng', 'Okafor', 'Eze', 'Nwosu', 'Adeyemi', 'Bello', 'Camara', 'Gueye', 'Bamba', 'Kouassi', 'Mokoena', 'Dlamini'],
+  la: ['González', 'Benítez', 'Acosta', 'Giménez', 'Sosa', 'Rojas', 'Aguirre', 'Ledesma', 'Paredes', 'Vega', 'Soto', 'Herrera', 'Cabrera', 'Peña', 'Miranda', 'Gallardo', 'Ibarra', 'Luna', 'Maldonado', 'Rivas', 'Escobar', 'Valencia', 'Carvalho', 'Oliveira'],
+  eu: ['Martin', 'Bernard', 'Dubois', 'Leroy', 'Moreau', 'Schmidt', 'Fischer', 'Weber', 'Wagner', 'Becker', 'Rossi', 'Ferrari', 'Esposito', 'Bianchi', 'Romano', 'de Jong', 'Jansen', 'Bakker', 'Visser', 'Hoffmann', 'Koch', 'Richter', 'Mancini', 'Giordano'],
+  en: ['Smith', 'Jones', 'Taylor', 'Brown', 'Williams', 'Wilson', 'Davies', 'Robinson', 'Wright', 'Thompson', 'Evans', 'Walker', 'White', 'Roberts', 'Green', 'Hall', 'Wood', 'Jackson', 'Clarke', 'Lewis', 'Morgan', 'Cook', 'Bailey', 'Carter'],
+  as: ['Sato', 'Suzuki', 'Takahashi', 'Tanaka', 'Watanabe', 'Ito', 'Yamamoto', 'Nakamura', 'Kobayashi', 'Kato', 'Yoshida', 'Yamada', 'Sasaki', 'Matsumoto', 'Inoue', 'Kimura', 'Hayashi', 'Shimizu', 'Mori', 'Abe', 'Ishikawa', 'Ogawa', 'Fujita', 'Okada'],
 };
 export function squad(team) { // 11 starters + 5 substitutes, stable per team (Edit mode names win)
   let s = 0; for (const c of team.id) s = s * 31 + c.charCodeAt(0); const pool = [...POOL[team.names]], out = [];
-  for (let i = 0; i < 16; i++) { s = (s * 1103515245 + 12345) >>> 0; const nm = pool.splice(s % pool.length, 1)[0]; out.push({ name: (team.players && team.players[i]) || nm, num: [1, 2, 5, 4, 3, 7, 8, 6, 11, 9, 10, 12, 13, 14, 15, 16][i] }); }
+  for (let i = 0; i < 16; i++) { s = (s * 1103515245 + 12345) >>> 0; const nm = pool.splice(s % pool.length, 1)[0]; out.push({ name: (team.players && team.players[i]) || (REAL[team.id] && REAL[team.id][i]) || nm, num: [1, 2, 5, 4, 3, 7, 8, 6, 11, 9, 10, 12, 13, 14, 15, 16][i] }); }
   return out;
 }
 // 4-4-2: x from own goal (-1) to opponent goal (+1), z across the pitch
