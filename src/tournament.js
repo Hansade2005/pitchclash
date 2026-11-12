@@ -225,6 +225,7 @@ function resolveQualifierIds(comp, opts) {
       let list = q.pool === 'row' ? clubsInPool('row') : rankLeague(q.pool, opts).map(getTeam);
       if (q.pool === 'row') list = list.sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
       if (q.confed) list = list.filter((c) => c.confed === q.confed);
+      if (q.country) list = list.filter((c) => c.country === q.country);
       list.slice(q.skip || 0).filter((c) => !chosen.includes(c.id)).slice(0, q.count).forEach((c) => add(c.id));
     } else if (q.from === 'confed') {
       NATIONS.filter((n) => n.confed === q.confed).sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name))
@@ -1162,7 +1163,7 @@ export function newCareerSeason(states, opts = {}) {
   });
 }
 
-// ============================================================ World Nations Cup cycle helpers
+// ============================================================ FIFA World Cup cycle helpers
 const listStates = (states) => (Array.isArray(states) ? states : Object.values(states));
 
 /**
@@ -1174,7 +1175,7 @@ export function worldPlayoffEntrants(states) {
 }
 
 /**
- * The 32 World Nations Cup finalists from finished qualifier states (the six wq-* comps
+ * The 32 FIFA World Cup finalists from finished qualifier states (the six wq-* comps
  * plus 'wq-playoff'): the union of their `qualified` lists. Feed it to
  * createCompetition('world-nations', { teams }). ('world-cycle' does all of this in one state.)
  */

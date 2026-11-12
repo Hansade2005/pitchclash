@@ -347,7 +347,7 @@ function creditsScreen() {
       <b>Engine:</b> three.js (MIT) · Electron (MIT).<br>
       <b>Recordings:</b> royalty-free stadium, crowd, commentary and music audio by BombinSound, JonathanSlatterMusic, Arunangshu Banerjee, DJArtMusic, FreeSound Community and ZoeDit.<br>
       <b>Music:</b> original generative soundtrack${Sound.nowPlaying() ? ' · Now playing: ' + esc(Sound.nowPlaying().title + ' — ' + Sound.nowPlaying().artist) : ''}.<br>
-      All club and competition names are fictional. National teams use country names and flag colours only.</div>
+      Real league, club and trophy names are used for authenticity. Player names are fictional. National teams use country names and flag colours only.</div>
       <div class="opts" style="margin-top:16px"><div class="opt nav" data-act="back"><span>Back</span><span></span></div></div></div>`,
     action: () => mainMenu(), back: () => mainMenu(),
   });

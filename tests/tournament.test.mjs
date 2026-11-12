@@ -364,7 +364,9 @@ test('club world championship: 32 clubs, all confederations, neutral groups, sin
   assert.deepEqual(st.ko.rounds.map((r) => r.name), ['Round of 16', 'Quarter-finals', 'Semi-finals', 'Final']);
   for (const id of ['asian-club', 'americas-club']) {
     const s2 = results[id];
-    const want = id === 'asian-club' ? { ASI: 16 } : { SAM: 10, NCA: 6 };
+    const want = id === 'asian-club'
+      ? { ASI: 14, OCE: 2 }
+      : { SAM: 10, NCA: 6 };
     assert.deepEqual(countBy(s2.teams, confOf), want, id);
   }
 });
@@ -529,49 +531,21 @@ test('new competitions: determinism, JSON round-trip across stages, generic API 
   }
 });
 
-// Real competition / club / player names that must never appear (case-insensitive, accents ignored, whole words).
-const BLOCKED = [
-  // competitions & organisations
-  'premier league', 'la liga', 'laliga', 'serie a', 'bundesliga', 'ligue 1', 'eredivisie', 'primeira liga',
-  'champions league', 'europa league', 'conference league', 'world cup', 'club world cup', 'nations league',
-  'olympic', 'olympics', 'olympic games', 'gold cup', 'confederations cup', 'copa libertadores', 'libertadores',
-  'sudamericana', 'copa america', 'recopa', 'asian cup', 'africa cup of nations', 'afcon', 'caf champions league',
-  'afc champions league', 'concacaf', 'conmebol', 'uefa', 'fifa', 'caf', 'afc', 'ofc', 'euros', 'euro 2024',
-  'fa cup', 'efl', 'carabao', 'league cup', 'community shield', 'copa del rey', 'supercopa de espana', 'dfb',
-  'dfl', 'coppa italia', 'supercoppa italiana', 'coupe de france', 'trophee des champions', 'mls', 'j1 league',
-  'j.league', 'k league', 'a-league', 'saudi pro league', 'intercontinental cup', 'finalissima', 'toulon',
-  'four continents', 'tri nations', 'emirates cup', 'audi cup', 'international champions cup', 'joan gamper',
-  'the championship', 'segunda division', 'league one', 'league two',
-  // clubs
-  'manchester', 'liverpool', 'arsenal', 'chelsea', 'tottenham', 'everton', 'aston villa', 'west ham', 'newcastle',
-  'barcelona', 'real madrid', 'atletico madrid', 'sevilla', 'valencia', 'villarreal', 'athletic bilbao',
-  'juventus', 'inter milan', 'ac milan', 'internazionale', 'napoli', 'as roma', 'lazio', 'fiorentina', 'atalanta',
-  'bayern', 'borussia', 'dortmund', 'leverkusen', 'schalke', 'rb leipzig', 'psg', 'paris saint-germain',
-  'olympique de marseille', 'olympique lyonnais', 'monaco', 'ajax', 'psv', 'feyenoord', 'benfica', 'fc porto',
-  'sporting cp', 'galatasaray', 'fenerbahce', 'besiktas', 'celtic', 'glasgow rangers', 'olympiacos',
-  'panathinaikos', 'boca juniors', 'river plate', 'flamengo', 'fluminense', 'corinthians', 'palmeiras',
-  'santos fc', 'gremio', 'penarol', 'club nacional', 'colo-colo', 'independiente', 'club america', 'chivas',
-  'la galaxy', 'inter miami', 'seattle sounders', 'al hilal', 'al nassr', 'al ahly', 'zamalek', 'kaizer chiefs',
-  'orlando pirates', 'mamelodi sundowns', 'tp mazembe', 'esperance', 'wydad', 'raja casablanca', 'urawa',
-  'kashima antlers', 'jeonbuk', 'ulsan', 'persepolis', 'esteghlal', 'auckland city', 'guarani', 'saprissa',
-  'central coast mariners', 'sydney fc', 'melbourne victory',
-];
+// Real-world names in use: leagues, clubs and competitions use their real names.
+// Player names stay fictional — famous player surnames must never appear.
+const EXPECTED_CLUBS = ['Arsenal', 'Real Madrid', 'Bayern Munich', 'Paris Saint-Germain', 'Inter Miami',
+  'Al Ahly', 'Mamelodi Sundowns', 'Flamengo', 'Boca Juniors', 'Urawa Red Diamonds'];
+const EXPECTED_LEAGUES = ['English Premier League', 'Spanish La Liga', 'Italian Serie A', 'German Bundesliga'];
+test('real league / club names are in use', () => {
+  for (const n of EXPECTED_CLUBS) assert.ok(CLUBS.some((c) => c.name === n), `missing club ${n}`);
+  for (const n of EXPECTED_LEAGUES) assert.ok(LEAGUES.some((l) => l.name === n), `missing league ${n}`);
+  assert.ok(COMPETITIONS.some((c) => c.name === 'UEFA Champions League'), 'missing UCL');
+  assert.ok(COMPETITIONS.some((c) => c.name === 'FIFA World Cup'), 'missing World Cup');
+});
 const BLOCKED_PLAYERS = ['messi', 'ronaldo', 'neymar', 'mbappe', 'haaland', 'salah', 'kane', 'bellingham',
   'maradona', 'pele', 'zidane', 'beckham', 'modric', 'lewandowski', 'de bruyne', 'vinicius junior', 'cruyff', 'pirlo'];
-BLOCKED.push(...BLOCKED_PLAYERS);
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-test('no real-world competition / club names (blocked list)', () => {
-  const hits = [];
-  const names = [
-    ...COMPETITIONS.map((c) => `competition ${c.name}`),
-    ...LEAGUES.map((l) => `league ${l.name}`),
-    ...CLUBS.map((c) => `club ${c.name}`),
-  ];
-  for (const n of names) {
-    const s = ` ${norm(n).replace(/[^a-z0-9.\-]+/g, ' ')} `;
-    for (const b of BLOCKED) if (s.includes(` ${b} `)) hits.push(`${n} ~ ${b}`);
-  }
-  assert.deepEqual(hits, []);
+test('player names stay fictional (no famous surnames)', () => {
   // Player names of all new clubs / youth sides avoid famous surnames too.
   const newTeams = [...CLUBS.filter((c) => ['alb2', 'ibe2'].includes(c.league) || (c.pool === 'row' && !['EUR', 'AFR'].includes(c.confed))),
     ...NATIONS.map((n) => getTeam(`${n.id}-u23`)), ...NATIONS.map((n) => getTeam(`${n.id}-u20`))];
