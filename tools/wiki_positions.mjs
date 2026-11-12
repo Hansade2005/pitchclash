@@ -1,6 +1,7 @@
 // Collects squad rosters with positions from Wikipedia's {{Fs player}} templates (structured, reliable GK/DF/MF/FW).
 // Usage: node tools/wiki_positions.mjs   -> writes src/data/real_positions.js
 import fs from 'fs';
+import { parseRoster, sane } from './wiki_parse.mjs';
 import { ALL_TEAMS } from '../src/data/teams.js';
 import { REAL_POS as PREV } from '../src/data/real_positions.js';
 
@@ -21,25 +22,8 @@ async function fetchBatch(titles) {
   }
   return null;
 }
-const clean = (s) => s.replace(/\[\[(?:[^|\]]*\|)?([^\]]*)\]\]/g, '$1').replace(/\{\{[^}]*\}\}/g, '').replace(/<[^>]*>/g, '').replace(/'{2,}/g, '').trim();
-export function parseRoster(text) {
-  const out = [], seen = new Set();
-  for (const line of text.split('\n')) {
-    if (!/\{\{\s*(?:Fs player|nat fs g player|nat fs player)/i.test(line)) continue;
-    const pos = (line.match(/\|\s*pos\s*=\s*([A-Za-z]+)/) || [])[1]?.toUpperCase();
-    const nm = (line.match(/\|\s*name\s*=\s*(.+?)(?:\||\}\})/) || [])[1];
-    if (!pos || !nm || !['GK', 'DF', 'MF', 'FW'].includes(pos)) continue;
-    let name = clean(nm); if (!name || /^\W|\d/.test(name) || seen.has(name)) continue;
-    seen.add(name); out.push([name, pos]);
-  }
-  return out;
-}
-export function sane(r) {
-  const c = (p) => r.filter((x) => x[1] === p).length;
-  return r.length >= 16 && c('GK') >= 2 && c('GK') <= 6 && c('DF') >= 4 && c('MF') >= 4 && c('FW') >= 2;
-}
 const result = { ...PREV }, miss = [];
-const teams = ALL_TEAMS.filter((t) => !PREV[t.id]); // re-runs only fill in teams still missing
+const teams = process.env.REFRESH ? ALL_TEAMS.slice() : ALL_TEAMS.filter((t) => !PREV[t.id]); // re-runs only fill in teams still missing
 for (const t of teams) {
   let got = null;
   const cs = cands(t);

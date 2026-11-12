@@ -1,6 +1,7 @@
 // Second pass for teams missing from real_positions.js: tries Wikipedia search hits and follows
 // transcluded squad templates ({{Chelsea F.C. squad}} etc). Usage: node tools/wiki_positions_fill.mjs
 import fs from 'fs';
+import { parseRoster, sane } from './wiki_parse.mjs';
 import { ALL_TEAMS } from '../src/data/teams.js';
 import { REAL_POS as PREV } from '../src/data/real_positions.js';
 import { REAL_SQUADS } from '../src/data/real_squads.js';
@@ -21,21 +22,6 @@ const raw = async (title) => {
   const p = j && j.query && Object.values(j.query.pages)[0];
   return p && p.revisions ? p.revisions[0].slots.main['*'] : '';
 };
-const clean = (s) => s.replace(/\[\[(?:[^|\]]*\|)?([^\]]*)\]\]/g, '$1').replace(/\{\{[^}]*\}\}/g, '').replace(/<[^>]*>/g, '').replace(/'{2,}/g, '').trim();
-function parseRoster(text) {
-  const out = [], seen = new Set();
-  for (const line of text.split('\n')) {
-    if (!/\{\{\s*(?:Fs player|nat fs g player|nat fs player)/i.test(line)) continue;
-    const pos = (line.match(/\|\s*pos\s*=\s*([A-Za-z]+)/) || [])[1]?.toUpperCase();
-    const nm = (line.match(/\|\s*name\s*=\s*(.+?)(?:\||\}\})/) || [])[1];
-    if (!pos || !nm || !['GK', 'DF', 'MF', 'FW'].includes(pos)) continue;
-    const name = clean(nm); if (!name || /^\W|\d/.test(name) || seen.has(name)) continue;
-    seen.add(name); out.push([name, pos]);
-  }
-  return out;
-}
-const sane = (r) => { const c = (p) => r.filter((x) => x[1] === p).length;
-  return r.length >= 16 && c('GK') >= 2 && c('GK') <= 12 && c('DF') >= 4 && c('MF') >= 4 && c('FW') >= 2; };
 // parse a page; if it has no inline roster follow squad-like templates
 async function rosterOf(title) {
   const txt = await raw(title); await sleep(200);
