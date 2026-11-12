@@ -1,6 +1,6 @@
 // One race session: vehicles, rules (sprint / elimination / orb rush), cameras, split-screen and net sync.
 import * as THREE from 'three';
-import { TRACKS, buildTrackData, lateral, nearestIdx } from './track.js';
+import { TRACKS, buildTrackData, lateral, nearestIdx, cutPos, elevAt } from './track.js';
 import { buildWorld, rng } from './world.js';
 import { Vehicle, collide } from './vehicle.js';
 import { makeAI, aiDrive, safeSpeed, steerTo } from './ai.js';
@@ -16,7 +16,7 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const trackCache = {};
 export const getTrack = id => trackCache[id] || (trackCache[id] = buildTrackData(TRACKS.find(t => t.id === id)));
-const ELIM_FIRST = 35, ELIM_EVERY = 20, ORB_TIME = 90;
+const ELIM_FIRST = 35, ELIM_EVERY = 20, ORB_TIME = 90, KD_TIME = 120, TOXIC_MAX = 150, CATCH_TIME = 110, SCORE_RULES = ['orbs', 'knockdown', 'gates'];
 
 export class Race {
   // cfg: { track, laps, rule, entrants:[{id,name,veh,up,color,type:'local'|'ai'|'remote',device,skill,person}], demo, net, isHost, onEnd }
@@ -28,7 +28,7 @@ export class Race {
     }
     const T = this.T;
     this.kind = kindOf((cfg.entrants.find(e => e.type !== 'cop' && e.type !== 'traffic') || cfg.entrants[0]).veh); this.mode = { boat: 'water', heli: 'air', plane: 'air', space: 'space' }[this.kind] || 'road'; this.alt = { heli: 11, plane: 14, space: 1.3 }[this.kind] || 0;
-    this.quality = game.quality; this.world = buildWorld(this.scene, game.renderer, T, this.quality, { mode: this.mode, alt: this.alt, relay: cfg.rule === 'relay', gates: this.gates });
+    this.quality = game.quality; this.world = buildWorld(this.scene, game.renderer, T, this.quality, { mode: this.mode, alt: this.alt, relay: cfg.rule === 'relay', weather: cfg.weather, gates: this.gates });
     this.fx = new FX(this.scene, this.quality === 'low');
     this.rule = cfg.rule || 'sprint'; this.laps = cfg.laps || 3; this.net = cfg.net || null; this.isHost = !this.net || cfg.isHost;
     this.state = 'countdown'; this.count = cfg.demo ? 0.1 : 3.6; this.time = 0; this.lastBeep = 4; this.endT = 0; this.over = false; this.sendT = 0; this.bandT = 0; this.paused = false;
@@ -44,6 +44,9 @@ export class Race {
       if (e.type === 'cop') { v.ai = makeAI(1.0, 0); v.block = !!e.block; v.started = true; if (cfg.rule !== 'pursuit') v.inactive = true; if (e.block) { v.inactive = true; v.place(T, 0, 0); } else { v.place(T, T.N - 40 - copK * 6, (copK % 2 ? -1 : 1) * 3); copK++; } }
       else if (e.type === 'traffic') { const lanes = [-0.55, 0.5, -0.18, 0.2]; v.ai = makeAI(0.5, 0); v.ai.fixed = lanes[trafK % 4] * T.half; v.ai.cap = 17 + (trafK % 3) * 3; v.started = true; v.place(T, Math.floor((trafK + 1) * T.N / (nTraffic + 1.5)) + 30, v.ai.fixed); trafK++; }
       else v.place(T, T.N - 5 - Math.floor(k / 2) * 5, (k % 2 ? -1 : 1) * 3.3);
+      v.track = T; v.useElev = this.mode === 'road'; v.ramDamage = this.mode === 'road' ? (cfg.rule === 'knockdown' ? 3 : cfg.rule === 'toxic' ? 0 : 0.8) : 0;
+      if (cfg.weather === 'rain') v.st.grip *= 0.9; else if (cfg.weather === 'snow') v.st.grip *= 0.82;
+      if (e.type === 'runner') { v.npc = true; v.ai = makeAI(0.92, 0); v.st.top *= 0.97; v.started = true; v.place(T, 55, 0); }
       this.vehicles.push(v); this.byId[e.id] = v;
       if (e.type === 'local') { v.device = e.device || 'kb'; v.auto = makeAI(0.8, 0); v.label && (v.label.visible = false); this.locals.push(v); }
     });
@@ -57,9 +60,12 @@ export class Race {
     });
     // orbs
     if (this.rule === 'orbs') this.initOrbs();
-    this.racers = this.vehicles.filter(v => !v.npc); this.cops = this.vehicles.filter(v => v.cop); this.blockT = 22; this.lapRule = ['sprint', 'combat', 'pursuit', 'trial', 'rush', 'relay'].includes(this.rule); this.heat = {};
+    this.racers = this.vehicles.filter(v => !v.npc); this.cops = this.vehicles.filter(v => v.cop); this.blockT = 22; this.lapRule = ['sprint', 'combat', 'pursuit', 'trial', 'rush', 'relay', 'versus', 'gates'].includes(this.rule); this.heat = {};
     if (cfg.peds && this.mode === 'road') this.peds = new Peds(this, cfg.peds);
     if (this.rule === 'combat' || cfg.weapons) this.combat = new Combat(this);
+    this.slow = 0; this.runner = this.vehicles.find(v => v.type === 'runner') || null;
+    if (this.runner) { const top = Math.max(...this.racers.map(v => v.st.top)), acc = Math.max(...this.racers.map(v => v.st.acc)); Object.assign(this.runner.st, { top: top * 0.95, acc: acc * 0.95 }); }
+    if (this.rule === 'gates') this.initDriftGates();
     if (!cfg.demo) ui.hudLayout(this.views.length, T, this.rule); else ui.hudClear();
     if (this.net) this.bindNet();
     this.order = [...this.racers];
@@ -107,12 +113,14 @@ export class Race {
   }
 
   ranking() {
-    const sc = v => v.finished ? 3e9 - v.finishTime : v.eliminated ? -1e9 + this.elimOrder.indexOf(v) : this.rule === 'orbs' ? 1e6 + v.score * 1e4 + v.progress * 1e-3 : 1e6 + v.progress;
+    const sc = v => this.rule === 'catch' ? (v === this.caughtBy ? 1e12 : 1e6 - (this.runner ? Math.hypot(v.x - this.runner.x, v.z - this.runner.z) : 0)) : this.rule === 'toxic' && !v.eliminated ? 1e6 + v.score * 1e4 + v.progress * 1e-3 : SCORE_RULES.includes(this.rule) && !v.eliminated ? 1e6 + v.score * 1e4 + v.progress * 1e-3 : v.finished ? 3e9 - v.finishTime : v.eliminated ? -1e9 + this.elimOrder.indexOf(v) : this.rule === 'orbs' ? 1e6 + v.score * 1e4 + v.progress * 1e-3 : 1e6 + v.progress;
     return [...this.racers].sort((a, b) => sc(b) - sc(a));
   }
 
   update(dt) {
     if (this.paused && !this.net) return;
+    if (this.slow > 0 && !this.net) { this.slow -= dt; dt *= 0.35; } else this.slow = 0;
+    const cv = document.getElementById('game'); if (cv && cv.classList.contains('slowmo') !== this.slow > 0) cv.classList.toggle('slowmo', this.slow > 0);
     this.frame++;
     const T = this.T, vs = this.vehicles;
     if (this.state === 'countdown') {
@@ -127,8 +135,11 @@ export class Race {
       if (v.remote || v.inactive) continue;
       if (v.block) { v.input.gas = 0; v.input.steer = 0; v.input.brake = 0; v.input.hand = true; continue; }
       if (v.type === 'local' && !v.finished && !v.eliminated) this.readPlayer(v, dt);
-      else if (v.ai || v.auto) { const ai = v.ai || v.auto; if (v.finished) ai.band = 0.8; if (this.orbs) this.aimOrb(v, ai); if (this.gates) this.flyTo(v, ai, true); aiDrive(v, ai, T, vs, dt); }
+      else if (v.ai || v.auto) { const ai = v.ai || v.auto; if (v.type === 'ai') this.aggro(v, ai); if (v.finished) ai.band = 0.8; if (this.orbs) this.aimOrb(v, ai); if (this.gates) this.flyTo(v, ai, true); aiDrive(v, ai, T, vs, dt); }
     }
+    for (const v of vs) if (v.ai && !v.remote && v.ai.cutGo) { const C = T.cut, cp = cutPos(T, v.x, v.z, v.idx), j = cp && cp.d < C.half + 4 ? Math.min(C.n, cp.j + 6) : 4; let a = Math.atan2(C.x[j] - v.x, C.z[j] - v.z) - v.h; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; v.input.steer = clamp(a * 2.4, -1, 1); v.input.gas = 1; v.input.brake = 0; }
+    if (this.rule === 'gates') for (const v of vs) if (v.ai && v.type === 'ai' && !v.remote && Math.max(Math.abs(T.curv[v.idx]), Math.abs(T.curv[(v.idx + 8) % T.N])) > 0.006 && v.vf > 16) v.input.hand = Math.random() < 0.75;
+    if (this.runner && !this.runner.remote) { const r = this.runner; let gap = 1e9; for (const v of this.racers) if (!v.eliminated) gap = Math.min(gap, Math.hypot(v.x - r.x, v.z - r.z)); r.ai.cap = gap > 70 ? r.st.top * 0.62 : gap > 35 ? r.st.top * 0.8 : null; }
     if (this.cops.length) this.copLogic(dt);
     // drafting
     for (const v of vs) {
@@ -137,7 +148,9 @@ export class Race {
       for (const o of vs) { if (o === v || o.eliminated || o.inactive) continue; const dx = o.x - v.x, dz = o.z - v.z, al = dx * fx_ + dz * fz; if (al > 3 && al < 24 && Math.abs(dx * fz - dz * fx_) < 1.8) { v.draft = true; break; } }
     }
     for (const v of vs) v.update(dt, T, this.fx, this.time);
+    for (const v of vs) v.lastHit = null;
     for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) if (!(vs[i].remote && vs[j].remote)) collide(vs[i], vs[j], this.fx);
+    this.events(dt);
 
     // --- rules
     if (this.state === 'racing' && !this.over) {
@@ -158,6 +171,7 @@ export class Race {
     }
     if (this.orbs) this.updateOrbs(dt);
     if (this.combat) this.combat.update(dt);
+    if (this.dgates) this.updateDriftGates();
     if (this.peds) this.peds.update(dt, this.views.map(v => v.cam));
     if (this.gates && this.state === 'racing') for (const v of this.racers) { // flying through a gate tops up nitro
       if (v.remote || v.eliminated) continue; const g = this.gates[v.gateK = v.gateK ?? 0]; if (!g) { if (v.idx < 30) v.gateK = 0; continue; }
@@ -248,6 +262,66 @@ export class Race {
     if (ai && ai.orbOff == null && ai.cap == null) { const di = (g.i - v.idx + this.T.N) % this.T.N; ai.fixed = di < 70 ? g.off * 0.9 + ai.lane : null; }
   }
 
+  // racing events each frame: takedowns, near misses, smashes, traffic hits, toxic tag, catching the runner
+  events(dt) {
+    const T = this.T, local = v => v.type === 'local';
+    for (const v of this.vehicles) {
+      if (v.crashT > 0 && v.wreckedBy && !v.tdDone) { v.tdDone = true; const a = v.wreckedBy; a.kills = (a.kills || 0) + 1; if (this.rule === 'knockdown' && !a.npc) a.score++; a.nitro = Math.min(1, a.nitro + 0.5);
+        this.fx.burst(v.x, 1 + (v.ey || 0), v.z, 1, 0.6, 0.15); if (local(a) || local(v)) { if (!this.net) this.slow = 0.9; audio.sfx('boom', 1); } if (local(a)) { a.trickMsg = 'TAKEDOWN!'; a.trickT = 1.6; } if (local(v)) { v.trickMsg = 'WRECKED!'; v.trickT = 1.6; } }
+      if (v.crashT <= 0 && v.tdDone) { v.tdDone = false; v.wreckedBy = null; }
+      if (v.smashAt) { const [x, z, kind] = v.smashAt; v.smashAt = null; for (let k = 0; k < 3; k++) this.fx.burst(x, 0.8, z, kind ? 1 : 0.7, kind ? 0.45 : 0.5, kind ? 0.1 : 0.35); if (!v.npc) { v.mayhem = (v.mayhem || 0) + 150; if (local(v)) { v.trickMsg = '+150 MAYHEM'; v.trickT = 1.1; audio.sfx('hit', 6); } } }
+      if (v.padHit) { v.padHit = false; if (local(v)) { v.trickMsg = 'BOOST!'; v.trickT = 0.8; audio.sfx('nitro'); } }
+      if (v.lastHit && v.lastHit.type === 'traffic' && v.impact > 7 && !v.npc && !v.remote) this.wanted(v, 20);
+    }
+    // near misses: skim past traffic or a rival at speed for nitro (and a moment of slow motion)
+    for (const v of this.locals) { if (v.eliminated || v.crashT > 0) continue; const fx = Math.sin(v.h), fz = Math.cos(v.h);
+      for (const o of this.vehicles) { if (o === v || o.inactive || o.eliminated || o.air) continue; const dx = o.x - v.x, dz = o.z - v.z; if (dx * dx + dz * dz > 20) continue; const al = dx * fx + dz * fz, sd = Math.abs(dx * fz - dz * fx);
+        if (Math.abs(al) < 1.2 && sd > 1.9 && sd < 3.3 && v.vf - o.vf > 9 && v.lastHit !== o && (o.nm || -9) < this.time - 2) { o.nm = this.time; v.nitro = Math.min(1, v.nitro + 0.12); v.trickMsg = 'NEAR MISS!  +NITRO'; v.trickT = 1.1; audio.sfx('orb'); if (o.type === 'traffic' && !this.net && this.slow <= 0) this.slow = 0.4; } } }
+    // toxic tag
+    if (this.rule === 'toxic' && this.state === 'racing') {
+      if (!this.toxicStarted) { this.toxicStarted = true; const pool = this.racers.filter(v => !v.eliminated); this.infect(pool[Math.floor(Math.random() * pool.length)], null); }
+      for (const v of this.racers) { if (v.eliminated || !(v.toxic > 0)) continue; v.toxic -= dt;
+        const o = v.lastHit; if (o && !o.npc && !o.eliminated && !(o.toxic > 0) && !((o.immune || 0) > this.time)) { this.infect(o, v); v.toxic = Math.min(20, v.toxic + 5); v.score++; }
+        else if (v.toxic <= 0) { v.toxic = 0; if (v.aura) v.aura.visible = false; this.eliminate(v); } }
+    }
+    // catch the runner
+    if (this.runner && this.state === 'racing' && !this.caughtBy) { const r = this.runner;
+      for (const v of this.racers) { if (v.eliminated) continue; const d = Math.hypot(v.x - r.x, v.z - r.z); v.catchT = d < 5.5 ? (v.catchT || 0) + dt : Math.max(0, (v.catchT || 0) - dt); if (v.catchT >= 2 || (v.lastHit === r && v.impact > 4)) { this.caughtBy = v; r.vx *= 0.2; r.vz *= 0.2; r.frozen = true; ui.toast((v.type === 'local' ? 'You' : v.name) + ' caught the target!'); if (local(v)) audio.sfx('win'); break; } } }
+  }
+  infect(v, by) {
+    if (!v) return; v.toxic = by ? 12 : 15; v.immune = this.time + 2;
+    if (!v.aura) { v.aura = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 10), new THREE.MeshBasicMaterial({ color: 0x5dff4a, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })); v.aura.position.y = 1; v.root.add(v.aura); }
+    v.aura.visible = true; this.fx.burst(v.x, 1.2 + (v.ey || 0), v.z, 0.4, 1, 0.3);
+    ui.toast(by ? `${by.name} infected ${v.name}!` : `${v.name} is TOXIC!`); if (v.type === 'local') audio.sfx('out');
+  }
+  // computer racers: ram rivals in Knockdown, chase/avoid in Toxic Tag, maybe take the shortcut
+  aggro(v, ai) {
+    const T = this.T, C = T.cut;
+    if (C && this.mode === 'road') { if (v.idx > C.a - 40 && v.idx < C.a - 18 && ai.cutRoll == null) ai.cutRoll = Math.random() < 0.45; if (v.idx < C.a - 45 || v.idx > C.b + 8) ai.cutRoll = null; ai.cutGo = !!ai.cutRoll && v.idx >= C.a - 12 && v.idx < C.b - 3; }
+    if (this.rule === 'catch' && this.runner) { const r = this.runner, d = Math.hypot(r.x - v.x, r.z - v.z); ai.fixed = d < 45 ? clamp(lateral(T, r.idx, r.x, r.z), -T.half + 2, T.half - 2) : null; if (d < 60) ai.band = 1.08; return; }
+    if (this.rule !== 'knockdown' && this.rule !== 'toxic') return; ai.fixed = null; if (this.state !== 'racing') return;
+    let tgt = null, bd = 30; for (const o of this.racers) { if (o === v || o.eliminated || o.crashT > 0) continue; if (this.rule === 'toxic' && !(v.toxic > 0) && !(o.toxic > 0)) continue; if (this.rule === 'toxic' && v.toxic > 0 && o.toxic > 0) continue; const d = Math.hypot(o.x - v.x, o.z - v.z); if (d < bd) { bd = d; tgt = o; } }
+    if (!tgt) return; const lo = lateral(T, tgt.idx, tgt.x, tgt.z), lim = T.half - 2;
+    ai.fixed = (this.rule === 'toxic' && !(v.toxic > 0)) ? clamp(-Math.sign(lo || 1) * lim * 0.8, -lim, lim) : clamp(lo, -lim, lim);
+  }
+  initDriftGates() {
+    const T = this.T, n = 10, mat = new THREE.MeshBasicMaterial({ color: 0xff3fa0, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }), post = new THREE.MeshBasicMaterial({ color: 0xffe14a });
+    this.dgates = []; this.dgGroup = new THREE.Group();
+    for (let k = 1; k <= n; k++) { let i = Math.floor(k * T.N / (n + 1)), best = i; for (let q = -25; q <= 25; q++) { const j = (i + q + T.N) % T.N; if (Math.abs(T.curv[j]) > Math.abs(T.curv[best])) best = j; } i = best;
+      const g = new THREE.Group(), e = elevAt(T, i); g.position.set(T.x[i], e, T.z[i]); g.rotation.y = Math.atan2(T.tx[i], T.tz[i]);
+      for (const sd of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4, 0.4), post); p.position.set(sd * (T.half + 0.4), 2, 0); g.add(p); }
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(T.half * 2 + 0.8, 0.9), mat); bar.position.y = 3.6; g.add(bar); const bar2 = bar.clone(); bar2.rotation.y = Math.PI; g.add(bar2);
+      this.dgGroup.add(g); this.dgates.push({ i, g }); }
+    this.scene.add(this.dgGroup);
+  }
+  updateDriftGates() {
+    const T = this.T;
+    for (const v of this.racers) { if (v.remote) continue; const p = v.gPrev ?? v.idx; v.gPrev = v.idx; if (this.state !== 'racing' || v.finished) continue;
+      for (const g of this.dgates) { const crossed = p < g.i && v.idx >= g.i && v.idx - p < 40; if (!crossed) continue;
+        if (v.drift || v.slip > 4) { v.combo = Math.min(5, (v.combo || 0) + 1); v.score += 100 * v.combo; if (v.type === 'local') { v.trickMsg = `DRIFT GATE  +${100 * v.combo}`; v.trickT = 1.1; audio.sfx('orb'); } }
+        else { v.combo = 0; v.score += 10; if (v.type === 'local') { v.trickMsg = 'GATE +10 – drift through for more!'; v.trickT = 1; } } } }
+  }
+
   aimOrb(v, ai) {
     ai.orbOff = null; let bd = 1e9;
     for (const o of this.orbs) { if (o.t > 0) continue; const di = (o.i - v.idx + this.T.N) % this.T.N; if (di > 4 && di < 60 && di < bd) { bd = di; ai.orbOff = o.off; } }
@@ -256,7 +330,7 @@ export class Race {
     const d = this.dummy, t = performance.now() / 1000;
     this.orbs.forEach((o, k) => {
       if (o.t > 0) o.t -= dt;
-      const s = o.t > 0 ? 0.0001 : 1; d.position.set(o.x, this.alt + 1.15 + Math.sin(t * 3 + k) * 0.18, o.z); d.rotation.set(0, t * 2 + k, 0.4); d.scale.setScalar(s); d.updateMatrix();
+      const s = o.t > 0 ? 0.0001 : 1; d.position.set(o.x, this.alt + (this.mode === 'road' ? elevAt(this.T, o.i) : 0) + 1.15 + Math.sin(t * 3 + k) * 0.18, o.z); d.rotation.set(0, t * 2 + k, 0.4); d.scale.setScalar(s); d.updateMatrix();
       this.orbMesh.setMatrixAt(k, d.matrix); this.orbGlow.setMatrixAt(k, d.matrix);
     });
     this.orbMesh.instanceMatrix.needsUpdate = this.orbGlow.instanceMatrix.needsUpdate = true;
@@ -266,7 +340,8 @@ export class Race {
     const c = input.read(v.device), T = this.T, a = save.settings.assist, inp = v.input;
     let steer = c.steer, gas = c.gas, brake = c.brake;
     if (save.settings.autoGas && !brake) gas = 1;
-    if (a !== 'pro' && v.vf > 6) {
+    const C = T.cut, nearCut = C && this.mode === 'road' && v.idx > C.a - 10 && v.idx < C.b && (v.onCut || ((cutPos(T, v.x, v.z, v.idx) || {}).d ?? 99) < C.half + 3);
+    if (a !== 'pro' && v.vf > 6 && !nearCut) {
       const d = lateral(T, v.idx, v.x, v.z), lim = T.half - v.halfW, edge = Math.abs(d) / lim;
       const guide = steerTo(v, T, clamp(d, -lim * 0.55, lim * 0.55));
       const w = a === 'easy' ? clamp((edge - 0.45) * 1.6, 0, 0.75) + (Math.abs(steer) < 0.1 ? 0.25 : 0) : clamp((edge - 0.75) * 2, 0, 0.4);
@@ -295,13 +370,16 @@ export class Race {
       const fin = humans.every(v => v.finished || v.eliminated);
       done = fin || (this.net && this.firstFinish && this.time - this.firstFinish > 30 && humans.some(v => v.finished));
       if (!this.net && this.locals.length && this.locals.every(v => v.finished)) done = true;
-    } else if (this.rule === 'elim') {
+    } else if (this.rule === 'knockdown') done = this.time >= KD_TIME;
+    else if (this.rule === 'toxic') { const alive = vs.filter(v => !v.eliminated); done = alive.length <= 1 || this.time >= TOXIC_MAX || humans.every(v => v.eliminated); }
+    else if (this.rule === 'catch') done = !!this.caughtBy || this.time >= CATCH_TIME;
+    else if (this.rule === 'elim') {
       const alive = vs.filter(v => !v.eliminated);
       done = alive.length <= 1 || (!this.net && this.locals.length && this.locals.every(v => v.eliminated)) || humans.every(v => v.eliminated);
     } else done = this.time >= ORB_TIME;
     if (this.cfg.demo) { if (done) { this.over = true; this.endT = 1; this.results = []; } return; }
     if (done && this.isHost) {
-      const res = this.ranking().map((v, i) => ({ id: v.id, name: v.name, type: v.type, pos: i + 1, time: v.finished ? v.finishTime : 0, score: v.score, out: v.eliminated, busted: !!v.busted, best: v.bestLap || 0, top: Math.round(v.topSpeed * 3.6), kills: v.kills || 0 }));
+      const res = this.ranking().map((v, i) => ({ id: v.id, name: v.name, type: v.type, pos: i + 1, time: v.finished ? v.finishTime : 0, score: v.score, out: v.eliminated, busted: !!v.busted, best: v.bestLap || 0, top: Math.round(v.topSpeed * 3.6), kills: v.kills || 0, mayhem: v.mayhem || 0, caught: v === this.caughtBy }));
       if (this.net) this.net.send({ t: 'end', results: res });
       this.finish(res);
     }
@@ -311,7 +389,7 @@ export class Race {
   updateCamera(vw, dt, snap) {
     let v = vw.v;
     if (v.eliminated) { const alive = this.order ? this.order.find(o => !o.eliminated) : null; if (alive) v = alive; }
-    const ay = v.alt + v.y * (v.air ? 1 : 0.6), airK = v.air ? 1.35 : 1;
+    const ay = v.alt + v.y * (v.air ? 1 : 0.6) + (v.ey || 0), airK = v.air ? 1.35 : 1;
     const cam = vw.cam, sp = Math.abs(v.vf), bike = v.isBike, k = snap ? 1 : 1 - Math.exp(-6 * dt);
     let tgtH = v.h;
     if (this.state === 'countdown') tgtH = v.h + clamp(this.count - 1.2, 0, 2.4) * 0.9;
@@ -348,9 +426,9 @@ export class Race {
     else if (this.lapRule && v.started && v.lapsDone === this.laps - 1 && this.time - v.lapStart < 2.5 && this.laps > 1) msg = 'FINAL LAP';
     const alive = this.racers.filter(x => !x.eliminated).length, wp = v.weapon;
     ui.hud(i, {
-      pos, total: this.racers.length, lapRule: this.lapRule, hp: this.combat || v.hp < 99 ? v.hp : null, weapon: !this.combat ? '' : (wp ? WEAPONS[wp.type].name + (wp.ammo > 1 ? '  ×' + wp.ammo : '') : '— no weapon —'), bust: this.cops.length ? v.bustT / 2.5 : null, count: this.state === 'countdown' ? this.count : -1, lap: Math.min(this.laps, v.lapsDone + 1), laps: this.laps, kmh: v.kmh, nitro: v.nitro, boosting: v.boosting, time: this.time, big, msg, rule: this.rule,
-      info: this.rule === 'elim' ? `KNOCKOUT IN ${Math.max(0, Math.ceil(this.elimAt - this.time))}s  ·  ${alive} LEFT` : this.rule === 'orbs' ? `ORBS ${v.score}  ·  ${Math.max(0, Math.ceil(ORB_TIME - this.time))}s` : this.rule === 'trial' ? (this.cfg.record ? 'RECORD ' + ui.fmtTime(this.cfg.record) : 'SET A LAP TIME') : this.rule === 'pursuit' ? `${this.cops.filter(c => !c.inactive && !c.block).length} COPS ON YOUR TAIL` : this.gates && this.rule !== 'orbs' && this.rule !== 'elim' ? `ALT ${Math.round(v.alt + v.y)} m  ·  GATES ${v.gatesHit || 0}/${this.gates.length * (this.lapRule ? this.laps : 1)}` : (this.heat[v.id] || 0) > this.time ? `WANTED!  POLICE ALERTED  ·  ${Math.ceil(this.heat[v.id] - this.time)}s` : '',
-      danger: (this.heat[v.id] || 0) > this.time || this.rule === 'elim' && !v.eliminated && order.filter(x => !x.eliminated).pop() === v && alive > 1,
+      pos, total: this.racers.length, lapRule: this.lapRule && this.rule !== 'gates' || this.rule === 'gates', blur: Math.min(1, Math.max(0, (v.kmh - 170) / 170)) * 0.6 + (v.boosting ? 0.45 : 0) + (this.slow > 0 ? 0.3 : 0), hp: this.combat || v.hp < 99 ? v.hp : null, weapon: !this.combat ? '' : (wp ? WEAPONS[wp.type].name + (wp.ammo > 1 ? '  ×' + wp.ammo : '') : '— no weapon —'), bust: this.cops.length ? v.bustT / 2.5 : null, count: this.state === 'countdown' ? this.count : -1, lap: Math.min(this.laps, v.lapsDone + 1), laps: this.laps, kmh: v.kmh, nitro: v.nitro, boosting: v.boosting, time: this.time, big, msg, rule: this.rule,
+      info: this.rule === 'knockdown' ? `TAKEDOWNS ${v.score}  ·  ${Math.max(0, Math.ceil(KD_TIME - this.time))}s` : this.rule === 'toxic' ? (v.toxic > 0 ? `YOU ARE TOXIC – PASS IT ON!  ${Math.ceil(v.toxic)}s` : `CLEAN  ·  ${alive} LEFT  ·  infections ${v.score}`) : this.rule === 'gates' ? `GATE POINTS ${v.score}  ·  combo ×${v.combo || 1}` : this.rule === 'catch' ? (this.caughtBy ? 'CAUGHT!' : `TARGET ${this.runner ? Math.round(Math.hypot(v.x - this.runner.x, v.z - this.runner.z)) : 0} m  ·  ${Math.max(0, Math.ceil(CATCH_TIME - this.time))}s`) : this.rule === 'elim' ? `KNOCKOUT IN ${Math.max(0, Math.ceil(this.elimAt - this.time))}s  ·  ${alive} LEFT` : this.rule === 'orbs' ? `ORBS ${v.score}  ·  ${Math.max(0, Math.ceil(ORB_TIME - this.time))}s` : this.rule === 'trial' ? (this.cfg.record ? 'RECORD ' + ui.fmtTime(this.cfg.record) : 'SET A LAP TIME') : this.rule === 'pursuit' ? `${this.cops.filter(c => !c.inactive && !c.block).length} COPS ON YOUR TAIL` : this.gates && this.rule !== 'orbs' && this.rule !== 'elim' ? `ALT ${Math.round(v.alt + v.y)} m  ·  GATES ${v.gatesHit || 0}/${this.gates.length * (this.lapRule ? this.laps : 1)}` : (this.heat[v.id] || 0) > this.time ? `WANTED!  POLICE ALERTED  ·  ${Math.ceil(this.heat[v.id] - this.time)}s` : '',
+      danger: v.toxic > 0 || (this.heat[v.id] || 0) > this.time || this.rule === 'elim' && !v.eliminated && order.filter(x => !x.eliminated).pop() === v && alive > 1,
       board: this.views.length === 1 ? order : null, me: v, vehicles: this.vehicles, best: v.bestLap,
     });
   }
@@ -360,10 +438,13 @@ export class Race {
     let sk = 0;
     this.locals.forEach((v, i) => {
       const on = !v.eliminated && this.state !== 'done';
-      audio.engine(i, on ? Math.abs(v.vf) / v.st.top : 0, on ? Math.max(v.input.gas, 0.15) : 0, v.isBike, v.boosting);
+      audio.engine(i, on ? Math.abs(v.vf) / v.st.top : 0, on ? Math.max(v.input.gas, 0.15) : 0, v.boatForm ? 'boat' : v.kind, v.boosting);
       if (on && (v.drift || v.slip > 6) && Math.abs(v.vf) > 8) sk = Math.max(sk, 0.06 + v.slip * 0.012);
     });
     audio.skid(this.paused ? 0 : sk);
+    // the nearest rival (or traffic car) is heard as it passes, louder the closer it is
+    let rv = null, rd = 48; for (const o of this.vehicles) { if (o.type === 'local' || o.inactive || o.eliminated) continue; for (const l of this.locals) { const d = Math.hypot(o.x - l.x, o.z - l.z); if (d < rd) { rd = d; rv = o; } } }
+    if (rv && !this.paused && this.state !== 'done') audio.engine(9, Math.abs(rv.vf) / rv.st.top, rv.input.gas || 0.6, rv.boatForm ? 'boat' : rv.kind, rv.boosting, (1 - rd / 48) ** 2 * 0.75); else audio.engine(9, 0, 0, rv ? rv.kind : this.kind, false, 0);
     let near = 0; for (const c of this.cops) { if (c.inactive) continue; for (const l of this.locals) { const d = Math.hypot(c.x - l.x, c.z - l.z); if (d < 110) near = Math.max(near, 1 - d / 110); } }
     audio.siren(this.paused || this.over ? 0 : near);
   }
@@ -388,6 +469,8 @@ export class Race {
     if (this.orbMesh) { this.scene.remove(this.orbMesh, this.orbGlow); this.orbMesh.geometry.dispose(); this.orbGlow.geometry.dispose(); }
     this.scene.remove(this.fx.smokeP.points, this.fx.glowP.points);
     if (this.combat) this.combat.dispose(); if (this.peds) this.peds.dispose();
+    if (this.dgGroup) { this.scene.remove(this.dgGroup); this.dgGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    const cv = document.getElementById('game'); if (cv) cv.classList.remove('slowmo');
     this.world.dispose(); audio.silence(); ui.hudClear();
   }
 }

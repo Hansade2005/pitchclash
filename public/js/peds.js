@@ -6,7 +6,7 @@ export class Peds {
   constructor(race, n) {
     this.race = race; const T = this.T = race.T; this.list = [];
     for (let k = 0; k < n; k++) {
-      let i = Math.floor(T.N * (k + 0.6) / n); if (i > T.tunnel[0] - 8 && i < T.tunnel[1] + 8) i = T.tunnel[1] + 12; i = Math.min(T.N - 40, Math.max(50, i));
+      let i = Math.floor(T.N * (k + 0.6) / n); if (i > T.tunnel[0] - 8 && i < T.tunnel[1] + 8) i = T.tunnel[1] + 12; i = Math.min(T.N - 40, Math.max(50, i)); while (T.elev && T.elev[i] > 0.2) i = (i + 9) % T.N;
       const p = makePerson(k + 2), edge = T.half + 2.4; p.play('Walk', 0); race.world.group.add(p.root);
       this.list.push({ p, i, lat: (k % 2 ? 1 : -1) * edge, dir: k % 2 ? -1 : 1, wait: 1 + k * 1.7, down: 0, vx: 0, vy: 0, vz: 0, y: 0, x: 0, z: 0, edge });
     }

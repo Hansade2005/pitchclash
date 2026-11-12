@@ -30,6 +30,15 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 **Settings → Driving help: Easy** (default) brakes for corners and steers you off walls.
 **Auto-accelerate** makes it steer-only.
 
+## What's new in 3.0
+
+- **Track structures**: elevated flyovers on pillars with a busy street underneath, river bridges with steel arches, tunnels, and **shortcuts** – a gap in the barrier, a SHORTCUT sign and a construction road with a smashable fence that saves 25–90 m. Boost pads on the straights.
+- **New race types**: Versus Duel, Knockdown (wreck rivals), Toxic Tag (spread the toxic aura before your timer runs out), Drift Gates, Catch the Runner, and Escape the Police – alongside Classic, Combat, City Rush, Land & Sea Relay, Elimination, Orb Rush and Time Trial.
+- **Action**: ram takedowns with slow motion, near-miss nitro, smashable barrels and fences for Mayhem credits, police patrols that chase reckless drivers (hitting traffic or pedestrians, firing weapons).
+- **Atmosphere**: rain with wet-road sheen, snow, speed-blur at high speed and on nitro.
+- **Engines**: each class sounds different – recorded engine loops for cars, bikes and boats (bikes revvier and raspier), rotor slap and turbine whine for helicopters, propeller drone for planes, a synth hum for spaceships – and you hear rivals as they pass.
+- **Menus**: rebuilt as lit 3D cards with rendered vehicles, drawn icons, stars and medals.
+
 ## What's in the game
 
 - **Six racing classes** – cars, bikes, boats (city canals), helicopters and planes (ring gates above the streets) and spaceships (a neon track among asteroids).
@@ -57,6 +66,7 @@ Graphics default to **Auto**, which lowers the render resolution if the frame ra
 
 **APEX CLASH** © 2026 **Anye Happiness Ade** — AI Engineer, Cameroon.
 
+- Engine sounds: built from the engine recordings in the owner's asset library (two loops cut from them).
 - Car, boat, helicopter, plane and character models: from the owner's `neon-overdrive` asset library (original vehicle models; characters generated with MakeHuman/MPFB2, CC0; animations from Adobe Mixamo, embedded for in-game use).
 - Music (CC BY 3.0, via Jamendo): "The Synthwave Electronic" by Sevennotes · "Ghosts" by Lyvo · "DJ Smallest - Chill" by Smallest.
 - Engine: three.js (MIT). Networking: ws (MIT).

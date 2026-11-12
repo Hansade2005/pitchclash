@@ -4,8 +4,9 @@ import { loadAll, makePerson, HANS } from './assets.js';
 import { TRACKS, trackById } from './track.js';
 import { Race, getTrack } from './race.js';
 import { flagURL, flagCanvas } from './flags.js';
+import { vehicleThumb } from './thumbs.js';
 import { Vehicle } from './vehicle.js';
-import { VEHICLES, idsOf, PAINTS, AI_NAMES, RULES, RULE_HELP, TOUR, COUNTRIES, KINDS, rulesFor, countryById, levelOf, xpFor, rankOf, UPGRADES, save, persist, resetSave, statsFor } from './data.js';
+import { VEHICLES, idsOf, PAINTS, AI_NAMES, RULES, RULE_HELP, TOUR, COUNTRIES, KINDS, rulesFor, countryById, TRACK_ENV, levelOf, xpFor, rankOf, UPGRADES, save, persist, resetSave, statsFor } from './data.js';
 import * as input from './input.js';
 import * as audio from './audio.js';
 import * as ui from './ui.js';
@@ -70,6 +71,7 @@ function startDemo() {
   game.race = new Race(game, { demo: true, track: pick(TRACKS).id, laps: 999, rule: 'sprint', entrants: Array.from({ length: 6 }, (_, i) => ({ id: 'ai' + i, name: AI_NAMES[i], veh: pick(ids), color: PAINTS[i], type: 'ai', skill: 0.8 + i * 0.03, person: i })) });
 }
 function launch(cfg) {
+  if (cfg.weather === undefined || cfg.weather === 'auto') cfg.weather = (TRACK_ENV[cfg.track] || {}).weather || null;
   hideShow(); ui.hideMenu(); ui.loading(0.5, 'Building ' + trackName(cfg.track) + '…');
   setTimeout(() => { disposeRace(); game.race = new Race(game, cfg); ui.loading(1); }, 40);
 }
@@ -97,15 +99,15 @@ const TIPS = ['Drift round corners to fill your nitro.', 'Tuck in behind a rival
 function xpBar() { const lv = levelOf(save.xp), a = xpFor(lv), b = xpFor(lv + 1); return `<div class="xp"><b>LV ${lv} · ${rankOf(lv)}</b><div><i style="width:${Math.round((save.xp - a) / (b - a) * 100)}%"></i></div><span>${save.xp - a}/${b - a} XP</span></div>`; }
 function mainMenu() {
   hideShow();
-  const stars = k => Object.values(save.tour[k]).reduce((a, b) => a + b, 0);
-  ui.menu({ id: 'main', title: 'APEX CLASH', logo: true, sub: `Welcome, ${save.name}  ·  ${save.credits.toLocaleString()} credits`, cls: 'narrow main', items: [
+  const stars = k => Object.values(save.tour[k]).reduce((a, b) => a + b, 0), tot = Object.keys(KINDS).reduce((a, k) => a + stars(k), 0), car = myVeh('car');
+  ui.menu({ id: 'main', title: 'APEX CLASH', logo: true, sub: `Welcome, ${save.name}  ·  ${save.credits.toLocaleString()} credits`, cls: 'main', items: [
     { html: xpBar() },
-    { label: 'World Tour', hint: `6 classes · 8 countries · 192 levels · ★ ${Object.keys(KINDS).reduce((a, k) => a + stars(k), 0)}/576`, cls: 'primary', onClick: () => tourMenu('car') },
-    { label: 'Quick Race', hint: 'Any track, any rules', onClick: quickMenu },
-    { label: 'MultiClash', hint: '2+ players · split-screen or online', onClick: clashMenu },
-    { label: 'Garage', hint: 'Buy, upgrade, paint', onClick: () => garageMenu('car') },
-    { label: 'Settings', onClick: settingsMenu },
-    { label: 'How to Play', onClick: howMenu },
+    { card: true, key: 'tour', label: 'World Tour', hint: '6 classes · 8 countries · 192 levels', icon: 'globe', accent: '#ff7a1a', img: vehicleThumb(car, paintOf(car)), badge: `${ui.stars(1, 1)} ${tot}/576`, onClick: () => tourMenu('car') },
+    { card: true, key: 'quick', label: 'Quick Race', hint: '11 race types · police · weather', icon: 'bolt', accent: '#35f0ff', img: vehicleThumb(myVeh('bike'), paintOf(myVeh('bike'))), onClick: quickMenu },
+    { card: true, key: 'clash', label: 'MultiClash', hint: 'Friends: split-screen or Wi-Fi', icon: 'users', accent: '#ff3fa0', img: vehicleThumb('kestrel', 0xff3fa0), onClick: clashMenu },
+    { card: true, key: 'garage', label: 'Garage', hint: 'Buy, upgrade and paint', icon: 'wrench', accent: '#3df58a', img: vehicleThumb(myVeh('space'), paintOf(myVeh('space'))), badge: `${save.credits.toLocaleString()} cr`, onClick: () => garageMenu('car') },
+    { card: true, size: 'small', key: 'set', label: 'Settings', icon: 'gear', accent: '#9aa5bd', onClick: settingsMenu },
+    { card: true, size: 'small', key: 'how', label: 'How to Play', icon: 'book', accent: '#9aa5bd', onClick: howMenu },
     { html: `<div class="tipline">Tip: ${pick(TIPS)}</div>` },
   ] });
 }
@@ -123,17 +125,20 @@ function trackMap(id) {
 const trackCard = id => { const t = trackById(id), c = countryById(t.country), m = trackMap(id); return `<div class="crow"><img class="flag" src="${flagURL(c.id)}" alt=""><div><b>${t.name}</b><span>${c.name} · ${m.km} km · ${{ day: 'Day', sunset: 'Sunset', dusk: 'Dusk', night: 'Night', overcast: 'Overcast' }[t.theme]}</span></div><img class="map" src="${m.url}" alt=""></div>`; };
 
 // cops + civilian traffic for a race (ids are stable so online clients agree)
-function npcEntrants(rule, cops = 0, traffic = 0, kind = 'car') {
-  const out = [], civ = ['fox', 'orion', 'meridian', 'atlas']; if (kind !== 'car' && kind !== 'bike') return out;
+function npcEntrants(rule, cops = 0, traffic = 0, kind = 'car', police = false) {
+  const out = [], civ = ['fox', 'orion', 'meridian', 'atlas'];
+  if (rule === 'catch') { const ids = idsOf(kind).sort((a, b) => VEHICLES[b].price - VEHICLES[a].price); out.push({ id: 'runner', name: 'TARGET', veh: ids[1] || ids[0], color: 0xffe14a, type: 'runner' }); }
+  if (kind !== 'car' && kind !== 'bike') return out;
+  if (police && !['rush', 'combat', 'pursuit'].includes(rule)) for (let i = 0; i < 2; i++) out.push({ id: 'cop' + i, name: 'POLICE', veh: 'police', color: 0xf2f2f5, type: 'cop' });
   if (rule === 'rush' || rule === 'combat') for (let i = 0; i < 2; i++) out.push({ id: 'cop' + i, name: 'POLICE', veh: 'police', color: 0xf2f2f5, type: 'cop' });
   if (rule === 'pursuit') { for (let i = 0; i < Math.max(2, cops); i++) out.push({ id: 'cop' + i, name: 'POLICE', veh: 'police', color: 0xf2f2f5, type: 'cop' }); for (let i = 0; i < 2; i++) out.push({ id: 'blk' + i, name: 'POLICE', veh: 'police', color: 0xf2f2f5, type: 'cop', block: true }); }
   for (let i = 0; i < traffic; i++) out.push({ id: 'civ' + i, name: '', veh: civ[i % civ.length], color: [0x9aa3ad, 0x7a4b2a, 0xdedede, 0x2d4a6e, 0x8d1f1f][i % 5], type: 'traffic' });
   return out;
 }
 function award(pos, total, bonus = 0) { const xp = 40 + Math.max(0, total - pos) * 15 + bonus, before = levelOf(save.xp); save.xp += xp; save.stats.races++; if (pos === 1) save.stats.wins++; persist(); if (levelOf(save.xp) > before) ui.toast(`LEVEL UP!  You are now Level ${levelOf(save.xp)} · ${rankOf(levelOf(save.xp))}`); return xp; }
-function statRow(me_, xp) { return `<div class="statrow"><div><b>${me_.best ? ui.fmtTime(me_.best) : '—'}</b>best lap</div><div><b>${me_.top || 0}</b>top km/h</div>${game.race && game.race.combat ? `<div><b>${me_.kills || 0}</b>wrecks</div>` : ''}<div><b>+${xp}</b>XP</div></div>`; }
+function statRow(me_, xp) { return `<div class="statrow"><div><b>${me_.best ? ui.fmtTime(me_.best) : '—'}</b>best lap</div><div><b>${me_.top || 0}</b>top km/h</div><div><b>${me_.kills || 0}</b>takedowns</div>${me_.mayhem ? `<div><b>+${me_.mayhem}</b>mayhem cr</div>` : ''}<div><b>+${xp}</b>XP</div></div>`; }
 
-const q = { kind: 'car', veh: null, country: 'cm', track: 'douala', laps: 3, ai: 5, diff: 'medium', rule: 'sprint', traffic: 0 };
+const q = { kind: 'car', veh: null, country: 'cm', track: 'douala', laps: 3, ai: 5, diff: 'medium', rule: 'sprint', traffic: 0, police: false, weather: 'auto' };
 function quickMenu() {
   hideShow();
   const ids = idsOf(q.kind); if (!ids.includes(q.veh)) q.veh = myVeh(q.kind);
@@ -148,19 +153,21 @@ function quickMenu() {
     opt('Race type', RULES[q.rule], d => q.rule = cyc(rulesFor(q.kind), q.rule, d)),
     opt('Vehicle', VEHICLES[q.veh].name, d => q.veh = cyc(ids, q.veh, d)),
     lapR ? opt('Laps', q.laps, d => q.laps = cyc([1, 2, 3, 4, 5], q.laps, d)) : null,
-    q.rule !== 'trial' ? opt('Opponents', q.ai, d => q.ai = cyc([1, 2, 3, 4, 5, 6, 7], q.ai, d)) : null,
+    q.rule !== 'trial' && q.rule !== 'versus' ? opt('Opponents', q.ai, d => q.ai = cyc([1, 2, 3, 4, 5, 6, 7], q.ai, d)) : null,
     q.rule !== 'trial' ? opt('Difficulty', q.diff, d => q.diff = cyc(Object.keys(DIFFS), q.diff, d)) : null,
+    road && !['pursuit', 'rush', 'combat', 'trial'].includes(q.rule) ? opt('Police patrol', q.police ? 'On – they chase reckless drivers' : 'Off', () => q.police = !q.police) : null,
+    opt('Weather', { auto: 'Track default', clear: 'Clear', rain: 'Rain', snow: 'Snow' }[q.weather], d => q.weather = cyc(['auto', 'clear', 'rain', 'snow'], q.weather, d)),
     q.rule !== 'trial' && road ? opt('Civilian traffic', q.traffic ? q.traffic + ' cars' : 'Off', d => q.traffic = cyc([0, 3, 5], q.traffic, d)) : null,
-    { label: 'START RACE', cls: 'primary', onClick: startQuick },
+    { label: 'START RACE', icon: 'flag', cls: 'primary', onClick: startQuick },
   ], back: mainMenu });
 }
 function startQuick() {
   if (!idsOf(q.kind).includes(q.veh)) q.veh = myVeh(q.kind);
   const p = { ...me(q.kind), veh: q.veh, up: save.owned[q.veh] || null, color: paintOf(q.veh) }, trial = q.rule === 'trial', key = q.track + '_' + q.kind;
-  launch({ track: q.track, laps: q.laps, rule: q.rule, seed: Date.now() % 1e6, record: save.best[key], restart: startQuick,
-    entrants: trial ? [p] : [...grid(aiEntrants(q.kind, q.ai, DIFFS[q.diff], q.veh), p, q.rule), ...npcEntrants(q.rule, 3, q.rule === 'rush' ? Math.max(4, q.traffic) : q.traffic, q.kind)], peds: q.rule === 'rush' ? 6 : 0,
+  launch({ track: q.track, laps: q.laps, rule: q.rule, seed: Date.now() % 1e6, record: save.best[key], restart: startQuick, weather: q.weather === 'clear' ? null : q.weather,
+    entrants: trial ? [p] : [...grid(aiEntrants(q.kind, q.rule === 'versus' ? 1 : q.ai, DIFFS[q.diff] + (q.rule === 'versus' ? 0.06 : 0), q.veh), p, q.rule), ...npcEntrants(q.rule, 3, q.rule === 'rush' ? Math.max(4, q.traffic) : q.traffic, q.kind, q.police)], peds: q.rule === 'rush' ? 6 : 0,
     onEnd: res => {
-      const m = res.find(r => r.type === 'local'), xp = award(m.pos, res.length);
+      const m = res.find(r => r.type === 'local'), xp = award(m.pos, res.length); if (m.mayhem) { save.credits += m.mayhem; persist(); }
       if (trial) { const old = save.best[key], rec = m.best && (!old || m.best < old); if (rec) { save.best[key] = m.best; persist(); audio.sfx('win'); }
         return resultsMenu(res, { title: rec ? 'New record!' : 'Time Trial', sub: `${trackName(q.track)}  ·  Best lap ${m.best ? ui.fmtTime(m.best) : '—'}${old ? '  ·  Previous record ' + ui.fmtTime(old) : ''}`, extra: statRow(m, xp), again: startQuick }); }
       resultsMenu(res, { title: m.busted ? 'Busted!' : 'Race Results', sub: trackName(q.track) + ' · ' + RULES[q.rule], extra: statRow(m, xp), again: startQuick });
@@ -170,11 +177,11 @@ function startQuick() {
 function resultsMenu(res, o) {
   const rule = game.race ? game.race.rule : 'sprint';
   ui.hudClear();
-  const medal = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : p;
-  const rows = res.map(r => `<div class="res ${r.type === 'local' || r.mine ? 'me' : ''}"><b>${medal(r.pos)}</b><span>${r.name}</span><em>${o.pts ? '+' + o.pts(r) + ' pts' : rule === 'orbs' ? r.score + ' orbs' : r.busted ? 'BUSTED' : r.out ? 'OUT' : r.time ? ui.fmtTime(r.time) : '—'}</em></div>`).join('');
+  const medal = ui.medal;
+  const rows = res.map(r => `<div class="res ${r.type === 'local' || r.mine ? 'me' : ''}"><b>${medal(r.pos)}</b><span>${r.name}</span><em>${o.pts ? '+' + o.pts(r) + ' pts' : rule === 'orbs' ? r.score + ' orbs' : rule === 'knockdown' ? r.score + ' takedowns' : rule === 'gates' ? r.score + ' pts' : rule === 'toxic' ? (r.out ? 'OUT · ' : '') + r.score + ' infected' : rule === 'catch' ? (r.caught ? 'CAUGHT IT' : '—') : r.busted ? 'BUSTED' : r.out ? 'OUT' : r.time ? ui.fmtTime(r.time) : '—'}</em></div>`).join('');
   ui.menu({ id: 'results', cls: o.cls, title: o.title, sub: o.sub, items: [{ html: rows, cls: 'reslist' }, o.extra ? { html: o.extra } : null,
-    o.next ? { label: o.nextLabel || 'Continue', cls: 'primary', onClick: o.next } : null, o.again ? { label: 'Race again', cls: o.next ? '' : 'primary', onClick: o.again } : null,
-    o.wait ? { text: o.wait, cls: 'dim' } : null, { label: 'Main menu', onClick: quitToMenu }] });
+    o.next ? { label: o.nextLabel || 'Continue', cls: 'primary', onClick: o.next } : null, o.again ? { label: 'Race again', icon: 'refresh', cls: o.next ? '' : 'primary', onClick: o.again } : null,
+    o.wait ? { text: o.wait, cls: 'dim' } : null, { label: 'Main menu', icon: 'exit', onClick: quitToMenu }] });
 }
 
 // ----- World Tour
@@ -184,29 +191,29 @@ const countryOpen = (kind, ci) => ci === 0 || (save.tour[kind][TOUR[kind][ci - 1
 function tourMenu(kind) {
   hideShow(); const ci = tsel[kind], c = COUNTRIES[ci], ev = TOUR[kind][ci], open = countryOpen(kind, ci), st = save.tour[kind];
   const total = COUNTRIES.reduce((a, _, i) => a + countryStars(kind, i), 0), re = () => tourMenu(kind);
-  ui.menu({ id: 'tour', title: 'World Tour', sub: `${KINDS[kind]}  ·  ★ ${total}/96  ·  ${save.credits.toLocaleString()} credits  ·  Driving: ${VEHICLES[myVeh(kind)].name}`, items: [
+  ui.menu({ id: 'tour', title: 'World Tour', sub: `${KINDS[kind]}  ·  ${total}/96 stars  ·  ${save.credits.toLocaleString()} credits  ·  Driving: ${VEHICLES[myVeh(kind)].name}`, items: [
     { row: [{ key: 'class', label: 'Class', value: KINDS[kind], cycle: true, onClick: () => tourMenu(cyc(Object.keys(KINDS), kind, 1)), onLeft: () => tourMenu(cyc(Object.keys(KINDS), kind, -1)) }, { label: 'Garage', cls: 'tab', onClick: () => garageMenu(kind) }] },
-    { html: `<div class="crow"><img class="flag" src="${flagURL(c.id)}" alt=""><div><b>${ci + 1}. ${c.name}</b><span>${open ? '★ ' + countryStars(kind, ci) + '/12' : 'Locked – win a star in the ' + COUNTRIES[ci - 1].name + ' Grand Final'}</span></div><img class="map" src="${trackMap(c.tracks[0]).url}" alt=""></div>` },
+    { html: `<div class="crow"><img class="flag" src="${flagURL(c.id)}" alt=""><div><b>${ci + 1}. ${c.name}</b><span>${open ? countryStars(kind, ci) + '/12 stars' : 'Locked – win a star in the ' + COUNTRIES[ci - 1].name + ' Grand Final'}</span></div><img class="map" src="${trackMap(c.tracks[0]).url}" alt=""></div>` },
     { key: 'country', label: 'Country', value: `${c.name}  (${ci + 1}/8)`, cycle: true, onClick: () => { tsel[kind] = (ci + 1) % 8; re(); }, onLeft: () => { tsel[kind] = (ci + 7) % 8; re(); } },
     ...ev.map((e, i) => {
       const ok = open && (i === 0 || (st[ev[i - 1].id] || 0) > 0), s = st[e.id] || 0;
-      return { key: 'ev' + i, label: `${i + 1}. ${e.name}`, hint: `${trackName(e.track)} · ${RULES[e.rule]}${e.traffic ? ' · traffic' : ''} · ${e.ai} rivals · ${e.prize.toLocaleString()} cr`, value: ok ? '★'.repeat(s) + '☆'.repeat(3 - s) : 'LOCKED', disabled: !ok, cls: ok && !s ? 'primary' : '', onClick: () => startTour(kind, ci, i) };
+      return { key: 'ev' + i, label: `${i + 1}. ${e.name}`, hint: `${trackName(e.track)} · ${RULES[e.rule]}${e.traffic ? ' · traffic' : ''} · ${e.ai} rivals · ${e.prize.toLocaleString()} cr`, valueHtml: ok ? ui.stars(s) : `${ui.icon('lock')}`, icon: ok ? ({ sprint: 'flag', versus: 'users', knockdown: 'car', toxic: 'bolt', gates: 'refresh', catch: 'timer', pursuit: 'exit' }[e.rule] || 'flag') : 'lock', disabled: !ok, cls: ok && !s ? 'primary' : '', onClick: () => startTour(kind, ci, i) };
     }),
   ], back: mainMenu });
 }
 function startTour(kind, ci, i) {
   const e = TOUR[kind][ci][i]; tsel[kind] = ci;
   launch({ track: e.track, laps: e.laps || 3, rule: e.rule, seed: ci * 10 + i + 7, restart: () => startTour(kind, ci, i),
-    entrants: [...grid(aiEntrants(kind, e.ai, e.skill), me(kind), e.rule), ...npcEntrants(e.rule, e.cops, e.traffic || 0, kind)], peds: e.peds || 0,
+    entrants: [...grid(aiEntrants(kind, e.rule === 'versus' ? 1 : e.ai, e.skill + (e.rule === 'versus' ? 0.05 : 0)), me(kind), e.rule), ...npcEntrants(e.rule, e.cops, e.traffic || 0, kind, ci >= 3)], peds: e.peds || 0,
     onEnd: res => {
       const m = res.find(r => r.type === 'local'), pos = m.pos, stars = m.busted ? 0 : pos === 1 ? 3 : pos === 2 ? 2 : pos === 3 ? 1 : 0, prize = Math.round(e.prize * ([1, 0.6, 0.35][pos - 1] || 0.1));
-      const xp = award(pos, res.length, stars * 30); save.credits += prize; save.tour[kind][e.id] = Math.max(save.tour[kind][e.id] || 0, stars); if (m.busted) save.stats.busted++; persist();
+      const xp = award(pos, res.length, stars * 30); save.credits += prize + (m.mayhem || 0); save.tour[kind][e.id] = Math.max(save.tour[kind][e.id] || 0, stars); if (m.busted) save.stats.busted++; persist();
       if (stars) audio.sfx('win');
       const won = pos === 1 && !m.busted; if (won) { const tc = trackById(e.track).country; setTimeout(() => showWinner(HANS, tc), 60); }
       const lastEv = i === 3, lastC = ci === COUNTRIES.length - 1, nextFn = !stars ? null : !lastEv ? () => startTour(kind, ci, i + 1) : !lastC ? () => { tsel[kind] = ci + 1; tourMenu(kind); } : null;
-      resultsMenu(res, { cls: won ? 'left' : '', title: m.busted ? 'Busted!' : won ? 'Winner! Raise the flag!' : stars ? `${ui.ordinal(pos)} place!` : 'Not this time…', sub: `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}   +${prize.toLocaleString()} credits` + (stars ? '' : '  ·  Finish top 3 to unlock the next level'),
+      resultsMenu(res, { cls: won ? 'left' : '', title: m.busted ? 'Busted!' : won ? 'Winner! Raise the flag!' : stars ? `${ui.ordinal(pos)} place!` : 'Not this time…', sub: `${stars}/3 stars   ·   +${prize.toLocaleString()} credits` + (stars ? '' : '  ·  Finish top 3 to unlock the next level'),
         next: nextFn, nextLabel: lastEv ? `Next country: ${lastC ? '' : COUNTRIES[ci + 1].name}` : 'Next level', again: () => startTour(kind, ci, i),
-        extra: statRow(m, xp) + (stars && lastEv ? `<div class="champ">${lastC ? '🏆 WORLD CHAMPION! You conquered the World Tour.' : '🏁 ' + COUNTRIES[ci].name + ' conquered!'}</div>` : '') });
+        extra: statRow(m, xp) + (stars && lastEv ? `<div class="champ">${lastC ? ui.icon('trophy') + ' WORLD CHAMPION! You conquered the World Tour.' : ui.icon('flag') + ' ' + COUNTRIES[ci].name + ' conquered!'}</div>` : '') });
     } });
 }
 
@@ -267,7 +274,7 @@ function howMenu() {
 // ---------------- MultiClash ----------------
 let mc = null, net = null;
 const POINTS = [10, 7, 5, 4, 3, 2, 1, 0];
-const ROUND_RULES = ['sprint', 'combat', 'relay', 'elim', 'pursuit'];
+const ROUND_RULES = ['sprint', 'combat', 'relay', 'elim', 'pursuit'], SPLIT_RULES = ['sprint', 'knockdown', 'gates', 'toxic', 'combat', 'relay', 'elim', 'pursuit'];
 function clashMenu() {
   hideShow(); if (net) { net.leave(); net = null; } mc = null;
   ui.menu({ id: 'clash', title: 'MultiClash', sub: 'A tournament of mixed rounds – Sprint, Elimination and Orb Rush. Most points takes the crown.', cls: 'narrow', items: [
@@ -307,7 +314,7 @@ function clashEntrants() {
 }
 function startClashRound() {
   const used = mc.used || (mc.used = []), free = TRACKS.filter(t => !used.includes(t.id)); const tr = pick(free.length ? free : TRACKS).id; used.push(tr);
-  const rr = ROUND_RULES[mc.round % ROUND_RULES.length]; mc.cur = { track: tr, rule: rulesFor(mc.kind).includes(rr) ? rr : 'sprint', laps: 2 };
+  const RL = mc.mode === 'split' ? SPLIT_RULES : ROUND_RULES, rr = RL[mc.round % RL.length]; mc.cur = { track: tr, rule: rulesFor(mc.kind).includes(rr) ? rr : 'sprint', laps: 2 };
   const c = { ...mc.cur, seed: Math.floor(Math.random() * 1e6), entrants: [...clashEntrants(), ...npcEntrants(mc.cur.rule, 3, 0, mc.kind)] };
   if (mc.mode === 'online') { net.send({ t: 'start', round: mc.round, rounds: mc.rounds, kind: mc.kind, cfg: c }); beginOnlineRound(c); }
   else launch({ ...c, onEnd: clashRoundEnd });
@@ -331,7 +338,7 @@ function clashFinal() {
   const order = Object.entries(mc.points).sort((a, b) => b[1] - a[1]); disposeRace(); startDemo();
   const mine = mc.mode === 'split' ? 'p0' : 'p' + net.id;
   showPodium(order.map(([id], i) => ({ name: mc.names[id], person: id === mine ? HANS : i * 3 + 1 }))); audio.sfx('win');
-  ui.menu({ id: 'final', title: `🏆 ${mc.names[order[0][0]]} wins the MultiClash!`, cls: 'left', items: [
+  ui.menu({ id: 'final', title: `${mc.names[order[0][0]]} wins the MultiClash!`, cls: 'left', items: [
     { html: `<div class="reslist">${order.map(([id, p], i) => `<div class="res ${i === 0 ? 'me' : ''}"><b>${i + 1}</b><span>${mc.names[id]}</span><em>${p} pts</em></div>`).join('')}</div>` },
     { label: 'Back to lobby', cls: 'primary', onClick: () => { mc.round = 0; mc.points = {}; mc.mode === 'split' ? splitLobby() : onlineLobby(); } }, { label: 'Main menu', onClick: quitToMenu }] });
 }
@@ -363,7 +370,7 @@ function joinMenu() {
 function onlineLobby() {
   hideShow(); const host = net.isHost, ids = idsOf(mc.kind), re = () => { net.send({ t: 'cfg', mc: { kind: mc.kind, rounds: mc.rounds, ai: mc.ai, diff: mc.diff } }); sendMe(); onlineLobby(); };
   ui.menu({ id: 'lobby', title: 'Room ' + net.room, sub: host ? 'Friends: open ' + ((mc.addr && mc.addr[0]) || 'http://<this-PC-address>:3000') + ' in their browser, choose MultiClash → Join a room, code ' + net.room : 'Connected. Waiting for the host to start.', items: [
-    { html: `<div class="reslist">${net.players.map(p => `<div class="res ${p.id === net.id ? 'me' : ''}"><b>${p.id === net.hostId ? '★' : '•'}</b><span>${p.name}</span><em>${(VEHICLES[p.veh] || {}).name || ''}</em></div>`).join('')}</div>` },
+    { html: `<div class="reslist">${net.players.map(p => `<div class="res ${p.id === net.id ? 'me' : ''}"><b>${p.id === net.hostId ? ui.icon('trophy') : '•'}</b><span>${p.name}</span><em>${(VEHICLES[p.veh] || {}).name || ''}</em></div>`).join('')}</div>` },
     { key: 'myveh', label: 'Your vehicle', value: VEHICLES[myVeh(mc.kind)].name, cycle: true, onClick: () => { save.sel[mc.kind] = cyc(ids.filter(i => save.owned[i] || true), myVeh(mc.kind), 1); sendMe(); onlineLobby(); }, onLeft: () => { save.sel[mc.kind] = cyc(ids, myVeh(mc.kind), -1); sendMe(); onlineLobby(); } },
     ...clashOpts(re, host),
     host ? { key: 'go', label: 'START MULTICLASH', cls: 'primary', onClick: () => { mc.round = 0; mc.points = {}; startClashRound(); } } : { text: 'The host starts the game.', cls: 'dim' },

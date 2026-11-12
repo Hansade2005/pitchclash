@@ -1,7 +1,7 @@
 // Combat racing: weapon crates, machine gun, homing rockets, mines, shield and instant nitro.
 // Ownership rule (works offline and online): whoever simulates a vehicle decides the damage it takes.
 import * as THREE from 'three';
-import { lateral, nearestIdx } from './track.js';
+import { lateral, nearestIdx, elevAt } from './track.js';
 import * as audio from './audio.js';
 
 export const WEAPONS = {
@@ -43,13 +43,13 @@ export class Combat {
   spawn(v, w, p, fromNet) {
     const x = p ? p.x : v.x, z = p ? p.z : v.z, h = p ? p.h : v.h, mine = v.type === 'local';
     if (w === 'gun') {
-      this.shots.push({ type: 'gun', x: x + Math.sin(h) * 2, z: z + Math.cos(h) * 2, h, sp: 150 + Math.max(0, v.vf), life: 0.55, owner: v });
+      this.shots.push({ y: v.ey || 0, type: 'gun', x: x + Math.sin(h) * 2, z: z + Math.cos(h) * 2, h, sp: 150 + Math.max(0, v.vf), life: 0.55, owner: v });
       if (mine) audio.sfx('gun');
     } else if (w === 'rocket') {
       const t = p && p.tid ? this.race.byId[p.tid] : this.targetFor(v, 190);
-      this.shots.push({ type: 'rocket', x: x + Math.sin(h) * 2.4, z: z + Math.cos(h) * 2.4, h, sp: Math.max(55, v.vf + 38), life: 4.5, owner: v, target: t });
+      this.shots.push({ y: v.ey || 0, type: 'rocket', x: x + Math.sin(h) * 2.4, z: z + Math.cos(h) * 2.4, h, sp: Math.max(55, v.vf + 38), life: 4.5, owner: v, target: t });
       if (mine) audio.sfx('rocket'); if (!p) p = { tid: t ? t.id : null };
-    } else if (w === 'mine') { this.mines.push({ x: x - Math.sin(h) * 3, z: z - Math.cos(h) * 3, owner: v, arm: 0.6, life: 40 }); if (mine) audio.sfx('click'); }
+    } else if (w === 'mine') { this.mines.push({ y: v.ey || 0, x: x - Math.sin(h) * 3, z: z - Math.cos(h) * 3, owner: v, arm: 0.6, life: 40 }); if (mine) audio.sfx('click'); }
     else if (w === 'shield') { if (!v.remote) v.shield = 7; if (mine) audio.sfx('nitro'); }
     else if (w === 'boost') { if (!v.remote) v.nitro = 1; if (mine) audio.sfx('nitro'); }
     if (this.race.net && !fromNet) this.race.net.send({ t: 'shot', id: v.id, w, x: +v.x.toFixed(2), z: +v.z.toFixed(2), h: +v.h.toFixed(3), tid: p && p.tid });
@@ -79,7 +79,7 @@ export class Combat {
     this.crates.forEach((c, k) => {
       if (c.t > 0) c.t -= dt;
       else for (const v of vs) { if (v.remote || v.weapon || v.npc || v.eliminated || v.inactive || v.finished) continue; const dx = c.x - v.x, dz = c.z - v.z; if (dx * dx + dz * dz < 5.5) { c.t = 9; this.give(v); this.fx.burst(c.x, 1, c.z, 1, 0.7, 0.2); if (r.net) r.net.send({ t: 'crate', k }); break; } }
-      d.position.set(c.x, this.y0 + 1.25 + Math.sin(time * 2.5 + k) * 0.15, c.z); d.rotation.set(0.5, time * 1.6 + k, 0.3); d.scale.setScalar(c.t > 0 ? 0.0001 : 1); d.updateMatrix(); this.crateMesh.setMatrixAt(k, d.matrix);
+      d.position.set(c.x, this.y0 + elevAt(this.T, c.i) + 1.25 + Math.sin(time * 2.5 + k) * 0.15, c.z); d.rotation.set(0.5, time * 1.6 + k, 0.3); d.scale.setScalar(c.t > 0 ? 0.0001 : 1); d.updateMatrix(); this.crateMesh.setMatrixAt(k, d.matrix);
     });
     this.crateMesh.instanceMatrix.needsUpdate = true;
     // firing: players hold the fire button, AI decides for itself
@@ -110,8 +110,8 @@ export class Combat {
           if (dx * dx + dz * dz < rad * rad) { this.hit(o, s.type === 'gun' ? 7 : 60, s.type === 'rocket', s.owner); dead = true; break; }
         }
       }
-      if (s.type === 'gun') this.fx.glowP.emit(s.x, this.y0 + 0.8, s.z, 0, 0, 0, 0.07, 0.35, 1, 0.85, 0.35, 1);
-      else if (!dead) { d.position.set(s.x, this.y0 + 0.9, s.z); d.rotation.set(0, s.h, 0); d.scale.setScalar(1); d.updateMatrix(); if (nr < 12) this.rocketMesh.setMatrixAt(nr++, d.matrix); }
+      if (s.type === 'gun') this.fx.glowP.emit(s.x, this.y0 + (s.y || 0) + 0.8, s.z, 0, 0, 0, 0.07, 0.35, 1, 0.85, 0.35, 1);
+      else if (!dead) { d.position.set(s.x, this.y0 + (s.y || 0) + 0.9, s.z); d.rotation.set(0, s.h, 0); d.scale.setScalar(1); d.updateMatrix(); if (nr < 12) this.rocketMesh.setMatrixAt(nr++, d.matrix); }
       if (dead) { if (s.type === 'rocket') this.fx.burst(s.x, 1, s.z, 1, 0.6, 0.2); this.shots.splice(i, 1); }
     }
     this.rocketMesh.count = nr; this.rocketMesh.instanceMatrix.needsUpdate = true;
@@ -121,7 +121,7 @@ export class Combat {
       const m = this.mines[i]; m.arm -= dt; m.life -= dt; let dead = m.life <= 0;
       if (m.arm <= 0) for (const o of vs) { if (o.eliminated || o.inactive || o.crashT > 0) continue; const dx = o.x - m.x, dz = o.z - m.z; if (dx * dx + dz * dz < 5) { this.hit(o, 50, true, m.owner); dead = true; break; } }
       if (dead) { this.mines.splice(i, 1); continue; }
-      if (nm < 24) { d.position.set(m.x, this.y0 + 0.14, m.z); d.rotation.set(0, 0, 0); d.scale.setScalar(Math.sin(time * 9) > 0 ? 1 : 0.8); d.updateMatrix(); this.mineMesh.setMatrixAt(nm++, d.matrix); }
+      if (nm < 24) { d.position.set(m.x, this.y0 + (m.y || 0) + 0.14, m.z); d.rotation.set(0, 0, 0); d.scale.setScalar(Math.sin(time * 9) > 0 ? 1 : 0.8); d.updateMatrix(); this.mineMesh.setMatrixAt(nm++, d.matrix); }
     }
     this.mineMesh.count = nm; this.mineMesh.instanceMatrix.needsUpdate = true;
     // shield bubbles + damage smoke

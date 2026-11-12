@@ -37,11 +37,16 @@ export const kindOf = id => VEHICLES[id].kind;
 export const idsOf = kind => Object.keys(VEHICLES).filter(k => VEHICLES[k].kind === kind);
 export const PAINTS = [0xe6191e, 0x1a5ae6, 0xf2c40a, 0x19c964, 0xff7a00, 0xb026ff, 0xededf2, 0x15151a, 0x00d5ff, 0xff3fa0];
 export const AI_NAMES = ['Rex', 'Lena', 'Blaze', 'Nova', 'Jett', 'Kira', 'Dash', 'Zoe', 'Axel', 'Mika', 'Colt', 'Ivy'];
-export const RULES = { sprint: 'Sprint Race', combat: 'Combat Race', pursuit: 'Police Chase', rush: 'City Rush', relay: 'Land & Sea Relay', elim: 'Elimination', orbs: 'Orb Rush', trial: 'Time Trial' };
-export const ROAD_ONLY = ['pursuit', 'rush', 'relay'];
+export const RULES = { sprint: 'Classic Race', versus: 'Versus Duel', knockdown: 'Knockdown', toxic: 'Toxic Tag', gates: 'Drift Gates', catch: 'Catch the Runner', combat: 'Combat Race', pursuit: 'Escape the Police', rush: 'City Rush', relay: 'Land & Sea Relay', elim: 'Elimination', orbs: 'Orb Rush', trial: 'Time Trial' };
+export const ROAD_ONLY = ['pursuit', 'rush', 'relay', 'knockdown', 'toxic', 'gates', 'catch'];
 export const rulesFor = kind => Object.keys(RULES).filter(r => kind === 'car' || kind === 'bike' || !ROAD_ONLY.includes(r));
 export const RULE_HELP = {
   sprint: 'First across the line after the final lap wins.',
+  versus: 'One rival, one race. Beat them to the line.',
+  knockdown: 'Ram rivals into wrecks. Most takedowns in 2 minutes wins.',
+  toxic: 'One car starts toxic. Ram clean cars to spread it and add time to your clock – if your toxic timer runs out, you are out.',
+  gates: 'Drift through the glowing gates. Chain drifts for bigger combos; most points wins.',
+  catch: 'A target car is fleeing. Stay on its bumper (or ram it) to catch it before time runs out.',
   combat: 'Grab weapon crates: machine gun, rockets, mines, shield. Wreck your rivals and win the race.',
   pursuit: 'Race your rivals while the police hunt you. Get stopped next to a cop and you are BUSTED.',
   rush: 'Race through live traffic and crossing pedestrians. Knock someone down and the police hunt you.',
@@ -64,21 +69,22 @@ export const COUNTRIES = [
 ];
 // per-track tweaks on top of the country look
 export const TRACK_ENV = {
-  yaounde: { scenery: 'hills', density: 0.6 }, riviera: { scenery: 'hills', density: 0.5, tree: 'palm' }, highlands: { scenery: 'hills', density: 0.2 },
+  london: { weather: 'rain' }, highlands: { scenery: 'hills', density: 0.2, weather: 'snow' }, saopaulo: { weather: 'rain' },
+  yaounde: { scenery: 'hills', density: 0.6 }, riviera: { scenery: 'hills', density: 0.5, tree: 'palm' },
   desert: { scenery: 'dunes', density: 0.1 }, fuji: { scenery: 'fuji', density: 0.4 }, monza: { scenery: 'hills', density: 0.3, tree: 'round' }, rio: { scenery: 'domes' },
 };
 export const countryById = id => COUNTRIES.find(c => c.id === id);
 
 // 4 events per country = 32 levels for cars and 32 for bikes.
 function tourFor(kind) {
-  const special = ['orbs', 'elim', 'combat'], out = [];
+  const road0 = kind === 'car' || kind === 'bike', special = road0 ? ['orbs', 'elim', 'gates', 'knockdown', 'toxic', 'combat'] : ['orbs', 'elim', 'combat'], out = [];
   COUNTRIES.forEach((c, ci) => {
     const [a, b] = c.tracks, sk = 0.72 + ci * 0.034, pz = 2000 + ci * 1500, k = kind === 'bike' ? 0.9 : kind === 'car' ? 1 : 1.1, ai = Math.min(7, 3 + Math.ceil(ci / 2));
-    const road = kind === 'car' || kind === 'bike', third = !road ? (ci % 2 ? 'combat' : 'elim') : ['pursuit', 'rush', 'relay', 'combat'][ci % 4];
+    const road = kind === 'car' || kind === 'bike', third = !road ? (ci % 2 ? 'combat' : 'versus') : ['pursuit', 'rush', 'relay', 'catch', 'versus', 'combat'][ci % 6];
     out.push([
       { name: 'Street Opener', track: a, rule: 'sprint', laps: 2, ai, skill: sk, prize: pz },
-      { name: { orbs: 'Orb Hunt', elim: 'Last One Standing', combat: 'Street War' }[special[ci % 3]], track: b, rule: special[ci % 3], laps: 2, ai, skill: sk + 0.015, prize: pz * 1.2 },
-      { name: { pursuit: 'Most Wanted', rush: 'Rush Hour', relay: 'Land & Sea', combat: 'Rocket Run', elim: 'Knockout' }[third], peds: third === 'rush' ? 6 : 0, track: a, rule: third, laps: 2, ai: Math.max(2, ai - 1), skill: sk + 0.025, prize: pz * 1.5, traffic: road && (ci >= 2 || third === 'rush') ? 4 : 0, cops: 2 + Math.floor(ci / 3) },
+      { name: { orbs: 'Orb Hunt', elim: 'Last One Standing', combat: 'Street War', gates: 'Drift King', knockdown: 'Demolition Derby', toxic: 'Toxic Rush' }[special[ci % special.length]], track: b, rule: special[ci % special.length], laps: 2, ai, skill: sk + 0.015, prize: pz * 1.2 },
+      { name: { pursuit: 'Great Escape', rush: 'Rush Hour', relay: 'Land & Sea', combat: 'Rocket Run', elim: 'Knockout', catch: 'Hunt the Runner', versus: 'Rival Duel' }[third], peds: third === 'rush' ? 6 : 0, track: a, rule: third, laps: 2, ai: Math.max(2, ai - 1), skill: sk + 0.025, prize: pz * 1.5, traffic: road && (ci >= 2 || third === 'rush') ? 4 : 0, cops: 2 + Math.floor(ci / 3) },
       { name: c.name + ' Grand Final', track: b, rule: 'sprint', laps: 3, ai: Math.min(7, ai + 1), skill: sk + 0.045, prize: pz * 2.2, traffic: road && ci >= 4 ? 3 : 0 },
     ].map((e, ei) => ({ ...e, id: c.id + ei, prize: Math.round(e.prize * k / 100) * 100 })));
   });

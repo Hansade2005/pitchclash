@@ -39,7 +39,7 @@ export function aiDrive(v, ai, T, others, dt) {
   ai.off += (target - ai.off) * (1 - Math.exp(-2.2 * dt));
   const inp = v.input, k = ai.skill * ai.band, allow = safeSpeed(v, T, 0.8 + 0.2 * k), cap = ai.cap != null ? ai.cap : v.st.top * (0.78 + 0.22 * k);
   inp.steer = steerTo(v, T, ai.off);
-  inp.gas = sp < Math.min(allow, cap) ? 1 : 0; inp.brake = sp > allow + 2 ? 1 : 0; inp.hand = false;
+  inp.gas = sp < Math.min(allow, cap) ? 1 : 0; inp.brake = sp > allow + 2 ? 1 : sp > cap + 4 ? 0.35 : 0; inp.hand = false;
   if (ai.boost > 0) { ai.boost -= dt; inp.nitro = true; }
   else { inp.nitro = false; if (ai.cap == null && v.nitro > 0.7 && allow > sp + 15 && Math.random() < dt * 0.5 * ai.skill) ai.boost = 2; }
   if (v.stuckT > 2.5) { v.stuckT = 0; v.reset(T); }

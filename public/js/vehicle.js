@@ -1,7 +1,7 @@
 // Arcade vehicle: fast, forgiving physics for cars and bikes + visuals (wheels, lean, rider).
 import * as THREE from 'three';
 import { makeVehicle, makePerson } from './assets.js';
-import { nearestIdx, lateral } from './track.js';
+import { nearestIdx, lateral, cutPos, elevAt } from './track.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
@@ -19,7 +19,7 @@ function nameSprite(text, color) {
 
 export class Vehicle {
   constructor(scene, stats, o = {}) {
-    this.scene = scene; this.st = stats; this.isBike = stats.kind === 'bike'; this.kind = stats.kind; this.isBoat = stats.kind === 'boat'; this.air = ['heli', 'plane', 'space'].includes(stats.kind); this.alt = { heli: 11, plane: 14, space: 1.3 }[stats.kind] || 0; this.y = 0; this.vy = 0; this.airT = 0; this.trickYaw = 0; this.trickFlip = 0; this.tricks = 0; this.canJump = stats.kind === 'car' || stats.kind === 'bike'; this.boatForm = false; this.name = o.name || 'Racer'; this.id = o.id; this.color = o.color ?? stats.color;
+    this.scene = scene; this.st = stats; this.isBike = stats.kind === 'bike'; this.kind = stats.kind; this.isBoat = stats.kind === 'boat'; this.air = ['heli', 'plane', 'space'].includes(stats.kind); this.alt = { heli: 11, plane: 14, space: 1.3 }[stats.kind] || 0; this.y = 0; this.vy = 0; this.airT = 0; this.trickYaw = 0; this.trickFlip = 0; this.tricks = 0; this.canJump = stats.kind === 'car' || stats.kind === 'bike'; this.boatForm = false; this.ey = 0; this.eyT = 0; this.pitch = 0; this.padT = 0; this.useElev = false; this.onCut = false; this.name = o.name || 'Racer'; this.id = o.id; this.color = o.color ?? stats.color;
     this.x = 0; this.z = 0; this.h = 0; this.vx = 0; this.vz = 0; this.vf = 0; this.steer = 0; this.slip = 0;
     this.nitro = 0.5; this.boosting = false; this.drift = false; this.draft = false;
     this.idx = 0; this.lapsDone = 0; this.started = false; this.finished = false; this.finishTime = 0; this.eliminated = false; this.score = 0;
@@ -78,7 +78,8 @@ export class Vehicle {
     const sr = (this.isBike ? 4.2 : 5.2) * dt; this.steer += clamp(inp.steer - this.steer, -sr, sr);
     let fx_ = Math.sin(this.h), fz = Math.cos(this.h);
     let vf = this.vx * fx_ + this.vz * fz, vl = this.vx * fz - this.vz * fx_;
-    this.boosting = inp.nitro && this.nitro > 0.02 && vf > 4;
+    if (this.padT > 0) this.padT -= dt;
+    this.boosting = (inp.nitro && this.nitro > 0.02 && vf > 4) || (this.padT > 0 && vf > 2);
     const top = st.top * (this.boosting ? 1.2 : 1) * (this.draft ? 1.04 : 1) * (this.boatForm ? 0.8 : 1), acc = st.acc * (this.boosting ? 1.0 + 0.9 * st.nitro : 1);
     if (inp.gas > 0 && vf < top) { const r = Math.max(0, vf / top); vf += acc * inp.gas * Math.max(0.12, 1 - r * r) * dt; }
     if (inp.brake > 0) { if (vf > 0.5) vf -= 42 * inp.brake * dt; else if (!this.crashT) vf = Math.max(-13, vf - 10 * inp.brake * dt); else vf = 0; }
@@ -98,25 +99,38 @@ export class Vehicle {
     this.vx = nfx * vf + nfz * vl; this.vz = nfz * vf - nfx * vl;
     this.x += this.vx * dt; this.z += this.vz * dt;
     // nitro economy
-    if (this.boosting) this.nitro = Math.max(0, this.nitro - 0.26 * dt);
+    if (this.boosting && this.padT <= 0) this.nitro = Math.max(0, this.nitro - 0.26 * dt);
     else this.nitro = Math.min(1, this.nitro + (0.022 + (this.drift ? 0.13 : 0) + (this.draft ? 0.06 : 0)) * dt);
 
     // walls
-    const prev = this.idx; this.idx = nearestIdx(T, this.x, this.z, this.idx);
-    const i = this.idx, d = lateral(T, i, this.x, this.z), lim = T.half - this.halfW;
-    if (Math.abs(d) > lim) {
-      const s = Math.sign(d), nx = T.tz[i] * s, nz = -T.tx[i] * s, pen = Math.abs(d) - lim;
+    const prev = this.idx, im = nearestIdx(T, this.x, this.z, this.idx), d = lateral(T, im, this.x, this.z), lim = T.half - this.halfW;
+    // the shortcut is a second corridor: a car may be on the main road, on the shortcut, or in the gap joining them
+    const cp = this.useElev && !this.air ? cutPos(T, this.x, this.z, this.idx) : null, cut = T.cut, inMain = Math.abs(d) <= lim, inCut = !!cp && cp.d <= cut.half - this.halfW;
+    this.onCut = inCut && !inMain && cp.j > 0 && cp.j < cut.n;
+    this.idx = this.onCut ? Math.round(cut.a + cp.j / cut.n * (cut.b - cut.a)) : im;
+    const i = this.idx;
+    if (!inMain && inCut) { /* inside the shortcut corridor: no main-road walls */ }
+    else if (!inMain && cp && cp.d - (cut.half - this.halfW) < Math.abs(d) - lim) {   // bounce off the shortcut's barriers
+      const side = Math.sign((this.x - cut.x[cp.j]) * cut.tz - (this.z - cut.z[cp.j]) * cut.tx) || 1, nx = cut.tz * side, nz = -cut.tx * side, pen = cp.d - (cut.half - this.halfW);
+      this.x -= nx * pen; this.z -= nz * pen; const vn = this.vx * nx + this.vz * nz;
+      if (vn > 0) { this.vx -= nx * vn * 1.25; this.vz -= nz * vn * 1.25; const k = 1 - Math.min(0.45, vn * 0.028); this.vx *= k; this.vz *= k; if (vn > 3) { this.impact = Math.max(this.impact, vn); if (fx) fx.spark(this.x + nx * this.halfW, 0.5, this.z + nz * this.halfW, this.vx, this.vz); } if (this.isBike && vn > 13 && this.safeT <= 0) this.crash(); }
+    }
+    else if (Math.abs(d) > lim) {
+      const s = Math.sign(d), nx = T.tz[im] * s, nz = -T.tx[im] * s, pen = Math.abs(d) - lim;
       this.x -= nx * pen; this.z -= nz * pen;
       const vn = this.vx * nx + this.vz * nz;
       if (vn > 0) {
         this.vx -= nx * vn * 1.25; this.vz -= nz * vn * 1.25;
         const k = this.air ? 0.985 : 1 - Math.min(0.45, vn * 0.028); this.vx *= k; this.vz *= k;
-        const dir = (Math.sin(this.h) * T.tx[i] + Math.cos(this.h) * T.tz[i]) >= 0 ? 0 : Math.PI;
-        this.h += clamp(wrap(Math.atan2(T.tx[i], T.tz[i]) + dir - this.h), -1, 1) * Math.min(0.8, vn * 0.05);
-        if (this.air) this.offCourse = 1.2; else if (vn > 3) { this.impact = Math.max(this.impact, vn); if (fx) fx.spark(this.x + nx * this.halfW, 0.5, this.z + nz * this.halfW, this.vx, this.vz); }
+        const dir = (Math.sin(this.h) * T.tx[im] + Math.cos(this.h) * T.tz[im]) >= 0 ? 0 : Math.PI;
+        this.h += clamp(wrap(Math.atan2(T.tx[im], T.tz[im]) + dir - this.h), -1, 1) * Math.min(0.8, vn * 0.05);
+        if (this.air) this.offCourse = 1.2; else if (vn > 3) { this.impact = Math.max(this.impact, vn); if (fx) fx.spark(this.x + nx * this.halfW, 0.5 + this.ey, this.z + nz * this.halfW, this.vx, this.vz); }
         if (this.isBike && !this.boatForm && vn > 13 && this.safeT <= 0) this.crash();
       }
     }
+    // road height (flyovers, bridges) and boost pads
+    this.eyT = this.useElev && !this.onCut ? elevAt(T, i) : 0;
+    if (this.useElev && T.pads && !flying) for (const pd of T.pads) { const di = i - pd.i; if (di >= -2 && di <= 2 && Math.abs(d - pd.off) < 2.4 && this.padT <= 0.6) { this.padT = 1.4; this.padHit = true; } }
     // stunt ramps: take off, spin with steering, flip with brake, land straight or wreck
     if (this.canJump && T.ramps && !flying && !this.boatForm && vf > 15) for (const rp of T.ramps) { const di = (i - rp.i + T.N) % T.N; if (di <= 3 && Math.abs(d - rp.off) < rp.w) { this.airT = 0.001; this.vy = clamp(4.5 + vf * 0.13, 6.5, 12.5); this.y = 0.4; this.trickYaw = this.trickFlip = 0; } }
     if (this.airT > 0) {
@@ -139,13 +153,13 @@ export class Vehicle {
       this.lapStart = time;
     } else if (prev < N * 0.25 && i > N * 0.75) { if (this.lapsDone > 0) this.lapsDone--; else this.started = false; }
     const along = Math.sin(this.h) * T.tx[i] + Math.cos(this.h) * T.tz[i];
-    this.wrongT = (along < -0.3 && vf > 4) ? this.wrongT + dt : 0;
+    this.wrongT = (!this.onCut && along < -0.3 && vf > 4) ? this.wrongT + dt : 0;
     this.stuckT = (!this.frozen && sp < 1.5 && (this.input.gas > 0.3)) ? this.stuckT + dt : 0;
     // effects
     if (fx && !this.frozen) {
-      if ((this.drift || this.slip > 5) && sp > 8 && Math.random() < 0.6) fx.smoke(this.x - nfx * this.len, 0.25, this.z - nfz * this.len, this.vx, this.vz);
+      if ((this.drift || this.slip > 5) && sp > 8 && Math.random() < 0.6) fx.smoke(this.x - nfx * this.len, 0.25 + this.ey, this.z - nfz * this.len, this.vx, this.vz);
       if ((this.isBoat || this.boatForm) && sp > 6 && Math.random() < 0.7) fx.smokeP.emit(this.x - nfx * this.len, 0.2, this.z - nfz * this.len, (Math.random() - 0.5) * 3, 1.5 + Math.random() * 1.5, (Math.random() - 0.5) * 3, 0.6, 0.6, 0.95, 0.98, 1, 0.5, 2.2, 6);
-      if (this.boosting) fx.flame(this.x - nfx * (this.len + 1.0), (this.isBike ? 0.55 : 0.4) + this.alt + this.y, this.z - nfz * (this.len + 1.0), this.vx * 0.8, this.vz * 0.8);
+      if (this.boosting) fx.flame(this.x - nfx * (this.len + 1.0), (this.isBike ? 0.55 : 0.4) + this.alt + this.y + this.ey, this.z - nfz * (this.len + 1.0), this.vx * 0.8, this.vz * 0.8);
     }
     if (this.crashT > 0) { this.crashT -= dt; if (this.crashT <= 0) this.recover(T); }
   }
@@ -198,7 +212,9 @@ export class Vehicle {
     if (this.brakeMat) this.brakeMat.opacity = this.input.brake > 0.1 && !this.remote ? 0.95 : 0.25;
     if (this.bar) { const t = performance.now() / 140; this.bar[0].material.opacity = Math.sin(t) > 0 ? 1 : 0.08; this.bar[1].material.opacity = Math.sin(t) > 0 ? 0.08 : 1; }
     const bob = this.air ? Math.sin(performance.now() / 600 + (this.phase || (this.phase = Math.random() * 6))) * 0.18 * Math.max(0, 1 - sp / 12) : (this.isBoat || this.boatForm) ? Math.sin(performance.now() / 260 + this.z) * 0.07 - 0.12 : 0;
-    this.root.position.set(this.x, this.alt + this.y + bob, this.z); if (this.shadow && this.air) this.shadow.position.y = 0.045 - this.alt - this.y; if (this.shadow && !this.air) this.shadow.position.y = 0.045 - this.y;
+    const ke = Math.min(1, 12 * dt); this.ey += (this.eyT - this.ey) * ke;
+    if (this.useElev) { const T = this.track, sl = T && T.elev ? (elevAt(T, this.idx + 2) - elevAt(T, this.idx - 2)) / (4 * T.step) : 0, al = T ? Math.sign(Math.sin(this.h) * T.tx[this.idx] + Math.cos(this.h) * T.tz[this.idx]) || 1 : 1; this.pitch += (-Math.atan(sl) * al - this.pitch) * ke; this.root.rotation.order = 'YXZ'; this.root.rotation.x = this.pitch; }
+    this.root.position.set(this.x, this.alt + this.y + bob + this.ey, this.z); if (this.shadow && this.air) this.shadow.position.y = 0.045 - this.alt - this.y; if (this.shadow && !this.air) this.shadow.position.y = 0.045 - this.y;
     const slide = clamp((this.vx * Math.cos(this.h) - this.vz * Math.sin(this.h)) * 0.02, -0.35, 0.35);
     if (this.spin && this.crashT > 0) { this.spinA = (this.spinA || 0) + this.spin * dt; this.spin *= Math.exp(-1.6 * dt); } else this.spinA = 0;
     this.root.rotation.y = this.h - slide * (this.isBike ? 0.4 : 1) + this.spinA + this.trickYaw;
@@ -262,7 +278,8 @@ export function collide(a, b, fx) {
       const j = -rv * 0.75;
       if (!a.remote) { a.vx -= nx * j * (b.remote ? 1 : 0.5); a.vz -= nz * j * (b.remote ? 1 : 0.5); }
       if (!b.remote) { b.vx += nx * j * (a.remote ? 1 : 0.5); b.vz += nz * j * (a.remote ? 1 : 0.5); }
-      hit = Math.max(hit, -rv);
+      hit = Math.max(hit, -rv); a.lastHit = b; b.lastHit = a;
+      if (-rv > 6 && a.ramDamage && b.ramDamage) { const sa = Math.hypot(a.vx, a.vz), sb = Math.hypot(b.vx, b.vz), tot = sa + sb + 1e-3, k = a.ramDamage * -rv * 2.2; if (!a.remote && a.damage(k * sb / tot, fx)) a.wreckedBy = b; if (!b.remote && b.damage(k * sa / tot, fx)) b.wreckedBy = a; }
       if (-rv > 4 && fx) fx.spark((ax + bx) / 2, 0.6, (az + bz) / 2, a.vx, a.vz);
       for (const v of [a, b]) if (v.isBike && -rv > 12 && !v.remote && v.safeT <= 0) v.crash();
     }

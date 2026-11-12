@@ -87,15 +87,47 @@ export function buildTrackData(def, spacing = 2) {
 
 // Track furniture, placed the same way on every machine: stunt ramps, a tunnel and a water section.
 function features(T) {
-  const N = T.N, straight = (i, n) => { for (let k = 0; k < n; k += 3) if (Math.abs(T.curv[(i + k) % N]) > 0.0055) return false; return true; };
-  T.ramps = [];
-  for (let i = 90, last = -999; i < N - 110 && T.ramps.length < 3; i += 5) if (i - last > N / 6 && straight(i - 8, 44)) { T.ramps.push({ i, off: (T.ramps.length % 2 ? -1 : 1) * T.half * 0.42, w: 3.2 }); last = i; }
-  // tunnel: a stretch around 55% of the lap; water: a stretch around 25% (used by relay stages)
+  const N = T.N, H = T.half, straight = (i, n) => { for (let k = 0; k < n; k += 3) if (Math.abs(T.curv[(i + k) % N]) > 0.0055) return false; return true; };
+  const used = [[N - 40, N], [0, 40]], free = (a, b) => a >= 0 && b < N && used.every(([u, v]) => b < u || a > v), take = (a, b) => used.push([a, b]);
   const seg = (f, len) => { const a = Math.floor(N * f); return [a, Math.min(N - 60, a + len)]; };
-  T.tunnel = seg(0.55, 80); T.water = seg(0.2, Math.floor(N * 0.22));
-  T.ramps = T.ramps.filter(r => !(r.i > T.tunnel[0] - 12 && r.i < T.tunnel[1] + 30));
-  T.ramps = T.ramps.filter(r => !(r.i > T.water[0] - 12 && r.i < T.water[1] + 30));
+  // tunnel around 55% of the lap; water stretch around 20% (relay stages)
+  T.tunnel = seg(0.55, 80); T.water = seg(0.2, Math.floor(N * 0.22)); take(T.tunnel[0] - 15, T.tunnel[1] + 15); take(T.water[0] - 15, T.water[1] + 15);
+  T.elev = new Float32Array(N);
+  const sm = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x), hump = (a, len, up, h) => { for (let k = 0; k <= len; k++) { const y = h * Math.min(sm(k / up), sm((len - k) / up)); T.elev[a + k] = Math.max(T.elev[a + k], y); } };
+  const place = (len, from) => { for (let k = 0; k < N; k += 4) { const a = (Math.floor(N * from) + k) % N; if (free(a - 8, a + len + 8)) return a; } return -1; };
+  // shortcut: a straight cut through the city across a long bend (saves 30 m or more)
+  let best = null;
+  for (let s = 40; s < N - 80; s += 6) for (let L = 40; L <= 200; L += 6) {
+    const b = s + L; if (b > N - 40) continue;
+    const ax = T.x[s], az = T.z[s], bx = T.x[b], bz = T.z[b], c = Math.hypot(bx - ax, bz - az), arc = L * T.step, ux = (bx - ax) / c, uz = (bz - az) / c;
+    if (c < 90 || c > 340 || arc - c < 25 || c / arc > 0.94) continue;
+    if (ux * T.tx[s] + uz * T.tz[s] < 0.55 || ux * T.tx[b] + uz * T.tz[b] < 0.55 || !free(s - 14, b + 14)) continue;   // gentle turn in and out
+    let ok = true, mid = 0; for (let d = 34; d < c - 34 && ok; d += 3) { mid++; const px = ax + ux * d, pz = az + uz * d; for (let i = 0; i < N; i += 2) if ((px - T.x[i]) ** 2 + (pz - T.z[i]) ** 2 < (H + 7) ** 2) { ok = false; break; } }
+    if (mid < 6) ok = false;   // the merge zones are the first and last 34 m; the middle must be clear of the road
+    if (!ok) continue; const gain = arc - c, score = Math.min(gain, 90) - c * 0.05; if (!best || score > best.score) best = { s, b, gain, c, score };
+  }
+  if (best) {
+    const { s: ca, b: cb, c } = best, n = Math.max(8, Math.round(c / 2)), x = new Float32Array(n + 1), z = new Float32Array(n + 1);
+    for (let k = 0; k <= n; k++) { x[k] = T.x[ca] + (T.x[cb] - T.x[ca]) * k / n; z[k] = T.z[ca] + (T.z[cb] - T.z[ca]) * k / n; }
+    T.cut = { a: ca, b: cb, n, x, z, tx: (T.x[cb] - T.x[ca]) / c, tz: (T.z[cb] - T.z[ca]) / c, half: 5.5, len: c, gain: best.gain }; take(ca - 14, cb + 14);
+  }
+  // elevated flyover: 300 m on pillars, crossing over a city street
+  let a = -1, FL = 0; for (const len of [130, 104, 84]) { a = place(len, 0.72); if (a >= 0) { FL = len; break; } }
+  if (a >= 0) { T.flyover = [a, a + FL]; hump(a, FL, Math.round(FL * 0.28), 7.5); take(a - 10, a + FL + 10); }
+  // river bridge: a gentle hump over a river
+  a = -1; let BL = 0; for (const len of [76, 60]) { a = place(len, 0.38); if (a >= 0) { BL = len; break; } }
+  if (a >= 0) { T.bridge = [a, a + BL]; hump(a, BL, Math.round(BL * 0.36), 3.2); take(a - 10, a + BL + 10); }
+  // stunt ramps and boost pads on the remaining straights
+  T.ramps = []; for (let i = 90, last = -999; i < N - 110 && T.ramps.length < 3; i += 5) if (i - last > N / 6 && straight(i - 8, 44) && free(i - 30, i + 30)) { T.ramps.push({ i, off: (T.ramps.length % 2 ? -1 : 1) * H * 0.42, w: 3.2 }); last = i; take(i - 30, i + 30); }
+  T.pads = []; for (let i = 60, last = -999; i < N - 60 && T.pads.length < 4; i += 7) if (i - last > N / 6 && straight(i - 5, 25) && free(i - 6, i + 6)) { T.pads.push({ i, off: (T.pads.length % 2 ? 1 : -1) * H * 0.35 }); last = i; take(i - 6, i + 6); }
   return T;
+}
+export const elevAt = (T, i) => T.elev ? T.elev[((i % T.N) + T.N) % T.N] : 0;
+// where a car is relative to the shortcut: { j (sample), d (distance from its centre line) } or null when far away
+export function cutPos(T, x, z, idx) {
+  const c = T.cut; if (!c || idx < c.a - 25 || idx > c.b + 25) return null;
+  let bj = 0, bd = 1e9; for (let j = 0; j <= c.n; j++) { const d = (x - c.x[j]) ** 2 + (z - c.z[j]) ** 2; if (d < bd) { bd = d; bj = j; } }
+  return { j: bj, d: Math.abs((x - c.x[bj]) * c.tz - (z - c.z[bj]) * c.tx) };
 }
 
 // Nearest sample index, searching a window around a hint (or globally if hint < 0).
