@@ -1,3 +1,4 @@
+import { REAL_SQUADS } from './real_squads.js';
 // Pitch Clash — team data: national teams, real club names, formations,
 // and deterministic squad generation.
 //
@@ -1512,7 +1513,9 @@ export function makeSquad(team, seed) {
     const starter = seenPos[pos] <= starterSlots[pos];
     const [region, , tone] = weightedPick(rng, pop);
     let nm;
-    for (let t = 0; t < 6; t++) { nm = genName(region, rng); if (!usedNames.has(nm.name)) break; }
+    const real = REAL_SQUADS[team.id] && REAL_SQUADS[team.id][i];
+    if (real) nm = { name: real, shortName: real.split(' ').slice(-1)[0] };
+    else for (let t = 0; t < 6; t++) { nm = genName(region, rng); if (!usedNames.has(nm.name)) break; }
     usedNames.add(nm.name);
     const toneRange = tone || (NAME_POOLS[region] || NAME_POOLS.english).tone;
     const skinTone = +clamp(toneRange[0] + rng() * (toneRange[1] - toneRange[0]), 0, 1).toFixed(3);
