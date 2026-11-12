@@ -24,7 +24,7 @@ export const TEAMS = [
   { id: 'mex', name: 'Mexico', kit: [0x0a6b3c, 0xffffff, 0xc8102e], gk: 0x1a1a1a, rating: 80, flag: ['v', '#006847', '#ffffff', '#ce1126'], names: 'la' },
 ];
 // Clubs in four leagues (real names). Club = [name, shirt, shorts, socks, rating]
-const SHORT = {"Arsenal FC": "ARS", "Manchester City": "MCI", "Chelsea FC": "CHE", "Liverpool FC": "LIV", "Tottenham Hotspur": "TOT", "Newcastle United": "NEW", "Manchester United": "MUN", "Aston Villa": "AVL", "Real Madrid CF": "RMA", "Atlético de Madrid": "ATM", "FC Barcelona": "FCB", "Athletic Club": "ATH", "Real Sociedad": "RSO", "Villarreal CF": "VIL", "Real Betis": "BET", "Girona FC": "GIR", "AC Milan": "MIL", "FC Internazionale Milano": "INT", "AS Roma": "ROM", "Juventus FC": "JUV", "SSC Napoli": "NAP", "Atalanta BC": "ATA", "SS Lazio": "LAZ", "ACF Fiorentina": "FIO", "Coton Sport FC": "CTS", "AS Vita Club": "AVC", "Enyimba International FC": "ENY", "Hearts of Oak SC": "HOO", "Al Ahly SC": "AHL", "Wydad AC": "WAC", "ASC Diaraf": "DIA", "ASEC Mimosas": "ASE"};
+const SHORT = {"Arsenal FC": "ARS", "Manchester City": "MCI", "Chelsea FC": "CHE", "Liverpool FC": "LIV", "Tottenham Hotspur": "TOT", "Newcastle United": "NEW", "Manchester United": "MUN", "Aston Villa": "AVL", "Real Madrid CF": "RMA", "Atlético de Madrid": "ATM", "FC Barcelona": "FCB", "Athletic Club": "ATH", "Real Sociedad": "RSO", "Villarreal CF": "VIL", "Real Betis": "BET", "Girona FC": "GIR", "AC Milan": "MIL", "FC Internazionale Milano": "INT", "AS Roma": "ROM", "Juventus FC": "JUV", "SSC Napoli": "NAP", "Atalanta BC": "ATA", "SS Lazio": "LAZ", "ACF Fiorentina": "FIO", "Coton Sport FC": "CTS", "AS Vita Club": "AVC", "Enyimba International FC": "ENY", "Hearts of Oak SC": "HOO", "Al Ahly SC": "AHL", "Wydad AC": "WAC", "ASC Diaraf": "DIA", "ASEC Mimosas": "ASE", "FC Bayern München": "BAY", "Bayer 04 Leverkusen": "B04", "Borussia Dortmund": "BVB", "RB Leipzig": "RBL", "VfB Stuttgart": "VFB", "Eintracht Frankfurt": "SGE", "VfL Wolfsburg": "WOB", "Borussia Mönchengladbach": "BMG", "Paris Saint-Germain": "PSG", "Olympique de Marseille": "OMA", "Olympique Lyonnais": "OLY", "AS Monaco FC": "ASM", "Lille OSC": "LOS", "RC Lens": "RCL", "OGC Nice": "NIC", "Stade Rennais FC": "REN", "PSV Eindhoven": "PSV", "Feyenoord": "FEY", "AFC Ajax": "AJA", "AZ Alkmaar": "AZA", "FC Twente": "TWE", "FC Utrecht": "UTR", "Go Ahead Eagles": "GAE", "Sparta Rotterdam": "SPR", "FC Porto": "FCP", "SL Benfica": "SLB", "SC Braga": "SCB", "Sporting CP": "SCP", "Vitória SC": "VSC", "FC Famalicão": "FAM", "Boavista FC": "BOA", "Estoril Praia": "ESP", "CR Flamengo": "FLA", "SE Palmeiras": "PAL", "São Paulo FC": "SAO", "Sport Club Corinthians Paulista": "COR", "Santos FC": "SAN", "Botafogo FR": "BOT", "Fluminense FC": "FLU", "CR Vasco da Gama": "VAS", "Boca Juniors": "BOC", "CA River Plate": "RIV", "Rosario Central": "RCE", "Talleres de Córdoba": "TAL", "Estudiantes de La Plata": "EDL", "CA Independiente": "IND", "Racing Club": "RAC", "CA San Lorenzo de Almagro": "SLA", "New York Red Bulls": "NYR", "LA Galaxy": "LAG", "Seattle Sounders FC": "SEA", "Atlanta United FC": "ATL", "Inter Miami CF": "MIA", "Chicago Fire FC": "CHI", "Houston Dynamo FC": "HOU", "Portland Timbers": "POR", "Al Hilal": "HIL", "Al Ittihad": "ITT", "Al Nassr": "NAS", "Al Ahli Saudi FC": "AHS", "Al Ettifaq": "ETT", "Al Shabab": "SHB", "Al Qadsiah": "QAD", "Al Fateh": "FAT"};
 // Real home kit colours [shirt, shorts, socks] for every club.
 const REAL_KITS = {
   "Arsenal FC": [0xef0107, 0xffffff, 0xef0107],
@@ -58,7 +58,71 @@ const REAL_KITS = {
   "Al Ahly SC": [0xd6001c, 0xffffff, 0xd6001c],
   "Wydad AC": [0xd6001c, 0xffffff, 0xd6001c],
   "ASC Diaraf": [0x1c5fb4, 0xffffff, 0x1c5fb4],
-  "ASEC Mimosas": [0xffd400, 0x111111, 0xffd400]
+  "ASEC Mimosas": [0xffd400, 0x111111, 0xffd400],
+  "FC Bayern München": [0xdc052d, 0xffffff, 0xdc052d],
+  "Bayer 04 Leverkusen": [0xe32221, 0x111111, 0xe32221],
+  "Borussia Dortmund": [0xfde100, 0x111111, 0xfde100],
+  "RB Leipzig": [0xffffff, 0xffffff, 0xdd0741],
+  "VfB Stuttgart": [0xffffff, 0xffffff, 0xe32219],
+  "Eintracht Frankfurt": [0xe1000f, 0x111111, 0xe1000f],
+  "VfL Wolfsburg": [0x65b32e, 0xffffff, 0x65b32e],
+  "Borussia Mönchengladbach": [0xffffff, 0x111111, 0x00a550],
+  "Paris Saint-Germain": [0x004170, 0x004170, 0xda291c],
+  "Olympique de Marseille": [0xffffff, 0xffffff, 0x2faee0],
+  "Olympique Lyonnais": [0xffffff, 0x1b3f8b, 0x1b3f8b],
+  "AS Monaco FC": [0xe30613, 0xffffff, 0xe30613],
+  "Lille OSC": [0xe01e13, 0x1c2c5b, 0xe01e13],
+  "RC Lens": [0xfcd116, 0xe30613, 0xfcd116],
+  "OGC Nice": [0xd6001c, 0x111111, 0xd6001c],
+  "Stade Rennais FC": [0xe30613, 0x111111, 0x111111],
+  "PSV Eindhoven": [0xe1161c, 0x111111, 0x111111],
+  "Feyenoord": [0xe30613, 0x111111, 0x111111],
+  "AFC Ajax": [0xffffff, 0xffffff, 0xd2122e],
+  "AZ Alkmaar": [0xd6001c, 0xffffff, 0xd6001c],
+  "FC Twente": [0xd6001c, 0xffffff, 0xd6001c],
+  "FC Utrecht": [0xd6001c, 0xffffff, 0xffffff],
+  "Go Ahead Eagles": [0xffd400, 0xd6001c, 0xffd400],
+  "Sparta Rotterdam": [0xd6001c, 0xffffff, 0x111111],
+  "FC Porto": [0x0b4ea2, 0xffffff, 0x0b4ea2],
+  "SL Benfica": [0xe30613, 0xffffff, 0xe30613],
+  "SC Braga": [0xd6001c, 0xffffff, 0xd6001c],
+  "Sporting CP": [0x00923f, 0xffffff, 0x00923f],
+  "Vitória SC": [0xffffff, 0x111111, 0xffffff],
+  "FC Famalicão": [0x1c3d78, 0xffffff, 0x1c3d78],
+  "Boavista FC": [0xffffff, 0x111111, 0xffffff],
+  "Estoril Praia": [0xffd400, 0x1c3d78, 0xffd400],
+  "CR Flamengo": [0xd6001c, 0x111111, 0x111111],
+  "SE Palmeiras": [0x00923f, 0xffffff, 0x00923f],
+  "São Paulo FC": [0xffffff, 0xffffff, 0xd6001c],
+  "Sport Club Corinthians Paulista": [0xffffff, 0x111111, 0xffffff],
+  "Santos FC": [0xffffff, 0xffffff, 0xffffff],
+  "Botafogo FR": [0x111111, 0xffffff, 0x111111],
+  "Fluminense FC": [0x7a1c34, 0xffffff, 0x00923f],
+  "CR Vasco da Gama": [0xffffff, 0x111111, 0x111111],
+  "Boca Juniors": [0x1c3d78, 0x1c3d78, 0xffd400],
+  "CA River Plate": [0xffffff, 0x111111, 0xffffff],
+  "Rosario Central": [0xffd400, 0x1c3d78, 0x1c3d78],
+  "Talleres de Córdoba": [0x1c3d78, 0xffffff, 0x1c3d78],
+  "Estudiantes de La Plata": [0xd6001c, 0xffffff, 0xd6001c],
+  "CA Independiente": [0xd6001c, 0x1c3d78, 0xd6001c],
+  "Racing Club": [0x7ec8f0, 0xffffff, 0x7ec8f0],
+  "CA San Lorenzo de Almagro": [0x1c3d78, 0xd6001c, 0x1c3d78],
+  "New York Red Bulls": [0xffffff, 0xffffff, 0xd6001c],
+  "LA Galaxy": [0xffffff, 0xffffff, 0x1c3d78],
+  "Seattle Sounders FC": [0x5d9732, 0x1c3d78, 0x5d9732],
+  "Atlanta United FC": [0xa50034, 0x111111, 0x111111],
+  "Inter Miami CF": [0xf7b5cd, 0x111111, 0xf7b5cd],
+  "Chicago Fire FC": [0xd6001c, 0x1c3d78, 0xd6001c],
+  "Houston Dynamo FC": [0xf58220, 0xffffff, 0xf58220],
+  "Portland Timbers": [0x00482b, 0xffffff, 0x00482b],
+  "Al Hilal": [0x0b4ea2, 0xffffff, 0x0b4ea2],
+  "Al Ittihad": [0xffd400, 0x111111, 0xffd400],
+  "Al Nassr": [0xffd400, 0x1c3d78, 0xffd400],
+  "Al Ahli Saudi FC": [0x00923f, 0xffffff, 0x00923f],
+  "Al Ettifaq": [0x00923f, 0xffffff, 0x00923f],
+  "Al Shabab": [0xffffff, 0xffffff, 0xffffff],
+  "Al Qadsiah": [0xffd400, 0x111111, 0xffd400],
+  "Al Fateh": [0x00923f, 0xffffff, 0x00923f]
 };
 // crest colours: the shirt colour plus whichever of shorts / socks / white / black contrasts most with it
 const cdist = (a, b) => Math.abs((a >> 16 & 255) - (b >> 16 & 255)) + Math.abs((a >> 8 & 255) - (b >> 8 & 255)) + Math.abs((a & 255) - (b & 255));
@@ -67,20 +131,43 @@ const hex = n => '#' + n.toString(16).padStart(6, '0');
 const C = (league, names, list) => list.map(([name, a0, b0, c0, rating], i) => { const kit = REAL_KITS[name] || [a0, b0, c0]; return { id: league + i, name, defShort: SHORT[name], league, kit, gk: 0x2a2a2a, rating, flag: ['crest', hex(kit[0]), hex(crestSecond(kit))], names, club: true }; });
 export const LEAGUES = [
   { id: 'en', name: 'Premier League' }, { id: 'es', name: 'La Liga' }, { id: 'it', name: 'Serie A' }, { id: 'af', name: 'CAF Champions League' },
+  { id: 'de', name: 'Bundesliga' }, { id: 'fr', name: 'Ligue 1' }, { id: 'nl', name: 'Eredivisie' }, { id: 'pt', name: 'Primeira Liga' }, { id: 'br', name: 'Campeonato Brasileiro Série A' }, { id: 'ar', name: 'Liga Profesional Argentina' }, { id: 'us', name: 'Major League Soccer' }, { id: 'sa', name: 'Saudi Pro League' },
 ];
 export const CLUBS = [
   ...C('en', 'en', [['Arsenal FC', 0xc8102e, 0xffffff, 0x111111, 88], ['Manchester City', 0x6cabdd, 0xffffff, 0x6cabdd, 89], ['Chelsea FC', 0x1a2a6b, 0x1a2a6b, 0xffffff, 83], ['Liverpool FC', 0xd8232a, 0x111111, 0xd8232a, 85], ['Tottenham Hotspur', 0xf2c40a, 0x111111, 0xf2c40a, 80], ['Newcastle United', 0x0a6b3c, 0xffffff, 0x0a6b3c, 78], ['Manchester United', 0x7a1f3d, 0x9ad0f5, 0x7a1f3d, 81], ['Aston Villa', 0xf5f5f5, 0x1a2a6b, 0xf5f5f5, 79]]),
   ...C('es', 'la', [['Real Madrid CF', 0xfafafa, 0xfafafa, 0xfafafa, 90], ['Atlético de Madrid', 0xc8102e, 0x1a2a6b, 0xc8102e, 86], ['FC Barcelona', 0x1a3fb0, 0xa50044, 0x1a3fb0, 89], ['Athletic Club', 0xf2c40a, 0x1a3fb0, 0xf2c40a, 82], ['Real Sociedad', 0x2a6be0, 0xffffff, 0x2a6be0, 80], ['Villarreal CF', 0x0a7a3c, 0xffffff, 0x0a7a3c, 79], ['Real Betis', 0xff7a00, 0x111111, 0xff7a00, 78], ['Girona FC', 0x6a1fb0, 0xffffff, 0x6a1fb0, 77]]),
   ...C('it', 'eu', [['AC Milan', 0xb5121b, 0x111111, 0xb5121b, 86], ['FC Internazionale Milano', 0x111111, 0xf5f5f5, 0x111111, 87], ['AS Roma', 0x5a2d82, 0xffffff, 0x5a2d82, 81], ['Juventus FC', 0x1a56c4, 0x1a56c4, 0xffffff, 84], ['SSC Napoli', 0x8e1f2f, 0xf2c40a, 0x8e1f2f, 83], ['Atalanta BC', 0x87ceeb, 0xffffff, 0x87ceeb, 80], ['SS Lazio', 0x0a6b3c, 0x111111, 0x0a6b3c, 78], ['ACF Fiorentina', 0xf2c40a, 0x1a2a6b, 0xf2c40a, 77]]),
   ...C('af', 'af', [['Coton Sport FC', 0x0a7a3c, 0xce1126, 0xfcd116, 82], ['AS Vita Club', 0xfcd116, 0x0a7a3c, 0xfcd116, 80], ['Enyimba International FC', 0x1f9d55, 0xffffff, 0x1f9d55, 81], ['Hearts of Oak SC', 0xf5d000, 0x111111, 0xf5d000, 79], ['Al Ahly SC', 0xc8102e, 0xffffff, 0xc8102e, 84], ['Wydad AC', 0x0a6b3c, 0xffffff, 0xc1272d, 83], ['ASC Diaraf', 0xfafafa, 0x0a8a3c, 0xfafafa, 79], ['ASEC Mimosas', 0xf77f00, 0xffffff, 0xf77f00, 80]]),
+  ...C('de', 'eu', [["FC Bayern München", 0xdc052d, 0xffffff, 0xdc052d, 89], ["Bayer 04 Leverkusen", 0xe32221, 0x111111, 0xe32221, 86], ["Borussia Dortmund", 0xfde100, 0x111111, 0xfde100, 84], ["RB Leipzig", 0xffffff, 0xffffff, 0xdd0741, 82], ["VfB Stuttgart", 0xffffff, 0xffffff, 0xe32219, 80], ["Eintracht Frankfurt", 0xe1000f, 0x111111, 0xe1000f, 78], ["VfL Wolfsburg", 0x65b32e, 0xffffff, 0x65b32e, 77], ["Borussia Mönchengladbach", 0xffffff, 0x111111, 0x00a550, 76]]),
+  ...C('fr', 'eu', [["Paris Saint-Germain", 0x004170, 0x004170, 0xda291c, 89], ["Olympique de Marseille", 0xffffff, 0xffffff, 0x2faee0, 86], ["Olympique Lyonnais", 0xffffff, 0x1b3f8b, 0x1b3f8b, 84], ["AS Monaco FC", 0xe30613, 0xffffff, 0xe30613, 82], ["Lille OSC", 0xe01e13, 0x1c2c5b, 0xe01e13, 80], ["RC Lens", 0xfcd116, 0xe30613, 0xfcd116, 79], ["OGC Nice", 0xd6001c, 0x111111, 0xd6001c, 77], ["Stade Rennais FC", 0xe30613, 0x111111, 0x111111, 76]]),
+  ...C('nl', 'eu', [["PSV Eindhoven", 0xe1161c, 0x111111, 0x111111, 84], ["Feyenoord", 0xe30613, 0x111111, 0x111111, 83], ["AFC Ajax", 0xffffff, 0xffffff, 0xd2122e, 82], ["AZ Alkmaar", 0xd6001c, 0xffffff, 0xd6001c, 81], ["FC Twente", 0xd6001c, 0xffffff, 0xd6001c, 80], ["FC Utrecht", 0xd6001c, 0xffffff, 0xffffff, 79], ["Go Ahead Eagles", 0xffd400, 0xd6001c, 0xffd400, 78], ["Sparta Rotterdam", 0xd6001c, 0xffffff, 0x111111, 77]]),
+  ...C('pt', 'la', [["FC Porto", 0x0b4ea2, 0xffffff, 0x0b4ea2, 85], ["SL Benfica", 0xe30613, 0xffffff, 0xe30613, 84], ["SC Braga", 0xd6001c, 0xffffff, 0xd6001c, 83], ["Sporting CP", 0x00923f, 0xffffff, 0x00923f, 82], ["Vitória SC", 0xffffff, 0x111111, 0xffffff, 81], ["FC Famalicão", 0x1c3d78, 0xffffff, 0x1c3d78, 80], ["Boavista FC", 0xffffff, 0x111111, 0xffffff, 79], ["Estoril Praia", 0xffd400, 0x1c3d78, 0xffd400, 78]]),
+  ...C('br', 'la', [["CR Flamengo", 0xd6001c, 0x111111, 0x111111, 86], ["SE Palmeiras", 0x00923f, 0xffffff, 0x00923f, 85], ["São Paulo FC", 0xffffff, 0xffffff, 0xd6001c, 84], ["Sport Club Corinthians Paulista", 0xffffff, 0x111111, 0xffffff, 83], ["Santos FC", 0xffffff, 0xffffff, 0xffffff, 82], ["Botafogo FR", 0x111111, 0xffffff, 0x111111, 81], ["Fluminense FC", 0x7a1c34, 0xffffff, 0x00923f, 80], ["CR Vasco da Gama", 0xffffff, 0x111111, 0x111111, 79]]),
+  ...C('ar', 'la', [["Boca Juniors", 0x1c3d78, 0x1c3d78, 0xffd400, 84], ["CA River Plate", 0xffffff, 0x111111, 0xffffff, 83], ["Rosario Central", 0xffd400, 0x1c3d78, 0x1c3d78, 82], ["Talleres de Córdoba", 0x1c3d78, 0xffffff, 0x1c3d78, 81], ["Estudiantes de La Plata", 0xd6001c, 0xffffff, 0xd6001c, 80], ["CA Independiente", 0xd6001c, 0x1c3d78, 0xd6001c, 79], ["Racing Club", 0x7ec8f0, 0xffffff, 0x7ec8f0, 78], ["CA San Lorenzo de Almagro", 0x1c3d78, 0xd6001c, 0x1c3d78, 77]]),
+  ...C('us', 'en', [["New York Red Bulls", 0xffffff, 0xffffff, 0xd6001c, 80], ["LA Galaxy", 0xffffff, 0xffffff, 0x1c3d78, 79], ["Seattle Sounders FC", 0x5d9732, 0x1c3d78, 0x5d9732, 78], ["Atlanta United FC", 0xa50034, 0x111111, 0x111111, 77], ["Inter Miami CF", 0xf7b5cd, 0x111111, 0xf7b5cd, 76], ["Chicago Fire FC", 0xd6001c, 0x1c3d78, 0xd6001c, 75], ["Houston Dynamo FC", 0xf58220, 0xffffff, 0xf58220, 74], ["Portland Timbers", 0x00482b, 0xffffff, 0x00482b, 73]]),
+  ...C('sa', 'sa', [["Al Hilal", 0x0b4ea2, 0xffffff, 0x0b4ea2, 82], ["Al Ittihad", 0xffd400, 0x111111, 0xffd400, 81], ["Al Nassr", 0xffd400, 0x1c3d78, 0xffd400, 80], ["Al Ahli Saudi FC", 0x00923f, 0xffffff, 0x00923f, 79], ["Al Ettifaq", 0x00923f, 0xffffff, 0x00923f, 78], ["Al Shabab", 0xffffff, 0xffffff, 0xffffff, 77], ["Al Qadsiah", 0xffd400, 0x111111, 0xffd400, 76], ["Al Fateh", 0x00923f, 0xffffff, 0x00923f, 75]]),
 ];
 export const ALL = () => [...TEAMS, ...CLUBS];
 export const teamById = id => TEAMS.find(t => t.id === id) || CLUBS.find(t => t.id === id);
 export const code = t => t.short || (t.club ? t.name.replace(/^(AC|SS|US|AS|FC|CD|CF|UD|Real|Atlético|Virtus|Deportivo|Racing|Sporting) /, '') : t.id).slice(0, 3).toUpperCase();
 // Competitions: knockout cups and single round-robin leagues
-export const CUP_NAMES = { en: 'FA Cup', es: 'Copa del Rey', it: 'Coppa Italia', af: 'CAF Confederation Cup' }, SUPER_NAMES = { en: 'Community Shield', es: 'Supercopa de España', it: 'Supercoppa Italiana', af: 'CAF Super Cup' };
+export const CUP_NAMES = { en: 'FA Cup', es: 'Copa del Rey', it: 'Coppa Italia', af: 'CAF Confederation Cup', de: 'DFB-Pokal', fr: 'Coupe de France', nl: 'KNVB Beker', pt: 'Taça de Portugal', br: 'Copa do Brasil', ar: 'Copa Argentina', us: 'US Open Cup', sa: "King's Cup" },
+  SUPER_NAMES = { en: 'Community Shield', es: 'Supercopa de España', it: 'Supercoppa Italiana', af: 'CAF Super Cup', de: 'DFL-Supercup', fr: 'Trophée des Champions', nl: 'Johan Cruyff Shield', pt: 'Supertaça Cândido de Oliveira', br: 'Supercopa do Brasil', ar: 'Supercopa Argentina', us: 'Campeones Cup', sa: 'Saudi Super Cup' };
+// continental competitions: which leagues feed them
+export const UEFA_LEAGUES = ['en', 'es', 'it', 'de', 'fr', 'nl', 'pt'];
+export const CONTINENTS = {
+  uefa: { id: 'ecc', name: 'UEFA Champions League', leagues: UEFA_LEAGUES, groups: true },
+  conmebol: { id: 'lib', name: 'Copa Libertadores', leagues: ['br', 'ar'], groups: true },
+  caf: { id: 'acc', name: 'CAF Champions League', leagues: ['af'], groups: false },
+  afc: { id: 'afc', name: 'AFC Champions League Elite', leagues: ['sa'], groups: false },
+  concacaf: { id: 'ccc', name: 'CONCACAF Champions Cup', leagues: ['us'], groups: false },
+};
+export const continentOf = lg => Object.values(CONTINENTS).find(c => c.leagues.includes(lg));
 export const COMPS = [
-  { id: 'ecc', name: 'UEFA Champions League 2026', format: 'groups', groupLegs: 2, koLegs: 2, hint: '16 clubs · 4 groups home & away · two-legged knockouts · one-off final', pool: () => CLUBS.filter(c => c.league !== 'af').sort((a, b) => b.rating - a.rating).slice(0, 16).map(c => c.id) },
+  { id: 'ecc', name: 'UEFA Champions League 2026', format: 'groups', groupLegs: 2, koLegs: 2, hint: '16 clubs · 4 groups home & away · two-legged knockouts · one-off final', pool: () => CLUBS.filter(c => UEFA_LEAGUES.includes(c.league)).sort((a, b) => b.rating - a.rating).slice(0, 16).map(c => c.id) },
+  { id: 'lib', name: 'Copa Libertadores', format: 'groups', groupLegs: 2, koLegs: 2, hint: '16 Brazilian and Argentine clubs · groups · knockouts', pool: () => CLUBS.filter(c => c.league === 'br' || c.league === 'ar').map(c => c.id) },
+  { id: 'afc', name: 'AFC Champions League Elite', format: 'ko', koLegs: 2, hint: '8 Saudi clubs · two-legged knockouts', pool: () => CLUBS.filter(c => c.league === 'sa').map(c => c.id) },
+  { id: 'ccc', name: 'CONCACAF Champions Cup', format: 'ko', koLegs: 2, hint: '8 MLS clubs · two-legged knockouts', pool: () => CLUBS.filter(c => c.league === 'us').map(c => c.id) },
   { id: 'wnc', name: 'FIFA World Cup 2026', format: 'groups', groupLegs: 1, koLegs: 1, hint: '16 nations · 4 groups · knockout with extra time and penalties', pool: () => TEAMS.slice().sort((a, b) => b.rating - a.rating).slice(0, 16).map(c => c.id) },
   { id: 'anc', name: 'Africa Cup of Nations 2026', format: 'ko', koLegs: 1, hint: '8 African nations · knockout', pool: () => TEAMS.filter(t => t.names === 'af').map(c => c.id) },
   { id: 'acc', name: 'African Club Champions Cup', format: 'ko', koLegs: 2, hint: '8 African clubs · two-legged knockouts · one-off final', pool: () => CLUBS.filter(c => c.league === 'af').map(c => c.id) },
@@ -88,6 +175,7 @@ export const COMPS = [
   ...LEAGUES.map(l => ({ id: 'lg_' + l.id, name: l.name, format: 'league', hint: '8 clubs · 14 match days, home & away', pool: () => CLUBS.filter(c => c.league === l.id).map(c => c.id) })),
 ];
 const POOL = {
+  sa: ['Al-Dawsari', 'Al-Shehri', 'Al-Owais', 'Al-Faraj', 'Al-Najei', 'Al-Buraikan', 'Al-Malki', 'Al-Ghamdi', 'Al-Harbi', 'Al-Qahtani', 'Al-Shahrani', 'Al-Zahrani', 'Al-Mutairi', 'Al-Otaibi', 'Al-Dosari', 'Al-Amri', 'Al-Hassan', 'Al-Jassim', 'Al-Abed', 'Al-Bishi', 'Al-Habib', 'Al-Sulaiti', 'Al-Maliki', 'Al-Rashed'],
   af: ['Diallo', 'Traoré', 'Keita', 'Coulibaly', 'Ouattara', 'Koné', 'Sow', 'Ndiaye', 'Diop', 'Mensah', 'Owusu', 'Asante', 'Boateng', 'Okafor', 'Eze', 'Nwosu', 'Adeyemi', 'Bello', 'Camara', 'Gueye', 'Bamba', 'Kouassi', 'Mokoena', 'Dlamini'],
   la: ['González', 'Benítez', 'Acosta', 'Giménez', 'Sosa', 'Rojas', 'Aguirre', 'Ledesma', 'Paredes', 'Vega', 'Soto', 'Herrera', 'Cabrera', 'Peña', 'Miranda', 'Gallardo', 'Ibarra', 'Luna', 'Maldonado', 'Rivas', 'Escobar', 'Valencia', 'Carvalho', 'Oliveira'],
   eu: ['Martin', 'Bernard', 'Dubois', 'Leroy', 'Moreau', 'Schmidt', 'Fischer', 'Weber', 'Wagner', 'Becker', 'Rossi', 'Ferrari', 'Esposito', 'Bianchi', 'Romano', 'de Jong', 'Jansen', 'Bakker', 'Visser', 'Hoffmann', 'Koch', 'Richter', 'Mancini', 'Giordano'],

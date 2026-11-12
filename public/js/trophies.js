@@ -28,6 +28,16 @@ export const TROPHIES = [
   { id: 'aw_treble', name: 'The Treble', kind: 'Award', design: 'bigcup', c: ['#f2c14a', '#6a1b9a'], blurb: 'League, cup and continental.' },
   { id: 'aw_dyn', name: 'Dynasty', kind: 'Award', design: 'globe', c: ['#f2c14a', '#111111'], blurb: 'Five league titles in a career.' },
 ];
+// more leagues, their cups and super cups, and the other continental titles
+const MORE = [['de', 'Bundesliga', 'DFB-Pokal', 'DFL-Supercup', '#c8102e'], ['fr', 'Ligue 1', 'Coupe de France', 'Trophée des Champions', '#1a2a6b'], ['nl', 'Eredivisie', 'KNVB Beker', 'Johan Cruyff Shield', '#f36c21'], ['pt', 'Primeira Liga', 'Taça de Portugal', 'Supertaça Cândido de Oliveira', '#046a38'],
+  ['br', 'Campeonato Brasileiro Série A', 'Copa do Brasil', 'Supercopa do Brasil', '#009c3b'], ['ar', 'Liga Profesional Argentina', 'Copa Argentina', 'Supercopa Argentina', '#74acdf'], ['us', 'Major League Soccer', 'US Open Cup', 'Campeones Cup', '#1a56c4'], ['sa', 'Saudi Pro League', "King's Cup", 'Saudi Super Cup', '#006c35']];
+const designs = ['crown', 'plate', 'shield'];
+MORE.forEach(([lg, ln, cn, sn, col], i) => {
+  TROPHIES.splice(TROPHIES.findIndex(t => t.kind === 'League' && t.id === 'lg_af') + 1 + i, 0, { id: 'lg_' + lg, name: ln, kind: 'League', design: designs[i % 3], c: ['#f2c14a', col], blurb: 'League champions.' });
+  TROPHIES.splice(TROPHIES.findIndex(t => t.id === 'cup_af') + 1 + i, 0, { id: 'cup_' + lg, name: cn, kind: 'Cup', design: 'cup', c: [i % 2 ? '#e8b93a' : '#d7dbe3', col], blurb: 'Domestic cup winners.' });
+  TROPHIES.splice(TROPHIES.findIndex(t => t.id === 'sup_af') + 1 + i, 0, { id: 'sup_' + lg, name: sn, kind: 'Super Cup', design: 'shield', c: ['#e8b93a', col], blurb: 'Season opener.' });
+});
+TROPHIES.splice(TROPHIES.findIndex(t => t.id === 'acc') + 1, 0, { id: 'lib', name: 'Copa Libertadores', kind: 'Continental', design: 'bigcup', c: ['#e8b93a', '#009c3b'], blurb: 'The cup of South America.' }, { id: 'afc', name: 'AFC Champions League Elite', kind: 'Continental', design: 'bigcup', c: ['#d7dbe3', '#006c35'], blurb: 'Best club side in Asia.' }, { id: 'ccc', name: 'CONCACAF Champions Cup', kind: 'Continental', design: 'bigcup', c: ['#e8b93a', '#1a56c4'], blurb: 'Champions of North America.' });
 export const trophyById = id => TROPHIES.find(t => t.id === id);
 export const cupIdFor = (kind, lg) => ({ league: 'lg_', cup: 'cup_', super: 'sup_' }[kind]) + lg;
 

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { loadAll } from './assets.js';
 import { Match } from './match.js';
 import { PL, PW } from './pitch.js';
-import { TEAMS, CLUBS, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, FORMATION_IDS, save, persist, applyEdits, cleanEdits } from './data.js';
+import { TEAMS, CLUBS, LEAGUES, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, FORMATION_IDS, save, persist, applyEdits, cleanEdits } from './data.js';
 import { compDef, startComp, stageName, myFixture, playRound, simulateRest, standings } from './comp.js';
 import { flagURL } from './flags.js';
 import { Net } from './net.js';
@@ -389,17 +389,19 @@ function careerEntry() {
   careerNew();
 }
 function careerNew() {
-  const clubs = [...CLUBS].sort((a, b) => a.league.localeCompare(b.league) || b.rating - a.rating), ids = clubs.map(c => c.id); cn.club = cn.club || ids[0]; const T = teamById(cn.club), lg = LEAGUES_NAME(T.league), re = careerNew;
-  const rank = CLUBS.filter(c => c.league === T.league).sort((a, b) => b.rating - a.rating).findIndex(c => c.id === T.id) + 1;
+  const lgs = LEAGUES.map(l => l.id); cn.league = cn.league || (cn.club ? teamById(cn.club).league : 'en'); const clubs = CLUBS.filter(c => c.league === cn.league).sort((a, b) => b.rating - a.rating), ids = clubs.map(c => c.id);
+  if (!cn.club || teamById(cn.club).league !== cn.league) cn.club = ids[0]; const T = teamById(cn.club), lg = LEAGUES_NAME(T.league), re = careerNew;
+  const rank = ids.indexOf(T.id) + 1;
   ui.menu({ id: 'careernew', title: 'Career mode', sub: 'Take charge of a club: league, cup and continental football, board objectives, transfers and a trophy cabinet.', items: [
     { html: `<div class="vs"><div>${flag(T)}</div><div>${esc(T.name)}<small>${esc(lg)} · rating ${T.rating} · #${rank} of 8 on paper</small></div><div class="kit">${kitSets(T).home.kit.map(c => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('')}</div></div>` },
+    { label: 'League', value: lg, cycle: true, onClick: () => { cn.league = cyc(lgs, cn.league, 1); re(); }, onLeft: () => { cn.league = cyc(lgs, cn.league, -1); re(); } },
     { label: 'Club', value: T.name, cycle: true, onClick: () => { cn.club = cyc(ids, cn.club, 1); re(); }, onLeft: () => { cn.club = cyc(ids, cn.club, -1); re(); } },
     { input: true, key: 'mg', label: 'Manager name', value: cn.mgr, max: 20, placeholder: 'Your name', onInput: v => { cn.mgr = v; } },
     { label: 'Difficulty', value: cn.diff, cycle: true, onClick: () => { cn.diff = cyc(Object.keys(DIFFS), cn.diff, 1); S.diff = cn.diff; persist(); re(); }, onLeft: () => { cn.diff = cyc(Object.keys(DIFFS), cn.diff, -1); S.diff = cn.diff; persist(); re(); } },
     { label: 'START CAREER', cls: 'primary', onClick: () => { save.career = career.newCareer(cn.club, (cn.mgr || '').trim() || 'The Gaffer', cn.diff, cn.keepXp || 0); cn.keepXp = 0; save.team = cn.club; persist(); careerHub(); } },
   ], back: mainMenu });
 }
-const LEAGUES_NAME = id => ({ en: 'Premier League', es: 'La Liga', it: 'Serie A', af: 'CAF Champions League' }[id] || id);
+const LEAGUES_NAME = id => (LEAGUES.find(l => l.id === id) || { name: id }).name;
 const money = v => '€' + Math.round(v) + 'M';
 function careerHub() {
   const cr = save.career; career.applyRatings(cr); const me = teamById(cr.club), ev = career.nextEvent(cr), ml = career.mgrLevel(cr.xp), done = !ev, o = cr.obj;
@@ -474,7 +476,7 @@ function careerHistory() {
   ], back: careerHub });
 }
 function seasonReview() {
-  const cr = save.career; if (!cr.review) { const rv = career.endSeason(cr); cr.review = rv; for (const t of [...rv.trophies, ...rv.awards]) { save.trophies.push(t); } if (rv.trophies.length) badge('a_trophy'); if (rv.trophies.includes('ecc') || rv.trophies.includes('acc')) badge('a_cont'); if (cr.season >= 3) badge('a_season3'); if (cr.budget >= 150) badge('a_rich'); persist(); }
+  const cr = save.career; if (!cr.review) { const rv = career.endSeason(cr); cr.review = rv; for (const t of [...rv.trophies, ...rv.awards]) { save.trophies.push(t); } if (rv.trophies.length) badge('a_trophy'); if (rv.trophies.some(t => ['ecc', 'lib', 'acc', 'afc', 'ccc'].includes(t))) badge('a_cont'); if (cr.season >= 3) badge('a_season3'); if (cr.budget >= 150) badge('a_rich'); persist(); }
   const rv = cr.review, h = rv.rec, ok = v => v === null ? '' : v ? '✔' : '✘', o = cr.obj, win = [...rv.trophies, ...rv.awards];
   ui.menu({ id: 'creview', title: `Season ${cr.season} review`, sub: `${teamById(cr.club).name} · ${h.year}/${String(h.year + 1).slice(2)}`, cls: 'wide', items: [
     { html: `<div class="cst big"><div><small>League</small><b>${h.pos}${['st', 'nd', 'rd'][h.pos - 1] || 'th'}</b></div><div><small>Points</small><b>${h.pts}</b></div><div><small>W-D-L</small><b>${h.w}-${h.d}-${h.l}</b></div><div><small>Goals</small><b>${h.gf}-${h.ga}</b></div></div>

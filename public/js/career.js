@@ -1,6 +1,6 @@
 // Career mode engine: seasons of league + cup + continental football with a calendar, board objectives, money, upgrades, transfers,
 // rating drift for every club, awards and a history book. Pure logic - the screens live in main.js.
-import { CLUBS, LEAGUES, teamById, CUP_NAMES, SUPER_NAMES } from './data.js';
+import { CLUBS, LEAGUES, teamById, CUP_NAMES, SUPER_NAMES, CONTINENTS, continentOf, UEFA_LEAGUES } from './data.js';
 import { REAL } from './real_squads.js';
 import { compDef, startComp, playRound, simulateRest, myFixture, stageName, standings, simScore } from './comp.js';
 
@@ -16,9 +16,10 @@ export function defOf(cr, k) {
   if (k === 'lg') return compDef('lg_' + lg);
   if (k === 'cup') return compDef('cup_' + lg);
   if (k === 'sup') return { id: 'sup_' + lg, name: SUPER_NAMES[lg], format: 'ko', koLegs: 1, pool: () => cr.supPair };
-  return lg === 'af' ? compDef('acc') : { id: 'ecc', name: 'UEFA Champions League', format: 'groups', groupLegs: 2, koLegs: 2, pool: () => cr.contPool };
+  const ct = continentOf(lg); if (!ct.groups) return compDef(ct.id);
+  return { id: ct.id, name: ct.name, format: 'groups', groupLegs: 2, koLegs: 2, pool: () => cr.contPool };
 }
-export const trophyIdOf = (cr, k) => k === 'lg' ? 'lg_' + leagueOf(cr.club) : k === 'cup' ? 'cup_' + leagueOf(cr.club) : k === 'sup' ? 'sup_' + leagueOf(cr.club) : leagueOf(cr.club) === 'af' ? 'acc' : 'ecc';
+export const trophyIdOf = (cr, k) => k === 'lg' ? 'lg_' + leagueOf(cr.club) : k === 'cup' ? 'cup_' + leagueOf(cr.club) : k === 'sup' ? 'sup_' + leagueOf(cr.club) : continentOf(leagueOf(cr.club)).id;
 
 // ---- rating handling: the career keeps its own ratings and applies them to the shared team objects while it is open
 const ORIG = new Map();
@@ -43,22 +44,24 @@ export function startSeason(cr) {
   const lg = leagueOf(cr.club), me = cr.club; applyRatings(cr); cr.comps = {}; cr.cal = []; cr.res = {};
   const ids = CLUBS.filter(c => c.league === lg).map(c => c.id), rank = [...ids].sort((a, b) => ratingOf(cr, b) - ratingOf(cr, a)).indexOf(me) + 1;
   cr.comps.lg = startComp(defOf(cr, 'lg'), me); cr.comps.cup = startComp(defOf(cr, 'cup'), me);
-  if (lg === 'af') cr.comps.cont = startComp(defOf(cr, 'cont'), me);
-  else { // top four of each big league + best of the rest
-    const q = []; for (const l of ['en', 'es', 'it']) { const t = cr.prevTop[l] || CLUBS.filter(c => c.league === l).map(c => c.id).sort((a, b) => ratingOf(cr, b) - ratingOf(cr, a)); q.push(...t.slice(0, 4)); }
-    const rest = CLUBS.filter(c => c.league !== 'af' && !q.includes(c.id)).map(c => c.id).sort((a, b) => ratingOf(cr, b) - ratingOf(cr, a)); cr.contPool = [...q, ...rest].slice(0, 16);
+  const ct = continentOf(lg);
+  if (!ct.groups) cr.comps.cont = startComp(defOf(cr, 'cont'), me);
+  else {
+    const byRating = l => CLUBS.filter(c => c.league === l).map(c => c.id).sort((x, y) => ratingOf(cr, y) - ratingOf(cr, x)), q = [];
+    if (ct.id === 'ecc') { for (const l of UEFA_LEAGUES) q.push(...(cr.prevTop[l] || byRating(l)).slice(0, 2)); const rest = CLUBS.filter(c => UEFA_LEAGUES.includes(c.league) && !q.includes(c.id)).map(c => c.id).sort((x, y) => ratingOf(cr, y) - ratingOf(cr, x)); cr.contPool = [...q, ...rest].slice(0, 16); }
+    else cr.contPool = CLUBS.filter(c => ct.leagues.includes(c.league)).map(c => c.id);
     cr.comps.cont = cr.contPool.includes(me) ? startComp(defOf(cr, 'cont'), me) : null;
   }
   // super cup: last season's champion v cup winner
   const lastLg = cr.prevTop[lg] && cr.prevTop[lg][0], lastCup = cr.lastCup; cr.comps.sup = null;
   if (cr.season > 1 && lastLg && lastCup && (me === lastLg || me === lastCup)) { const opp = me === lastLg ? lastCup : lastLg; cr.supPair = [me, lastLg === lastCup ? cr.prevTop[lg][1] : opp]; cr.comps.sup = startComp(defOf(cr, 'sup'), me); }
-  const contRounds = !cr.comps.cont ? 0 : lg === 'af' ? 5 : 11;
+  const contRounds = !cr.comps.cont ? 0 : ct.groups ? 11 : 5;
   for (let i = 0; i < 14; i++) cr.cal.push({ k: 'lg', t: (i + 0.5) / 14 });
   [0.2, 0.5, 0.84].forEach(t => cr.cal.push({ k: 'cup', t })); for (let i = 0; i < contRounds; i++) cr.cal.push({ k: 'cont', t: 0.03 + i * (0.9 / contRounds) });
   if (cr.comps.sup) cr.cal.push({ k: 'sup', t: -1 });
   cr.cal.sort((a, b) => a.t - b.t);
   // board objectives
-  cr.obj = { league: rank <= 1 ? 1 : rank <= 2 ? 2 : rank <= 4 ? 4 : 6, leagueText: rank <= 1 ? 'Win the league' : rank <= 2 ? 'Finish in the top 2' : rank <= 4 ? 'Finish in the top 4' : 'Finish in the top 6', cup: rank <= 3 ? 3 : 2, cupText: rank <= 3 ? 'Reach the cup final' : 'Reach the cup semi-finals', cont: cr.comps.cont ? (rank <= 2 || lg === 'af' ? 2 : 1) : 0, contText: cr.comps.cont ? (rank <= 2 ? 'Reach the semi-finals' : lg === 'af' ? 'Reach the semi-finals' : 'Get out of the group') : '' };
+  cr.obj = { league: rank <= 1 ? 1 : rank <= 2 ? 2 : rank <= 4 ? 4 : 6, leagueText: rank <= 1 ? 'Win the league' : rank <= 2 ? 'Finish in the top 2' : rank <= 4 ? 'Finish in the top 4' : 'Finish in the top 6', cup: rank <= 3 ? 3 : 2, cupText: rank <= 3 ? 'Reach the cup final' : 'Reach the cup semi-finals', cont: cr.comps.cont ? (rank <= 2 || !ct.groups ? 2 : 1) : 0, contText: cr.comps.cont ? (rank <= 2 || !ct.groups ? 'Reach the semi-finals' : 'Get out of the group') : '' };
   genMarket(cr); cr.season0 = true;
 }
 // next scheduled match for the manager: { k, comp, def, fix, stage } or null when the season is over
@@ -86,7 +89,7 @@ export const quickSim = (cr, ev) => { const [gf, ga] = simScore(teamById(cr.club
 const stageRank = { 'Quarter-final': 1, 'Semi-final': 2, 'Final': 3 };
 export function endSeason(cr) {
   const lg = leagueOf(cr.club), me = cr.club, L = cr.comps.lg, table = standings(L, L.groups[0]), pos = table.indexOf(me) + 1, row = L.table[me], won = k => cr.comps[k] && cr.comps[k].done && cr.comps[k].champion === me;
-  const trophies = []; if (pos === 1) trophies.push('lg_' + lg); if (won('cup')) trophies.push('cup_' + lg); if (won('cont')) trophies.push(lg === 'af' ? 'acc' : 'ecc'); if (won('sup')) trophies.push('sup_' + lg);
+  const trophies = []; if (pos === 1) trophies.push('lg_' + lg); if (won('cup')) trophies.push('cup_' + lg); if (won('cont')) trophies.push(continentOf(lg).id); if (won('sup')) trophies.push('sup_' + lg);
   const awards = [], gb = Object.entries(cr.scorers).sort((a, b) => b[1] - a[1])[0]; if (gb && gb[1] >= 8) awards.push('aw_boot');
   if (pos === 1 && row.pts >= Math.max(...Object.values(L.table).map(r => r.pts))) awards.push('aw_moy'); if (pos === 1 && row.l === 0) awards.push('aw_inv');
   if (pos === 1 && won('cup')) awards.push('aw_double'); if (pos === 1 && won('cup') && won('cont')) awards.push('aw_treble'); if (pos === 1) cr.titles++; if (cr.titles >= 5 && pos === 1 && cr.titles === 5) awards.push('aw_dyn');
