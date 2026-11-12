@@ -39,11 +39,13 @@ export const ALL = () => [...TEAMS, ...CLUBS];
 export const teamById = id => TEAMS.find(t => t.id === id) || CLUBS.find(t => t.id === id);
 export const code = t => t.short || (t.club ? t.name.replace(/^(AC|SS|US|AS|FC|CD|CF|UD|Real|Atlético|Virtus|Deportivo|Racing|Sporting) /, '') : t.id).slice(0, 3).toUpperCase();
 // Competitions: knockout cups and single round-robin leagues
+export const CUP_NAMES = { en: 'FA Cup', es: 'Copa del Rey', it: 'Coppa Italia', af: 'CAF Confederation Cup' }, SUPER_NAMES = { en: 'Community Shield', es: 'Supercopa de España', it: 'Supercoppa Italiana', af: 'CAF Super Cup' };
 export const COMPS = [
   { id: 'ecc', name: 'UEFA Champions League 2026', format: 'groups', groupLegs: 2, koLegs: 2, hint: '16 clubs · 4 groups home & away · two-legged knockouts · one-off final', pool: () => CLUBS.filter(c => c.league !== 'af').sort((a, b) => b.rating - a.rating).slice(0, 16).map(c => c.id) },
   { id: 'wnc', name: 'FIFA World Cup 2026', format: 'groups', groupLegs: 1, koLegs: 1, hint: '16 nations · 4 groups · knockout with extra time and penalties', pool: () => TEAMS.slice().sort((a, b) => b.rating - a.rating).slice(0, 16).map(c => c.id) },
   { id: 'anc', name: 'Africa Cup of Nations 2026', format: 'ko', koLegs: 1, hint: '8 African nations · knockout', pool: () => TEAMS.filter(t => t.names === 'af').map(c => c.id) },
   { id: 'acc', name: 'African Club Champions Cup', format: 'ko', koLegs: 2, hint: '8 African clubs · two-legged knockouts · one-off final', pool: () => CLUBS.filter(c => c.league === 'af').map(c => c.id) },
+  ...LEAGUES.map(l => ({ id: 'cup_' + l.id, name: CUP_NAMES[l.id], format: 'ko', koLegs: 1, hint: '8 clubs · single-leg knockout', pool: () => CLUBS.filter(c => c.league === l.id).map(c => c.id) })),
   ...LEAGUES.map(l => ({ id: 'lg_' + l.id, name: l.name, format: 'league', hint: '8 clubs · 14 match days, home & away', pool: () => CLUBS.filter(c => c.league === l.id).map(c => c.id) })),
 ];
 const POOL = {
@@ -55,7 +57,7 @@ const POOL = {
 };
 export function squad(team) { // 11 starters + 5 substitutes, stable per team (Edit mode names win)
   let s = 0; for (const c of team.id) s = s * 31 + c.charCodeAt(0); const pool = [...POOL[team.names]], out = [];
-  for (let i = 0; i < 16; i++) { s = (s * 1103515245 + 12345) >>> 0; const nm = pool.splice(s % pool.length, 1)[0]; out.push({ name: (team.players && team.players[i]) || (REAL[team.id] && REAL[team.id][i]) || nm, num: [1, 2, 5, 4, 3, 7, 8, 6, 11, 9, 10, 12, 13, 14, 15, 16][i] }); }
+  for (let i = 0; i < 16; i++) { s = (s * 1103515245 + 12345) >>> 0; const nm = pool.splice(s % pool.length, 1)[0]; out.push({ name: (team.players && team.players[i]) || (team.cp && team.cp[i]) || (REAL[team.id] && REAL[team.id][i]) || nm, num: [1, 2, 5, 4, 3, 7, 8, 6, 11, 9, 10, 12, 13, 14, 15, 16][i] }); }
   return out;
 }
 // 4-4-2: x from own goal (-1) to opponent goal (+1), z across the pitch
@@ -81,7 +83,7 @@ export function layoutXI(names, form) {
 export const DIFFS = { easy: 0.86, normal: 0.95, hard: 1.03 };
 
 const KEY = 'goalnation.save.v1';
-const def = () => ({ team: 'cmr', comp: null, trophies: [], edits: { teams: {}, comps: {} }, settings: { half: 3, diff: 'normal', music: 0.5, sfx: 0.8, commentary: 0.9, quality: 'auto' }, cups: 0, wins: 0, played: 0, goals: 0 });
+const def = () => ({ team: 'cmr', comp: null, career: null, ach: {}, trophies: [], edits: { teams: {}, comps: {} }, settings: { half: 3, diff: 'normal', music: 0.5, sfx: 0.8, commentary: 0.9, quality: 'auto' }, cups: 0, wins: 0, played: 0, goals: 0 });
 export let save = def();
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = { ...def(), ...s, settings: { ...def().settings, ...s.settings }, edits: { teams: {}, comps: {}, ...(s.edits || {}) } }; } catch (e) {}
 // ---- Edit mode: names, short names, kits, squads and badges typed in by the player (saved on this PC only)
@@ -90,7 +92,7 @@ export function applyEdits() {
   for (const t of [...TEAMS, ...CLUBS]) {
     if (!ORIG.has(t.id)) ORIG.set(t.id, { name: t.name, kit: [...t.kit] });
     const o = ORIG.get(t.id), e = save.edits.teams[t.id] || {};
-    t.name = e.name || o.name; t.short = e.code || t.defShort || null; t.kit = Array.isArray(e.kit) && e.kit.length === 3 ? e.kit : [...o.kit]; t.players = Array.isArray(e.players) ? e.players : null; t.badge = typeof e.badge === 'string' && e.badge.startsWith('data:image/') ? e.badge : null;
+    t.name = e.name || o.name; t.short = e.code || t.defShort || null; t.kit = Array.isArray(e.kit) && e.kit.length === 3 ? e.kit : [...o.kit]; t.players = Array.isArray(e.players) ? e.players : null; t.kits = e.kits && typeof e.kits === 'object' ? e.kits : null; t.badge = typeof e.badge === 'string' && e.badge.startsWith('data:image/') ? e.badge : null;
   }
   for (const c of COMPS) { if (!c.orig) c.orig = c.name; c.name = save.edits.comps[c.id] || c.orig; }
 }
@@ -99,6 +101,7 @@ export function cleanEdits(o) {
   const str = (v, n) => typeof v === 'string' ? v.replace(/[<>]/g, '').slice(0, n) : undefined, out = { teams: {}, comps: {} };
   for (const [id, e] of Object.entries((o && o.teams) || {})) { if (!teamById(id) || !e) continue; const t = {}; if (str(e.name, 28)) t.name = str(e.name, 28); if (str(e.code, 3)) t.code = str(e.code, 3).toUpperCase();
     if (Array.isArray(e.kit) && e.kit.length === 3 && e.kit.every(n => Number.isInteger(n) && n >= 0 && n <= 0xffffff)) t.kit = e.kit;
+    if (e.kits && typeof e.kits === 'object') { const ok = k => Array.isArray(k) && k.length === 3 && k.every(n => Number.isInteger(n) && n >= 0 && n <= 0xffffff); t.kits = {}; if (ok(e.kits.away)) t.kits.away = e.kits.away; if (ok(e.kits.third)) t.kits.third = e.kits.third; }
     if (Array.isArray(e.players)) t.players = e.players.slice(0, 16).map(n => str(n, 22) || '');
     if (typeof e.badge === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(e.badge) && e.badge.length < 60000) t.badge = e.badge;
     out.teams[id] = t; }

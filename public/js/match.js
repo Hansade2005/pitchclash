@@ -5,6 +5,8 @@ import { makePlayer } from './assets.js';
 import { FORMATION, FORMATIONS, layoutXI, DIFFS, squad, code } from './data.js';
 import { createWeather } from './weather.js';
 import { stadiumById } from './stadiums.js';
+import { pickKits } from './kits.js';
+import { build3D } from './trophies.js';
 import * as input from './input.js';
 import * as audio from './audio.js';
 
@@ -19,7 +21,7 @@ export class Match {
   //       mustWin (tie must be decided: extra time + penalties), agg (first-leg goals), net + role ('host'|'guest') for online, onEnd }
   constructor(game, cfg) {
     this.game = game; this.cfg = cfg; this.scene = game.scene; this.teams = [cfg.home, cfg.away]; this.score = [0, 0]; this.stats = [0, 1].map(() => ({ shots: 0, sot: 0, poss: 0, passes: 0, fouls: 0, corners: 0, offsides: 0, tackles: 0 }));
-    this.net = cfg.net || null; this.role = cfg.role || 'local'; this.evq = []; this.agg = cfg.agg || [0, 0]; this.decider = !!cfg.mustWin; this.subsLeft = [5, 5]; this.bench = [[], []];
+    this.kits = pickKits(cfg.home, cfg.away, cfg.kitSel); this.net = cfg.net || null; this.role = cfg.role || 'local'; this.evq = []; this.agg = cfg.agg || [0, 0]; this.decider = !!cfg.mustWin; this.subsLeft = [5, 5]; this.bench = [[], []];
     const fwd = k => (...a) => { audio[k](...a); if (this.role === 'host') this.evq.push([k, ...a]); };
     this.A = Object.fromEntries(['say', 'sayTeam', 'sfx', 'cheer', 'chant', 'jingle', 'decisive', 'sting', 'chatter'].map(k => [k, fwd(k)]));
     this.tod = cfg.tod || (cfg.night ? 'night' : 'day'); this.wkey = cfg.weather || 'clear'; this.shadowsOn = !!game.shadows; this.pscale = { normal: 1, large: 1.18, xl: 1.35 }[cfg.psize || 'large'] || 1.18; this.labelMode = cfg.labels || 'sel'; this.camMode = cfg.camera || 'broadcast'; this.stad = stadiumById(cfg.stadium);
@@ -33,9 +35,9 @@ export class Match {
     this.ballSh = sh(); this.ballSh.scale.setScalar(0.2); this.scene.add(this.ballMesh, this.ballSh);
     this.players = [];
     for (let t = 0; t < 2; t++) {
-      const team = this.teams[t], form = FORMATIONS[(cfg.formations || [])[t]] || FORMATION, lay = layoutXI(squad(team), form), names = lay.xi, rate = team.rating, vs = [...team.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 16, kit = t === 1 && this.clash() ? [0xf2f2f2, 0x222222, 0xf2f2f2] : team.kit;
+      const team = this.teams[t], form = FORMATIONS[(cfg.formations || [])[t]] || FORMATION, lay = layoutXI(squad(team), form), names = lay.xi, rate = team.rating, vs = [...team.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 16, kit = this.kits[t].kit;
       form.forEach((f, i) => {
-        const gk = i === 0, m = makePlayer(i + vs + t * 5, gk ? [team.gk, team.gk, team.gk] : kit, gk), s = sh(); s.scale.setScalar(0.42); m.root.add(s);
+        const gk = i === 0, m = makePlayer(i + vs + t * 5, gk ? [this.kits[t].gk, this.kits[t].gk, this.kits[t].gk] : kit, gk), s = sh(); s.scale.setScalar(0.42); m.root.add(s);
         const p = { t, i, gk, role: f[2], ax: f[0], az: f[1], x: 0, z: 0, vx: 0, vz: 0, face: 0, m, name: names[i].name, num: names[i].num, sta: 1, yel: 0, state: 'run', st: 0, cd: 0, human: -1, incoming: 0, think: R() * 0.3,
           spd: (6.6 + rate * 0.016 + (f[2] === 'FW' ? 0.35 : f[2] === 'DF' ? -0.1 : 0.15) + (R() - 0.5) * 0.3) * this.wx.speed, skill: rate + (R() - 0.5) * 8 };
         p.baseSpd = p.spd; m.root.scale.setScalar(this.pscale); if (this.shadowsOn) { m.root.traverse(o => { if (o.isMesh) o.castShadow = true; }); s.material.opacity = 0.12; } this.scene.add(m.root); this.players.push(p);
@@ -82,14 +84,37 @@ export class Match {
     iv.sort((x, y) => x[0] - y[0]); let blocked = 0, end = -9; for (const [lo, hi] of iv) { const st = Math.max(lo, end); if (hi > st) { blocked += hi - st; end = Math.max(end, hi); } }
     return { deg: a0 * 180 / Math.PI, open: clamp(1 - blocked / a0, 0, 1), dist: dx };
   }
+  // trophy ceremony: the winners gather round the cup, confetti falls and the camera orbits
+  startCeremony(trophyId, side, done) {
+    if (this.cer) return; const conf = 900, pos = new Float32Array(conf * 3), vel = [], colors = new Float32Array(conf * 3), kit = this.kits[side].kit;
+    const pal = [kit[0], kit[1], 0xffffff, 0xf2c14a, 0xffd86b].map(h => new THREE.Color(h));
+    for (let i = 0; i < conf; i++) { pos[i * 3] = (Math.random() - 0.5) * 30; pos[i * 3 + 1] = Math.random() * 18; pos[i * 3 + 2] = (Math.random() - 0.5) * 30; vel.push([(Math.random() - 0.5) * 1.5, -(1.5 + Math.random() * 2.5), (Math.random() - 0.5) * 1.5, Math.random() * 6]); const c = pal[i % pal.length]; colors.set([c.r, c.g, c.b], i * 3); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.2, vertexColors: true, transparent: true, depthWrite: false, fog: false })); pts.frustumCulled = false; this.scene.add(pts);
+    const tro = build3D(THREE, trophyId); tro.position.set(0, 0, 0); this.scene.add(tro); const light = new THREE.PointLight(0xffe2a8, 60, 40, 1.6); light.position.set(2, 7, 4); this.scene.add(light);
+    const win = this.players.filter(p => p.t === side && !p.off); win.forEach((p, i) => { const a = i / win.length * Math.PI * 2, r = 4.2 + (i % 2) * 0.9; p.x = Math.sin(a) * r; p.z = Math.cos(a) * r; p.face = Math.atan2(-p.x, -p.z); p.state = 'run'; p.vx = p.vz = 0; p.m.root.position.set(p.x, 0, p.z); p.m.root.rotation.y = p.face; p.m.play('Celebrate', 0.2); p.m.root.visible = true; });
+    for (const p of this.players) if (p.t !== side && !p.off) p.m.root.visible = false; this.ball.y = -5; this.ballMesh.visible = false; this.ballSh.visible = false; for (const r of this.rings) r.visible = false;
+    for (const a of this.aimV) a.pivot.visible = a.ret.visible = a.rcv.visible = false;
+    this.cer = { t: 0, dur: 13, pts, vel, tro, light, win, done, geo }; this.A.cheer('goal'); this.A.sting('goal');
+  }
+  updateCer(dt) {
+    const C = this.cer; C.t += dt; C.tro.rotation.y += dt * 0.6; C.tro.position.y = Math.sin(C.t * 1.4) * 0.05; const pos = C.geo.attributes.position.array;
+    for (let i = 0; i < C.vel.length; i++) { const v = C.vel[i], j = i * 3; pos[j] += (v[0] + Math.sin(C.t * 2 + v[3]) * 0.8) * dt; pos[j + 1] += v[1] * dt; pos[j + 2] += (v[2] + Math.cos(C.t * 1.7 + v[3]) * 0.8) * dt; if (pos[j + 1] < 0.05) { if (C.t < C.dur - 3) { pos[j + 1] = 16 + Math.random() * 4; pos[j] = (Math.random() - 0.5) * 30; pos[j + 2] = (Math.random() - 0.5) * 30; } else pos[j + 1] = 0.05; } }
+    C.geo.attributes.position.needsUpdate = true; for (const p of C.win) p.m.mixer.update(dt);
+    if (C.t >= C.dur || this.humans.some(h => !h.remote && this.readH(h).passDown)) this.endCeremony();
+  }
+  endCeremony() {
+    const C = this.cer; if (!C) return; this.cer = null; this.scene.remove(C.pts); C.geo.dispose(); C.pts.material.dispose(); this.scene.remove(C.tro, C.light);
+    for (const p of this.players) if (!p.off) p.m.root.visible = true; this.ballMesh.visible = true; this.ballSh.visible = true; C.done && C.done();
+  }
   label(p) { // name tag above a player: shirt number + surname
     if (p._lbl && p._lblName === p.name) return p._lbl; if (p._lbl) { p.m.root.remove(p._lbl); p._lbl.material.map.dispose(); p._lbl.material.dispose(); }
     const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '800 26px Arial'; const sur = p.name.split(' ').slice(-1)[0].toUpperCase().slice(0, 12), txt = `${p.num}  ${sur}`, w = Math.min(244, g.measureText(txt).width + 26);
-    const kc = '#' + new THREE.Color(this.teams[p.t].kit[0]).getHexString(); g.fillStyle = 'rgba(8,12,22,0.82)'; g.beginPath(); g.roundRect(128 - w / 2, 10, w, 40, 10); g.fill(); g.fillStyle = kc; g.fillRect(128 - w / 2, 14, 5, 32); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128 + 3, 31);
+    const kc = '#' + new THREE.Color(this.kits[p.t].kit[0]).getHexString(); g.fillStyle = 'rgba(8,12,22,0.82)'; g.beginPath(); g.roundRect(128 - w / 2, 10, w, 40, 10); g.fill(); g.fillStyle = kc; g.fillRect(128 - w / 2, 14, 5, 32); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128 + 3, 31);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, fog: false })); sp.scale.set(5.6 / this.pscale, 1.4 / this.pscale, 1); sp.position.y = 2.55; sp.renderOrder = 10; p.m.root.add(sp); p._lbl = sp; p._lblName = p.name; return sp;
   }
   updateLabels() {
-    const mine = new Set(this.humans.map(h => h.sel)); const vis = this.labelMode !== 'off' && (this.phase === 'play' || this.phase === 'restart' || this.phase === 'kickoff' || this.phase === 'penaim');
+    const mine = new Set(this.humans.map(h => h.sel)); const vis = !this.cer && this.labelMode !== 'off' && (this.phase === 'play' || this.phase === 'restart' || this.phase === 'kickoff' || this.phase === 'penaim');
     for (const p of this.players) { const on = vis && !p.off && (this.labelMode === 'all' || mine.has(p) || (this.labelMode === 'sel' && this.ball.owner === p)); if (on) this.label(p).visible = true; else if (p._lbl) p._lbl.visible = false; }
   }
   updateAim() {
@@ -172,6 +197,7 @@ export class Match {
 
   // ---------- per-frame ----------
   update(dt) {
+    if (this.cer) this.updateCer(dt);
     this.wclock += dt; this.weather.update(dt, this.cam, this.wclock);
     if (this.role === 'guest') return this.guestUpdate(dt);
     this.step(dt);
@@ -604,6 +630,7 @@ export class Match {
     this.ballSh.position.set(b.x, 0.03, b.z); this.ballSh.scale.setScalar(0.2 + Math.min(1, b.y * 0.05));
     this.humans.forEach((h, n) => { const r = this.rings[n], p = h.sel; r.visible = !!p && this.phase !== 'pens' && this.phase !== 'penaim'; if (p) r.position.set(p.x, 0.04, p.z); }); this.updateAim(); this.updateLabels();
     const pt = this.passTo; this.tgtRing.visible = !!pt && !b.owner && this.phase === 'play'; if (pt) this.tgtRing.position.set(pt.x, 0.05, pt.z);
+    if (this.cer) { const C = this.cer, a = C.t * 0.32; c.position.set(Math.sin(a) * 12.5, 3.6 + Math.sin(C.t * 0.5) * 1.2, Math.cos(a) * 12.5); c.lookAt(0, 2.1, 0); c.fov = 42; c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); return; }
     // broadcast camera
     const pens = this.phase === 'pens', pa = this.phase === 'penaim' && this.penAim, cel = this.phase === 'goal' && this.celeb; this.zoom += ((this.phase === 'goal' ? 1 : this.phase === 'replay' ? 0.6 : 0) - this.zoom) * Math.min(1, 2 * dt);
     const fx = cel ? this.celeb.p.x : this.phase === 'intro' ? Math.sin(this.phaseT * 0.45) * 30 : b.x, fz = cel ? this.celeb.p.z : b.z, tx = pens ? PL - 16 : clamp(fx * 0.86, -PL + 14, PL - 14), tz = pens ? 0 : fz * 0.42; this.camX += (tx - this.camX) * Math.min(1, 3 * dt); this.camZ += (tz - this.camZ) * Math.min(1, 3 * dt);
@@ -614,7 +641,7 @@ export class Match {
   }
   render(renderer) { renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight); renderer.render(this.scene, this.cam); }
   dispose() {
-    this.stadium.dispose(); this.weather.dispose(); audio.weatherSound(null); for (const p of this.players) { this.scene.remove(p.m.root); p.m.dispose(); }
+    if (this.cer) this.endCeremony(); this.stadium.dispose(); this.weather.dispose(); audio.weatherSound(null); for (const p of this.players) { this.scene.remove(p.m.root); p.m.dispose(); }
     this.scene.remove(this.ballMesh, this.ballSh, this.tgtRing, ...this.rings, this.penRet.s, this.penRet.k); for (const a of this.aimV) this.scene.remove(a.pivot, a.ret, a.rcv); audio.crowd(false);
     if (this.net) for (const k in this.h) this.net.off(k, this.h[k]);
   }

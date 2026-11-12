@@ -3,13 +3,16 @@ import * as THREE from 'three';
 import { loadAll } from './assets.js';
 import { Match } from './match.js';
 import { PL, PW } from './pitch.js';
-import { TEAMS, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, FORMATION_IDS, save, persist, applyEdits, cleanEdits } from './data.js';
+import { TEAMS, CLUBS, ALL, COMPS, DIFFS, teamById, code, squad, FORMATION, FORMATION_IDS, save, persist, applyEdits, cleanEdits } from './data.js';
 import { compDef, startComp, stageName, myFixture, playRound, simulateRest, standings } from './comp.js';
 import { flagURL } from './flags.js';
 import { Net } from './net.js';
 import { STADIUMS, stadiumById, homeStadium } from './stadiums.js';
 import { WEATHER, WEATHER_IDS, randomWeather } from './weather.js';
 import { CAM_IDS } from './match.js';
+import { kitSets, KIT_NAMES, KIT_PRESETS } from './kits.js';
+import { TROPHIES, trophyArt, trophyById, ACHS, unlock } from './trophies.js';
+import * as career from './career.js';
 import * as input from './input.js';
 import * as audio from './audio.js';
 import * as ui from './ui.js';
@@ -89,17 +92,19 @@ function hud() {
   if (!radarBase) { radarBase = document.createElement('canvas'); radarBase.width = W; radarBase.height = H; const b = radarBase.getContext('2d'); b.fillStyle = 'rgba(8,30,16,0.88)'; b.fillRect(0, 0, W, H); b.strokeStyle = 'rgba(255,255,255,0.7)'; b.lineWidth = 1; b.strokeRect(X(-PL), Z(-PW), X(PL) - X(-PL), Z(PW) - Z(-PW)); b.beginPath(); b.moveTo(X(0), Z(-PW)); b.lineTo(X(0), Z(PW)); b.stroke(); b.beginPath(); b.arc(X(0), Z(0), 12, 0, 7); b.stroke(); }
   g.clearRect(0, 0, W, H); g.drawImage(radarBase, 0, 0);
   const mine = new Set(m.humans.map(h => h.sel));
-  for (const q of m.players) { if (q.off) continue; g.fillStyle = mine.has(q) ? '#ffe14a' : '#' + (q.gk ? m.teams[q.t].gk : m.teams[q.t].kit[0]).toString(16).padStart(6, '0'); g.strokeStyle = q.t ? '#000' : '#fff'; g.beginPath(); g.arc(X(q.x), Z(q.z), mine.has(q) ? 4 : 3, 0, 7); g.fill(); g.stroke(); }
+  for (const q of m.players) { if (q.off) continue; g.fillStyle = mine.has(q) ? '#ffe14a' : '#' + (q.gk ? m.kits[q.t].gk : m.kits[q.t].kit[0]).toString(16).padStart(6, '0'); g.strokeStyle = q.t ? '#000' : '#fff'; g.beginPath(); g.arc(X(q.x), Z(q.z), mine.has(q) ? 4 : 3, 0, 7); g.fill(); g.stroke(); }
   g.fillStyle = '#fff'; g.beginPath(); g.arc(X(m.ball.x), Z(m.ball.z), 2.2, 0, 7); g.fill();
 }
 
 // ---------------- menus ----------------
 function mainMenu() {
-  const c = save.comp; audio.music('menu');
+  const c = save.comp; audio.music('menu'); career.restoreRatings(); const cr = save.career;
   ui.menu({ id: 'main', title: 'GOAL NATION 2026', logo: true, cls: 'narrow main', sub: `Played ${save.played} · Won ${save.wins} · Goals ${save.goals} · Trophies ${save.trophies.length}`, items: [
     c ? { label: 'Continue: ' + compDef(c.id).name, hint: stageName(c), cls: 'primary', onClick: compMenu } : null,
-    { label: 'Kick-off', hint: 'Friendly: any two teams, 1 or 2 players', cls: c ? '' : 'primary', onClick: () => kickMenu(false) },
+    { label: 'Career mode', hint: cr && !cr.over ? `${teamById(cr.club).name} · season ${cr.season}` : 'Manage a club through seasons: league, cup, Europe', cls: !c && cr && !cr.over ? 'primary' : '', onClick: careerEntry },
+    { label: 'Kick-off', hint: 'Friendly: any two teams, 1 or 2 players', cls: c || (cr && !cr.over) ? '' : 'primary', onClick: () => kickMenu(false) },
     { label: 'Competitions', hint: 'Champions cups, nation cups and leagues', onClick: compsMenu },
+    { label: 'Trophy room', hint: `${new Set(save.trophies).size} of ${TROPHIES.length} trophies · ${Object.keys(save.ach || {}).length} achievements`, onClick: trophyRoom },
     { label: 'Online match', hint: 'Play a friend over Wi-Fi / LAN', onClick: onlineMenu },
     { label: 'Penalty shoot-out', onClick: () => kickMenu(true) },
     { label: 'Edit mode', hint: 'Rename teams, squads and cups · kits · badges', onClick: editMenu },
@@ -119,6 +124,8 @@ function kickMenu(pens) {
     opt('Stadium', S.stadium === 'random' ? 'Random' : S.stadium && S.stadium !== 'auto' ? stadiumById(S.stadium).name : 'Home ground (' + homeStadium(A).name + ')', d => { const o = ['auto', 'random', ...STADIUMS.map(x => x.id)]; S.stadium = cyc(o, S.stadium || 'auto', d); persist(); }),
     opt('Weather', S.weather && S.weather !== 'auto' ? WEATHER[S.weather].name : 'Auto', d => { S.weather = cyc(['auto', ...WEATHER_IDS], S.weather || 'auto', d); persist(); }),
     opt('Time of day', S.tod && S.tod !== 'auto' ? { day: 'Day', dusk: 'Dusk', night: 'Night' }[S.tod] : 'Auto', d => { S.tod = cyc(['auto', ...TODS], S.tod || 'auto', d); persist(); }),
+    opt('Kit – ' + A.name, k.kA && k.kA !== 'auto' ? KIT_NAMES[k.kA] : 'Auto', d => { k.kA = cyc(['auto', 'home', 'away', 'third'], k.kA || 'auto', d); }),
+    opt('Kit – ' + B.name, k.kB && k.kB !== 'auto' ? KIT_NAMES[k.kB] : 'Auto', d => { k.kB = cyc(['auto', 'home', 'away', 'third'], k.kB || 'auto', d); }),
     opt('Formation – ' + A.name, S.form || '4-4-2', d => { S.form = cyc(FORMATION_IDS, S.form || '4-4-2', d); persist(); }),
     opt('Formation – ' + B.name, S.formB || '4-4-2', d => { S.formB = cyc(FORMATION_IDS, S.formB || '4-4-2', d); persist(); }),
     k.pens ? null : opt('Half length', S.half + ' min', d => { S.half = cyc([2, 3, 4, 5, 8], S.half, d); persist(); }),
@@ -158,14 +165,14 @@ function playersMenu() {
 function firstPad(n, fallback) { const p = input.pads(); return p[n] ? 'pad' + p[n].index : fallback; }
 function friendly() {
   const A = teamById(k.a), B = teamById(k.b);
-  play({ home: A, away: B, humans: humansFor(k.players), formations: [S.form || '4-4-2', S.formB || '4-4-2'], mustWin: k.pens, pensOnly: k.pens, onEnd: r => resultMenu(A, B, r, { again: friendly, next: mainMenu }) });
+  play({ home: A, away: B, humans: humansFor(k.players), kitSel: [k.kA || 'auto', k.kB || 'auto'], formations: [S.form || '4-4-2', S.formB || '4-4-2'], mustWin: k.pens, pensOnly: k.pens, onEnd: r => resultMenu(A, B, r, { again: friendly, next: mainMenu }) });
 }
 const evIcon = e => e.card ? (e.card === 'Y' ? '🟨' : e.card === 'YR' ? '🟨🟥' : '🟥') : e.sub ? '🔁' : e.inj ? '🩹' : '⚽';
 function resultMenu(A, B, r, o) {
   $('hud').style.display = 'none'; audio.music('menu'); const side = o.side || 0, my = r.score[side], th = r.score[1 - side], pens = r.pens && [r.pens[side], r.pens[1 - side]];
   const agg = o.agg ? [o.agg[0] + r.score[0], o.agg[1] + r.score[1]] : null;
   const won = pens ? pens[0] > pens[1] : agg ? agg[0] > agg[1] : my > th, drew = !pens && (agg ? agg[0] === agg[1] : my === th);
-  save.played++; save.goals += my; if (won) save.wins++; persist(); if (won) audio.sfx('win');
+  if (!o.shown) { save.played++; save.goals += my; if (won) save.wins++; if (won) { badge('a_first'); if (!pens && my - th >= 5) badge('a_big'); if (pens && !r.pens.every(x => x === r.pens[0])) badge('a_pens'); const first = r.events.find(e => !e.sub && !e.card && !e.inj); if (first && first.t !== side) badge('a_comeback'); } persist(); if (won) audio.sfx('win'); }
   const tot = r.stats[0].poss + r.stats[1].poss || 1;
   const ev = r.events.map(e => `<div class="res"><b>${e.min}'</b><span>${evIcon(e)} ${esc(e.name)}${e.sub ? ' <small>for ' + esc(e.off) + '</small>' : ''}</span><em>${esc(code(e.t ? B : A))}</em></div>`).join('');
   ui.menu({ id: 'result', title: o.title || (won ? 'You win!' : drew ? 'Draw' : 'Defeat'), sub: o.sub, items: [
@@ -174,9 +181,11 @@ function resultMenu(A, B, r, o) {
     r.motm ? { html: `<div class="motm"><span>MAN OF THE MATCH</span><b>${esc(r.motm.num)}  ${esc(r.motm.name)}</b><em>${esc(code(r.motm.t ? B : A))} · ${esc(r.motm.line)}</em></div>` } : null,
     o.extra ? { html: o.extra } : null,
     { label: o.nextLabel || 'Continue', cls: 'primary', onClick: () => { demo(); o.next(); } }, o.again ? { label: 'Rematch', onClick: o.again } : null,
+    o.trophy && game.match ? { label: 'Lift the trophy', hint: trophyById(o.trophy) ? trophyById(o.trophy).name : '', cls: 'gold', onClick: () => { ui.hideMenu(); game.match.startCeremony(o.trophy, side, () => resultMenu(A, B, r, { ...o, trophy: null, shown: true })); } } : null,
     ...(o.more || []),
   ] });
 }
+function badge(id) { if (unlock(save, id)) { const a = ACHS.find(x => x[0] === id); if (a) ui.toast('Achievement unlocked: ' + a[1]); persist(); } }
 
 // ---------------- competitions ----------------
 const cs = { comp: 'ecc', team: null };
@@ -213,12 +222,12 @@ function playComp() {
   const c = save.comp, def = compDef(c.id), f = myFixture(c), A = teamById(c.me), B = teamById(f.opp), rn = stageName(c);
   play({ home: A, away: B, humans: S.compFriends ? humansFor('custom').map(h => ({ ...h, side: 0 })) : [{ side: 0, device: 'all' }], mustWin: f.decider, agg: f.agg, leg2: !!f.agg, onEnd: r => {
     playRound(c, def, { gf: r.score[0], ga: r.score[1], pens: r.pens });
-    let extra = '', next = compMenu, nextLabel = 'Continue', more = [];
-    if (c.done && c.champion === c.me) { extra = `🏆 CHAMPIONS! ${esc(A.name)} win the ${esc(def.name)}!`; save.trophies.push(c.id); save.comp = null; next = mainMenu; audio.say('champions'); }
+    let extra = '', next = compMenu, nextLabel = 'Continue', more = [], trophy = null;
+    if (c.done && c.champion === c.me) { extra = `🏆 CHAMPIONS! ${esc(A.name)} win the ${esc(def.name)}!`; save.trophies.push(c.id); badge('a_trophy'); trophy = c.id; save.comp = null; next = mainMenu; audio.say('champions'); }
     else if (c.out) { extra = esc(c.out); next = mainMenu; nextLabel = 'Main menu'; more = [{ label: 'See who wins', onClick: () => { demo(); simulateRest(c, def); finalMenu(c, def); } }]; save.comp = null; }
     else if (c.done) { extra = `${nm(c.champion)} win the ${esc(def.name)}.`; save.comp = null; next = mainMenu; }
     else if (c.through) { extra = esc(c.through); c.through = null; }
-    persist(); resultMenu(A, B, r, { sub: `${def.name} · ${rn}`, next, nextLabel, more, agg: f.agg, extra: extra ? `<div class="champ">${extra}</div>` : '' });
+    persist(); resultMenu(A, B, r, { sub: `${def.name} · ${rn}`, next, nextLabel, more, trophy, agg: f.agg, extra: extra ? `<div class="champ">${extra}</div>` : '' });
   } });
 }
 function finalMenu(c, def) {
@@ -293,6 +302,7 @@ function editMenu() {
     { input: true, key: 'cd', label: 'Short name', value: code(T), max: 3, onInput: v => { const E = teamEdits(T); if (v.trim()) E.code = v.trim().toUpperCase().slice(0, 3); else delete E.code; commit(); } },
     kitOpt(0, 'Shirt colour'), kitOpt(1, 'Shorts colour'), kitOpt(2, 'Socks colour'),
     { row: [{ key: 'bdg', label: 'Import badge image…', onClick: () => pickFile('image/*', importBadge) }, { key: 'rmb', label: 'Remove badge', disabled: !T.badge, onClick: () => { delete teamEdits(T).badge; commit(); re(); } }] },
+    { key: 'kl', label: 'Away & third kits', hint: 'Kit locker with ready-made kits', onClick: kitLocker },
     { key: 'sq', label: 'Edit squad names', hint: '11 starters and 5 substitutes', onClick: squadEdit },
     { key: 'cp', label: 'Rename competitions', onClick: compEdit },
     { row: [{ key: 'ex', label: 'Export edit file', onClick: exportEdits }, { key: 'im', label: 'Import edit file…', onClick: () => pickFile('.json,application/json', importEdits) }] },
@@ -343,6 +353,148 @@ function howMenu() {
     <p class="tip dim">Commentary voices, crowd recordings, chants and the original music come from the Pitch Clash library. GOAL NATION 2026 © 2026 Anye Happiness Ade — AI Engineer, Cameroon. All clubs, squads and competitions are fictional unless you rename them in Edit mode.</p>` }], back: mainMenu });
 }
 
+// ---------------- kit locker (Edit mode) ----------------
+const kl = { slot: 'away' };
+function kitLocker() {
+  ed.team = ed.team || save.team; const T = teamById(ed.team), re = kitLocker, cur = kitSets(T)[kl.slot].kit, E = teamEdits(T), save1 = k => { E.kits = E.kits || {}; E.kits[kl.slot] = k; commit(); re(); };
+  const pre = KIT_PRESETS.findIndex(x => x[1] === cur[0] && x[2] === cur[1] && x[3] === cur[2]);
+  const setCol = (i, d) => { const k = [...cur], c = palName(k[i]); k[i] = cyc(PALETTE, c, d)[1]; save1(k); };
+  const chips = (kit, gkc) => `<div class="kit">${kit.map(c => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('')}${gkc != null ? `<i class="gk" style="background:#${gkc.toString(16).padStart(6, '0')}"></i>` : ''}</div>`;
+  const sets = kitSets(T);
+  ui.menu({ id: 'kitlocker', title: 'Kit locker', sub: T.name, items: [
+    { html: `<div class="kitrow">${['home', 'away', 'third'].map(n => `<div class="kc ${n === kl.slot ? 'on' : ''}"><b>${KIT_NAMES[n]}</b>${chips(sets[n].kit, sets[n].gk)}</div>`).join('')}</div>` },
+    { label: 'Kit to edit', value: KIT_NAMES[kl.slot], cycle: true, onClick: () => { kl.slot = kl.slot === 'away' ? 'third' : 'away'; re(); }, onLeft: () => { kl.slot = kl.slot === 'away' ? 'third' : 'away'; re(); } },
+    { label: 'Ready-made kit', value: pre >= 0 ? KIT_PRESETS[pre][0] : 'Custom', cycle: true, onClick: () => { const n = KIT_PRESETS[(pre + 1 + KIT_PRESETS.length) % KIT_PRESETS.length]; save1([n[1], n[2], n[3]]); }, onLeft: () => { const n = KIT_PRESETS[(pre - 1 + KIT_PRESETS.length) % KIT_PRESETS.length]; save1([n[1], n[2], n[3]]); } },
+    ...['Shirt', 'Shorts', 'Socks'].map((n, i) => ({ key: 'c' + i, label: n + ' colour', value: palName(cur[i])[0], cycle: true, onClick: () => setCol(i, 1), onLeft: () => setCol(i, -1) })),
+    { label: 'Reset this kit', cls: 'danger', onClick: () => { if (E.kits) delete E.kits[kl.slot]; commit(); re(); } },
+  ], back: editMenu });
+}
+
+// ---------------- trophy room ----------------
+function trophyRoom() {
+  const have = {}; for (const id of save.trophies) have[id] = (have[id] || 0) + 1; const kinds = ['Nations', 'Continental', 'League', 'Cup', 'Super Cup', 'Award'];
+  const card = t => `<div class="tcard ${have[t.id] ? '' : 'locked'}">${trophyArt(t.id, 72, !have[t.id])}<b>${esc(t.name)}</b><small>${have[t.id] ? `Won ×${have[t.id]}` : esc(t.blurb)}</small></div>`;
+  const ach = ACHS.map(([id, n, d]) => `<div class="ach ${save.ach && save.ach[id] ? 'on' : ''}"><i>${save.ach && save.ach[id] ? '★' : '☆'}</i><span><b>${esc(n)}</b><small>${esc(d)}</small></span></div>`).join('');
+  ui.menu({ id: 'trophyroom', title: 'Trophy room', sub: `${new Set(save.trophies).size} of ${TROPHIES.length} collected`, cls: 'wide', items: [
+    { html: kinds.map(kd => `<h3>${esc(kd === 'Award' ? 'Career awards' : kd)}</h3><div class="tgrid">${TROPHIES.filter(t => t.kind === kd).map(card).join('')}</div>`).join('') + `<h3>Achievements</h3><div class="achs">${ach}</div>` },
+  ], back: mainMenu });
+}
+
+// ---------------- career mode ----------------
+const cn = { club: null, mgr: '', diff: 'normal' };
+function careerEntry() {
+  const cr = save.career;
+  if (cr && !cr.over) return careerHub();
+  if (cr && cr.over) return careerOver();
+  careerNew();
+}
+function careerNew() {
+  const clubs = [...CLUBS].sort((a, b) => a.league.localeCompare(b.league) || b.rating - a.rating), ids = clubs.map(c => c.id); cn.club = cn.club || ids[0]; const T = teamById(cn.club), lg = LEAGUES_NAME(T.league), re = careerNew;
+  const rank = CLUBS.filter(c => c.league === T.league).sort((a, b) => b.rating - a.rating).findIndex(c => c.id === T.id) + 1;
+  ui.menu({ id: 'careernew', title: 'Career mode', sub: 'Take charge of a club: league, cup and continental football, board objectives, transfers and a trophy cabinet.', items: [
+    { html: `<div class="vs"><div>${flag(T)}</div><div>${esc(T.name)}<small>${esc(lg)} · rating ${T.rating} · #${rank} of 8 on paper</small></div><div class="kit">${kitSets(T).home.kit.map(c => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('')}</div></div>` },
+    { label: 'Club', value: T.name, cycle: true, onClick: () => { cn.club = cyc(ids, cn.club, 1); re(); }, onLeft: () => { cn.club = cyc(ids, cn.club, -1); re(); } },
+    { input: true, key: 'mg', label: 'Manager name', value: cn.mgr, max: 20, placeholder: 'Your name', onInput: v => { cn.mgr = v; } },
+    { label: 'Difficulty', value: cn.diff, cycle: true, onClick: () => { cn.diff = cyc(Object.keys(DIFFS), cn.diff, 1); S.diff = cn.diff; persist(); re(); }, onLeft: () => { cn.diff = cyc(Object.keys(DIFFS), cn.diff, -1); S.diff = cn.diff; persist(); re(); } },
+    { label: 'START CAREER', cls: 'primary', onClick: () => { save.career = career.newCareer(cn.club, (cn.mgr || '').trim() || 'The Gaffer', cn.diff, cn.keepXp || 0); cn.keepXp = 0; save.team = cn.club; persist(); careerHub(); } },
+  ], back: mainMenu });
+}
+const LEAGUES_NAME = id => ({ en: 'Premier League', es: 'La Liga', it: 'Serie A', af: 'CAF Champions League' }[id] || id);
+const money = v => '€' + Math.round(v) + 'M';
+function careerHub() {
+  const cr = save.career; career.applyRatings(cr); const me = teamById(cr.club), ev = career.nextEvent(cr), ml = career.mgrLevel(cr.xp), done = !ev, o = cr.obj;
+  const bar = v => `<div class="cbar"><i style="width:${v}%;background:${v > 60 ? '#3df58a' : v > 30 ? '#ffc21f' : '#ff5a4a'}"></i></div>`;
+  const L = cr.comps.lg, table = standings(L, L.groups[0]), pos = table.indexOf(cr.club) + 1;
+  ui.menu({ id: 'career', title: me.name, sub: `Season ${cr.season} · ${cr.year}/${String(cr.year + 1).slice(2)} · ${cr.manager} (${ml.name})`, cls: 'wide', items: [
+    { html: `<div class="chead"><div>${flag(me)}</div><div class="cst"><div><small>Rating</small><b>${me.rating}</b></div><div><small>League</small><b>${pos}${['st', 'nd', 'rd'][pos - 1] || 'th'}</b></div><div><small>Budget</small><b>${money(cr.budget)}</b></div><div><small>Record</small><b>${cr.played.w}-${cr.played.d}-${cr.played.l}</b></div></div></div>
+      <div class="cobj"><div><small>Board confidence</small>${bar(cr.board)}</div><ul><li>🎯 ${esc(o.leagueText)}</li><li>🏆 ${esc(o.cupText)}</li>${o.contText ? `<li>🌍 ${esc(o.contText)}</li>` : ''}</ul></div>` },
+    done ? { label: 'SEASON REVIEW', hint: 'The season is complete', cls: 'primary', onClick: seasonReview }
+      : { label: 'PLAY MATCH', hint: `${ev.label} · ${ev.stage}  ·  ${me.name} vs ${teamById(ev.fix.opp).name}${ev.fix.agg ? ` (1st leg ${ev.fix.agg[0]}-${ev.fix.agg[1]})` : ''}${ev.fix.home ? '  ·  home' : '  ·  away'}`, cls: 'primary', onClick: () => careerPlay(ev) },
+    done ? null : { label: 'Simulate match', hint: 'Let the squad play it out', onClick: () => careerSim(ev) },
+    { row: [{ label: 'Tables & fixtures', onClick: () => careerTables('lg') }, { label: 'Calendar', onClick: careerCalendar }] },
+    { row: [{ label: 'Club', hint: 'Upgrades & transfers', onClick: careerClub }, { label: 'Seasons & trophies', onClick: careerHistory }] },
+    { row: [{ label: 'Manager', onClick: careerManager }, { label: 'Save & exit', onClick: mainMenu }] },
+    { label: 'Retire', cls: 'danger', onClick: () => { ui.menu({ id: 'retire', title: 'Retire?', sub: 'This deletes the career (your trophies stay in the trophy room).', items: [{ label: 'Keep managing', cls: 'primary', onClick: careerHub }, { label: 'Retire and delete', cls: 'danger', onClick: () => { save.career = null; persist(); mainMenu(); } }], back: careerHub }); } },
+  ], back: mainMenu });
+}
+function careerPlay(ev) {
+  const cr = save.career, A = teamById(cr.club), B = teamById(ev.fix.opp);
+  play({ home: A, away: B, humans: S.compFriends ? humansFor('custom').map(h => ({ ...h, side: 0 })) : [{ side: 0, device: 'all' }], mustWin: ev.fix.decider, agg: ev.fix.agg, leg2: !!ev.fix.agg, ...(ev.fix.home ? {} : { stadium: homeStadium(B).id }),
+    onEnd: r => careerFinish(ev, { gf: r.score[0], ga: r.score[1], pens: r.pens, events: r.events }, A, B, r) });
+}
+function careerSim(ev) {
+  const cr = save.career, A = teamById(cr.club), B = teamById(ev.fix.opp), res = career.quickSim(cr, ev);
+  careerFinish(ev, res, A, B, { score: [res.gf, res.ga], pens: res.pens, events: [], stats: [{ shots: 0, poss: 1, passes: 0, sot: 0, fouls: 0, corners: 0 }, { shots: 0, poss: 1, passes: 0, sot: 0, fouls: 0, corners: 0 }] }, true);
+}
+function careerFinish(ev, res, A, B, r, simmed) {
+  const cr = save.career, out = career.playEvent(cr, res), won = res.pens ? res.pens[0] > res.pens[1] : res.gf > res.ga;
+  const tid = career.trophyIdOf(cr, out.k); let extra = '', trophy = null;
+  if (out.champion) { extra = `${trophyArt(tid, 54)} <b>${esc(trophyById(tid).name)} — ${out.k === 'lg' ? 'league champions!' : 'winners!'}</b>`; trophy = tid; audio.say('champions'); }
+  else if (out.out) extra = esc(out.out); else if (out.through) extra = esc(out.through);
+  if (won) badge('a_first'); if (cr.goals >= 50) badge('a_goals50'); if (cr.goals >= 200) badge('a_goals200'); persist();
+  if (simmed) { ui.menu({ id: 'simres', title: won ? 'Win' : res.gf === res.ga && !res.pens ? 'Draw' : 'Defeat', sub: ev.label + ' · ' + ev.stage, items: [{ html: `<div class="vs"><div>${flag(A)}</div><div>${esc(A.name)} &nbsp;${res.gf} - ${res.ga}&nbsp; ${esc(B.name)}${res.pens ? `<small>penalties ${res.pens[0]} - ${res.pens[1]}</small>` : ''}</div><div>${flag(B)}</div></div>` }, extra ? { html: `<div class="champ">${extra}</div>` } : null, { label: 'Continue', cls: 'primary', onClick: careerHub }] }); return; }
+  resultMenu(A, B, r, { sub: ev.label + ' · ' + ev.stage, next: careerHub, trophy, extra: extra ? `<div class="champ">${extra}</div>` : '' });
+}
+function careerTables(k) {
+  const cr = save.career, re = careerTables, ks = ['lg', 'cup', 'cont', 'sup'].filter(x => cr.comps[x]), c = cr.comps[k] || cr.comps.lg; k = cr.comps[k] ? k : 'lg';
+  ui.menu({ id: 'ctables', title: career.defOf(cr, k).name, sub: stageName(c), cls: 'wide', items: [
+    { label: 'Competition', value: career.COMP_LABEL[k], cycle: true, onClick: () => re(cyc(ks, k, 1)), onLeft: () => re(cyc(ks, k, -1)) },
+    { html: `<div class="reslist">${c.done ? `<h3>Finished — champions: ${nm(c.champion)}</h3>` + (c.stage === 'league' ? tableHtml(c, c.groups[0]) : '') : compBody(c)}</div>` },
+  ], back: careerHub });
+}
+function careerCalendar() {
+  const cr = save.career, L = cr.comps.lg, cnt = { lg: L.round, cup: 0, cont: 0, sup: 0 }, rows = cr.cal.slice(0, 16).map(e => { const n = ++cnt[e.k]; return `<div class="fix"><span>${career.COMP_LABEL[e.k]}</span><b>${e.k === 'lg' ? 'Match day ' + n : e.k === 'sup' ? 'Super Cup' : 'Round ' + (cr.comps[e.k].round !== undefined && cr.comps[e.k].stage !== 'ko' ? n : n)}</b><span>${esc(career.defOf(cr, e.k).name)}</span></div>`; }).join('');
+  ui.menu({ id: 'ccal', title: 'Calendar', sub: `${cr.cal.length} matches left this season`, items: [{ html: `<div class="reslist">${rows || 'Season complete.'}</div>` }], back: careerHub });
+}
+function careerClub() {
+  const cr = save.career, re = careerClub, buy = (fn, msg) => { if (fn()) { persist(); ui.toast(msg); } else ui.toast('Not enough money.'); re(); };
+  ui.menu({ id: 'cclub', title: 'Club', sub: `Budget ${money(cr.budget)}`, cls: 'wide', items: [
+    { text: 'Upgrades', cls: 'dim' },
+    ...career.UPGRADES.map(u => { const c = career.upgradeCost(cr, u); return { label: `${u.name}  ·  level ${cr[u.id]}/${u.max}`, hint: u.text(cr[u.id]), value: c == null ? 'MAX' : money(c), disabled: c == null || cr.budget < c, onClick: () => buy(() => career.buyUpgrade(cr, u.id), u.name + ' upgraded') }; }),
+    { text: 'Transfer market', cls: 'dim' },
+    ...cr.market.map((p, i) => ({ label: `${p.name}`, hint: `${p.role} · from ${p.from}`, value: `+${p.bonus} · ${money(p.price)}`, disabled: cr.budget < p.price, onClick: () => buy(() => career.signPlayer(cr, i), p.name + ' signed') })),
+    cr.market.length ? null : { text: 'No one is available right now.', cls: 'dim' },
+    cr.signed.length ? { html: `<div class="reslist"><h3>Your signings</h3>${cr.signed.map(x => `<div class="res"><b>+${x.bonus}</b><span>${esc(x.name)}</span></div>`).join('')}</div>` } : null,
+  ], back: careerHub });
+}
+function careerManager() {
+  const cr = save.career, ml = career.mgrLevel(cr.xp), pct = ml.next ? Math.min(100, (cr.xp - [0, 60, 160, 320, 560, 900][ml.level - 1]) / (ml.next - [0, 60, 160, 320, 560, 900][ml.level - 1]) * 100) : 100;
+  ui.menu({ id: 'cmgr', title: cr.manager, sub: `${ml.name} · level ${ml.level}`, items: [
+    { html: `<div class="cbar"><i style="width:${pct}%;background:#ffc21f"></i></div><small class="dim">${cr.xp} XP${ml.next ? ' · next level at ' + ml.next : ''}</small>
+      <table class="how"><tr><td>Matches</td><td>${cr.played.w + cr.played.d + cr.played.l}</td></tr><tr><td>Won – drawn – lost</td><td>${cr.played.w} – ${cr.played.d} – ${cr.played.l}</td></tr><tr><td>Goals for – against</td><td>${cr.played.gf} – ${cr.played.ga}</td></tr><tr><td>League titles</td><td>${cr.titles}</td></tr><tr><td>Top scorers this season</td><td>${Object.entries(cr.scorers).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, g]) => esc(n) + ' ' + g).join(', ') || '—'}</td></tr></table>` },
+  ], back: careerHub });
+}
+function careerHistory() {
+  const cr = save.career, rows = cr.hist.map(h => `<tr><td>${h.year}/${String(h.year + 1).slice(2)}</td><td>${h.pos}</td><td>${h.pts}</td><td>${h.cup}</td><td>${h.cont}</td><td>${h.trophies.length}</td></tr>`).join('');
+  const mine = {}; for (const h of cr.hist) for (const t of [...h.trophies, ...h.awards]) mine[t] = (mine[t] || 0) + 1;
+  ui.menu({ id: 'chist', title: 'Seasons & trophies', cls: 'wide', items: [
+    { html: cr.hist.length ? `<table class="tbl"><tr><th>Season</th><th>Pos</th><th>Pts</th><th>Cup</th><th>Europe</th><th>Trophies</th></tr>${rows}</table>` : '<p class="tip">Your history appears here after the first season.</p>' },
+    Object.keys(mine).length ? { html: `<h3>Won with ${esc(teamById(cr.club).name)}</h3><div class="tgrid">${Object.entries(mine).map(([id, n]) => `<div class="tcard">${trophyArt(id, 60)}<b>${esc(trophyById(id).name)}</b><small>×${n}</small></div>`).join('')}</div>` } : null,
+    { label: 'Full trophy room', onClick: trophyRoom },
+  ], back: careerHub });
+}
+function seasonReview() {
+  const cr = save.career; if (!cr.review) { const rv = career.endSeason(cr); cr.review = rv; for (const t of [...rv.trophies, ...rv.awards]) { save.trophies.push(t); } if (rv.trophies.length) badge('a_trophy'); if (rv.trophies.includes('ecc') || rv.trophies.includes('acc')) badge('a_cont'); if (cr.season >= 3) badge('a_season3'); if (cr.budget >= 150) badge('a_rich'); persist(); }
+  const rv = cr.review, h = rv.rec, ok = v => v === null ? '' : v ? '✔' : '✘', o = cr.obj, win = [...rv.trophies, ...rv.awards];
+  ui.menu({ id: 'creview', title: `Season ${cr.season} review`, sub: `${teamById(cr.club).name} · ${h.year}/${String(h.year + 1).slice(2)}`, cls: 'wide', items: [
+    { html: `<div class="cst big"><div><small>League</small><b>${h.pos}${['st', 'nd', 'rd'][h.pos - 1] || 'th'}</b></div><div><small>Points</small><b>${h.pts}</b></div><div><small>W-D-L</small><b>${h.w}-${h.d}-${h.l}</b></div><div><small>Goals</small><b>${h.gf}-${h.ga}</b></div></div>
+      <ul class="cobjl"><li>${ok(rv.objectives.leagueMet)} ${esc(o.leagueText)}</li><li>${ok(rv.objectives.cupMet)} ${esc(o.cupText)} <em>(${esc(h.cup)})</em></li>${o.contText ? `<li>${ok(rv.objectives.contMet)} ${esc(o.contText)} <em>(${esc(h.cont)})</em></li>` : ''}</ul>
+      <p class="tip">Prize & gate money <b>+${money(h.income)}</b> · board confidence ${h.board >= 0 ? '+' : ''}${h.board} → <b>${cr.board}%</b> · top scorer ${esc(h.scorer)}</p>
+      ${win.length ? `<h3>Silverware</h3><div class="tgrid">${win.map(id => `<div class="tcard">${trophyArt(id, 64)}<b>${esc(trophyById(id).name)}</b></div>`).join('')}</div>` : '<p class="tip dim">No trophies this season.</p>'}` },
+    cr.sacked ? { label: 'The board has lost faith…', cls: 'danger', onClick: () => { cr.over = true; persist(); careerOver(); } }
+      : { label: `START SEASON ${cr.season + 1}`, cls: 'primary', onClick: () => { career.nextSeason(cr); cr.review = null; persist(); careerHub(); } },
+  ], back: careerHub });
+}
+function careerOver() {
+  const cr = save.career, ml = career.mgrLevel(cr.xp);
+  ui.menu({ id: 'cover', title: 'Sacked', sub: `${cr.manager} · ${cr.season} season${cr.season > 1 ? 's' : ''} at ${teamById(cr.club).name}`, items: [
+    { html: `<p class="tip">The board has run out of patience. You won ${cr.titles} league title${cr.titles === 1 ? '' : 's'} and finished as a <b>${ml.name}</b> with ${cr.xp} XP.</p>` },
+    { label: 'Take a new job', cls: 'primary', onClick: () => { const xp = cr.xp, name = cr.manager; save.career = null; careerNewKeep(name, xp); } },
+    { label: 'Main menu', onClick: () => { save.career = null; persist(); mainMenu(); } },
+  ] });
+}
+function careerNewKeep(name, xp) { cn.mgr = name; careerNew(); cn.keepXp = xp; }
+
 // ---------------- loop ----------------
 let last = performance.now(), fpsT = 0, fpsN = 0, shotReq = false;
 addEventListener('keydown', e => { if (e.repeat || e.target instanceof HTMLInputElement) return; if (e.code === 'F12' || e.code === 'F9') { shotReq = true; e.preventDefault(); } if (e.code === 'KeyV' && game.match && !game.match.cfg.demo) { const m = game.match; m.camMode = cyc(CAM_IDS, m.camMode, 1); S.camera = m.camMode; persist(); ui.toast('Camera: ' + m.camMode); } });
@@ -357,5 +509,5 @@ function frame(now) {
   try { await loadAll(p => ui.loading(p * 0.9, 'Loading players…')); } catch (e) { console.error(e); ui.loading(0.5, 'Failed to load: ' + e.message); return; }
   ui.loading(0.95, 'Building the stadium…'); await new Promise(r => setTimeout(r, 30));
   demo(); ui.loading(1); mainMenu(); requestAnimationFrame(frame);
-  window.__g = { game, play, k, kickMenu, playersMenu, friendly, compMenu, playComp, save, teamById, COMPS, startComp, compDef, editMenu, lobby: () => lobby(), get net() { return net; } };
+  window.__g = { career, careerNew, careerHub, trophyRoom, kitLocker, seasonReview, THREE, game, play, k, kickMenu, playersMenu, friendly, compMenu, playComp, save, teamById, COMPS, startComp, compDef, editMenu, lobby: () => lobby(), get net() { return net; } };
 })();
