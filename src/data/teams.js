@@ -1474,7 +1474,7 @@ const SQUAD_TEMPLATE = ['GK', 'GK', 'GK', 'CB', 'CB', 'CB', 'CB', 'LB', 'LB', 'R
 // Real players for a team, placed into squad slots by position when position data exists.
 // Returns an array indexed by slot (null = keep a generated name). Crawled rosters (REAL_POS: [name, pos] in page order)
 // win over the older name-only lists; without positions, names fill slots in list order.
-const POS_LINE = { GK: 'G', CB: 'D', LB: 'D', RB: 'D', CDM: 'M', CM: 'M', CAM: 'M', LM: 'M', RM: 'M', LW: 'A', RW: 'A', ST: 'A' };
+const POS_LINE = { DF: 'D', MF: 'M', FW: 'A', GK: 'G', CB: 'D', LB: 'D', RB: 'D', CDM: 'M', CM: 'M', CAM: 'M', LM: 'M', RM: 'M', LW: 'A', RW: 'A', ST: 'A' };
 const realSlotCache = new Map();
 function assignReal(teamId) {
   if (realSlotCache.has(teamId)) return realSlotCache.get(teamId);

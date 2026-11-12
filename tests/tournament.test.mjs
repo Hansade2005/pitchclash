@@ -569,7 +569,7 @@ test('no superstar player names in generated squads (blocked list)', () => {
   const newTeams = [...CLUBS.filter((c) => ['alb2', 'ibe2'].includes(c.league) || (c.pool === 'row' && !['EUR', 'AFR'].includes(c.confed))),
     ...NATIONS.map((n) => getTeam(`${n.id}-u23`)), ...NATIONS.map((n) => getTeam(`${n.id}-u20`))];
   for (const t of newTeams) {
-    const real = new Set(REAL_SQUADS[t.id] || []);       // real players are allowed; only generated names are checked
+    const real = new Set([...(REAL_SQUADS[t.id] || []), ...((REAL_POS[t.id] || []).map((x) => x[0]))]);       // real players are allowed; only generated names are checked
     for (const p of makeSquad(t)) {
       if (real.has(p.name)) continue;
       const s = ` ${norm(p.name)} `;
