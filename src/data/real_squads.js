@@ -27,4 +27,5 @@ export const REAL_SQUADS = {
   "atletico-de-madrid": ["Oblak", "Llorente", "Pubill", "Hancko", "Grimaldo", "Hjulmand", "Barrios", "Baena", "Kang In Lee", "Lookman", "Julián Álvarez", "Sørloth"],
   "borussia-dortmund": ["Miguel Adje", "Mathis Albert", "Waldemar Anton", "Maximilian Beier", "Jobe Bellingham", "Ramy Bensebaini", "Carney Chukwuemeka"],
   "sen": ["Édouard Mendy", "Mory Diaw", "Yehvann Diouf"],
+  "ac-milan": ["Lorenzo Torriani", "Zachary Athekame", "Davide Bartesaghi", "Ismael Bennacer", "Warren Bondo", "Emanuele Borsani"],
 };
