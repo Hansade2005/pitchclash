@@ -222,7 +222,7 @@ function teamSelect({ sides }) {
         return `<div class="teamcard ${st.active === s ? 'active' : ''}">
           <div class="side">${s === 0 ? 'HOME' : 'AWAY'} · ${humans ? humans + ' PLAYER' + (humans > 1 ? 'S' : '') : 'CPU'}</div>
           <div class="cat"><span class="arr nav" data-act="cat:${s}:-1">◀</span> ${esc(c.name)} <span class="arr nav" data-act="cat:${s}:1">▶</span></div>
-          <div class="crest ${t.kind === 'club' ? 'img' : ''}" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)">${t.kind === 'club' ? `<img src="../assets/crests/${t.id}.svg" alt="" onerror="this.remove()">` : `<span>${esc(t.short)}</span>`}</div>
+          <div class="crest img" style="background:linear-gradient(135deg, ${t.colors.shirt} 50%, ${t.colors.shorts} 50%)">${badgeImg(t)}</div>
           <div class="tname"><span class="arr nav" data-act="team:${s}:-1">◀</span> ${esc(t.name)} <span class="arr nav" data-act="team:${s}:1">▶</span></div>
           <div class="stars">${stars(t.rating)} <small>${t.rating}</small></div>
           <div class="attrs">ATT ${t.style.attack} · DEF ${t.style.defence} · PAC ${t.style.pace} · PAS ${t.style.passing}</div>
@@ -453,7 +453,10 @@ function buildMatch(ctx) {
 }
 
 // ------------------------------------------------------------------ HUD
-const crestImg = t => (t && t.kind === 'club' ? `<img class="sbcrest" src="../assets/crests/${t.id}.svg" alt="" onerror="this.remove()">` : '');
+// Club crests (assets/crests) and national flags (assets/flags). Falls back to the code if the file is missing.
+const badgeSrc = t => (t.kind === 'club' ? `../assets/crests/${t.id}.svg` : `../assets/flags/${t.id}.svg`);
+const badgeImg = t => `<img src="${badgeSrc(t)}" alt="" onerror="this.outerHTML='<span>${esc(t.short)}</span>'">`;
+const crestImg = t => (t ? `<img class="sbcrest" src="${badgeSrc(t)}" alt="" onerror="this.remove()">` : '');
 
 function buildHud(t0, t1, k0, k1) {
   hudEl.innerHTML = `
