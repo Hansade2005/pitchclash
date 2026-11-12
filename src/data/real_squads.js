@@ -21,4 +21,10 @@ export const REAL_SQUADS = {
   "fra": ["Mike Maignan", "Guillaume Restes", "Robin Risser", "Ibrahima Konaté", "Aurélien Tchouaméni", "Bradley Barcola", "Désiré Doué", "Kylian Mbappé", "Michael Olise", "Pablo Pagis", "Marcus Thuram"],
   "arg": ["Emiliano Martínez", "Aaron Anselmino", "Gonzalo Montiel", "Mariano Troilo", "Alexis Mac Allister", "Enzo Fernández", "Julián Álvarez"],
   "ger": ["Wael Mohya", "Niclas Füllkrug"],
+  "tottenham-hotspur": ["Guglielmo Vicario", "Antonín Kinsky", "Martin Dubravka", "Austin", "Micky van de Ven", "Jan Paul van Hecke", "Kevin Danso", "Marcos Senesi", "Ben Davies", "Andy Robertson", "Pedro Porro", "Destiny Udogie", "Archie Gray", "Xavi Simons", "Conor Gallagher", "Richarlison", "James Maddison", "Mathys Tel", "Lucas Bergvall", "Mohammed Kudus", "Dejan Kulusevski", "Wilson Odobert", "Mateus Fernandes"],
+  "newcastle-united": ["Nick Pope", "Lukas Hornicek", "Ewen Jaouen", "Mark Gillespie", "Sven Botman", "Malick Thiaw", "Fabian Schär", "Dan Burn", "Lewis Hall", "Tino Livramento", "Amar Dedic", "Bruno Guimarães", "Nico González", "Bazoumana Touré", "Yoane Wissa", "Anthony Elanga", "Matias Fernández-Pardo", "William Osula"],
+  "juventus-fc": ["Grabara", "Celik", "Bremer", "Gatti", "Locatelli", "Kelly", "Conceição", "Koopmeiners", "Kolo Muani", "Douglas Luiz"],
+  "atletico-de-madrid": ["Oblak", "Llorente", "Pubill", "Hancko", "Grimaldo", "Hjulmand", "Barrios", "Baena", "Kang In Lee", "Lookman", "Julián Álvarez", "Sørloth"],
+  "borussia-dortmund": ["Miguel Adje", "Mathis Albert", "Waldemar Anton", "Maximilian Beier", "Jobe Bellingham", "Ramy Bensebaini", "Carney Chukwuemeka"],
+  "sen": ["Édouard Mendy", "Mory Diaw", "Yehvann Diouf"],
 };
