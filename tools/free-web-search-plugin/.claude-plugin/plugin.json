@@ -1,0 +1,5 @@
+{
+  "name": "free-web-search",
+  "version": "1.0.0",
+  "description": "Free web search and page crawling through the Jina reader and DuckDuckGo: ranks candidate links, crawls the best pages and returns results, with a football squad extractor. No API key and no search-tool budget."
+}
