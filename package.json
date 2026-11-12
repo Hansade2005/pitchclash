@@ -1,0 +1,49 @@
+{
+  "name": "goal-nation-2026",
+  "version": "1.1.0",
+  "description": "GOAL NATION 2026 - 11 v 11 stadium football with cups, leagues and online matches",
+  "main": "electron-main.js",
+  "author": "Anye Happiness Ade (AI Engineer, Cameroon)",
+  "license": "UNLICENSED",
+  "productName": "GOAL NATION 2026",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "installer": "bash installer/build_installer.sh"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "build": {
+    "appId": "dev.pipilot.goalnation2026",
+    "productName": "GOAL NATION 2026",
+    "copyright": "Copyright (c) 2026 Anye Happiness Ade, Cameroon - AI Engineer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron-main.js",
+      "server.js",
+      "package.json",
+      "public/**"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    }
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
