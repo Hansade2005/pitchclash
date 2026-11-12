@@ -4,3 +4,5 @@ src/bundle.js
 tmp-music-render/
 *.log
 .DS_Store
+tools/search/.cache/
+tools/search/domain_stats.json
