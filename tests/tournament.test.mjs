@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { NATIONS, CLUBS, LEAGUES, formations, makeSquad, getTeam, YOUTH_LEVELS, clubsInPool } from '../src/data/teams.js';
 import { REAL_SQUADS } from '../src/data/real_squads.js';
+import { REAL_POS } from '../src/data/real_positions.js';
 import { COMPETITIONS, getCompetition, COMPETITION_CATEGORIES, WORLD_CYCLE_SLOTS } from '../src/data/competitions.js';
 import {
   createCompetition, nextFixtures, simulateRound, advance, simulateAll, recordResult, standings,
@@ -573,6 +574,17 @@ test('no superstar player names in generated squads (blocked list)', () => {
       if (real.has(p.name)) continue;
       const s = ` ${norm(p.name)} `;
       for (const b of BLOCKED_PLAYERS) assert.ok(!s.includes(` ${b} `), `${t.name}: ${p.name}`);
+    }
+  }
+});
+
+test('real players are placed in matching positions', () => {
+  for (const [id, roster] of Object.entries(REAL_POS)) {
+    const pos = new Map(roster.map(([n, p]) => [n, p]));
+    for (const p of makeSquad(id)) {
+      if (!pos.has(p.name) || !pos.get(p.name)) continue;                 // generated name or unknown position
+      const real = pos.get(p.name);
+      assert.equal(real === 'GK', p.pos === 'GK', `${id}: ${p.name} (${real}) is in a ${p.pos} slot`);
     }
   }
 });

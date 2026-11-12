@@ -15,6 +15,7 @@ const STATS_FILE = path.join(HERE, 'domain_stats.json');
 const DELAY_MS = +process.env.SEARCH_DELAY_MS || 3500;      // spacing between reader requests
 fs.mkdirSync(CACHE, { recursive: true });
 
+const BLOCKED = /bots use DuckDuckGo too|complete the following challenge|captcha|unusual traffic|are you a robot/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let last = 0;
 async function throttle() { const wait = last + DELAY_MS - Date.now(); if (wait > 0) await sleep(wait); last = Date.now(); }
@@ -30,14 +31,15 @@ function curl(url) {
   });
 }
 
-async function reader(target, { retries = 3 } = {}) {
+export async function reader(target, { retries = 3 } = {}) {
   const key = createHash('sha1').update(target).digest('hex');
   const file = path.join(CACHE, key + '.md');
   if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8');
   for (let i = 0; i <= retries; i++) {
     await throttle();
     const r = await curl('https://r.jina.ai/' + target);
-    if (r.status === 200 && r.body.length > 200) { fs.writeFileSync(file, r.body); return r.body; }
+    if (r.status === 200 && r.body.length > 200 && !BLOCKED.test(r.body.slice(0, 1500))) { fs.writeFileSync(file, r.body); return r.body; }
+    if (r.status === 200 && BLOCKED.test(r.body.slice(0, 1500))) { await sleep(20000 * (i + 1)); continue; }   // bot challenge: wait, then retry
     if (r.status === 429 || r.status >= 500 || r.status === 0) await sleep(8000 * (i + 1));   // back off
     else break;
   }
@@ -45,17 +47,40 @@ async function reader(target, { retries = 3 } = {}) {
 }
 
 // ------------------------------------------------------------------ search
-export async function search(query) {
-  const md = await reader('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query));
-  const out = [], re = /^## \[(.+?)\]\((https:\/\/duckduckgo\.com\/l\/\?uddg=([^&)]+)[^)]*)\)/gm;
-  let m; const heads = [];
-  while ((m = re.exec(md))) heads.push({ title: m[1].replace(/\*+/g, ''), url: decodeURIComponent(m[3]), at: m.index + m[0].length });
-  heads.forEach((h, i) => {
-    const seg = md.slice(h.at, i + 1 < heads.length ? heads[i + 1].at : undefined);
-    const snippet = seg.replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*+/g, '').replace(/\s+/g, ' ').trim().slice(0, 400);
-    if (/^https?:/.test(h.url)) out.push({ title: h.title, url: h.url, snippet });
-  });
+const clean = (s) => s.replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\*+/g, '').replace(/\s+/g, ' ').trim().slice(0, 400);
+const unwrap = (u) => { try { return decodeURIComponent(u); } catch { return u; } };
+
+function parseDdgHtml(md) {            // html.duckduckgo.com/html/
+  const re = /^## \[(.+?)\]\((https:\/\/duckduckgo\.com\/l\/\?uddg=([^&)]+)[^)]*)\)/gm, heads = []; let m;
+  while ((m = re.exec(md))) heads.push({ title: m[1].replace(/\*+/g, ''), url: unwrap(m[3]), at: m.index + m[0].length });
+  return heads.map((h, i) => ({ title: h.title, url: h.url, snippet: clean(md.slice(h.at, i + 1 < heads.length ? heads[i + 1].at : undefined)) }));
+}
+function parseDdgLite(md) {            // lite.duckduckgo.com/lite/  ->  "1.[Title](https://duckduckgo.com/l/?uddg=...)"
+  const re = /^\d+\.\[(.+?)\]\((https:\/\/duckduckgo\.com\/l\/\?uddg=([^&)]+)[^)]*)\)/gm, heads = []; let m;
+  while ((m = re.exec(md))) heads.push({ title: m[1].replace(/\*+/g, ''), url: unwrap(m[3]), at: m.index + m[0].length });
+  return heads.map((h, i) => ({ title: h.title, url: h.url, snippet: clean(md.slice(h.at, i + 1 < heads.length ? heads[i + 1].at : undefined)) }));
+}
+function parseBing(md) {               // www.bing.com/search  ->  redirect links carry the target as u=a1<base64url>
+  const re = /\[([^\]]{8,160})\]\((https:\/\/www\.bing\.com\/ck\/a\?[^)]*?[&?]u=a1([A-Za-z0-9_\-]+)[^)]*)\)/g, out = [], seen = new Set(); let m;
+  while ((m = re.exec(md))) {
+    let url = ''; try { url = Buffer.from(m[3].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'); } catch {}
+    if (!/^https?:/.test(url) || /bing\.com|microsoft\.com/.test(url) || seen.has(url)) continue;
+    seen.add(url); out.push({ title: m[1].replace(/\*+/g, ''), url, snippet: clean(md.slice(m.index + m[0].length, m.index + m[0].length + 500)) });
+  }
   return out;
+}
+const ENGINES = [
+  ['ddg-html', (q) => 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), parseDdgHtml],
+  ['ddg-lite', (q) => 'https://lite.duckduckgo.com/lite/?q=' + encodeURIComponent(q), parseDdgLite],
+  ['bing', (q) => 'https://www.bing.com/search?q=' + encodeURIComponent(q), parseBing],
+];
+export async function search(query) {
+  for (const [name, url, parse] of ENGINES) {
+    const md = await reader(url(query), { retries: 1 });
+    const res = md ? parse(md).filter((r) => /^https?:/.test(r.url)) : [];
+    if (res.length) return res.map((r) => ({ ...r, engine: name }));
+  }
+  return [];
 }
 
 // ------------------------------------------------------------------ ranking

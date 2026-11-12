@@ -1,5 +1,6 @@
 import { REAL_SQUADS } from './real_squads.js';
 import { REAL_KITS } from './real_kits.js';
+import { REAL_POS } from './real_positions.js';
 // Pitch Clash — team data: national teams, real club names, formations,
 // and deterministic squad generation.
 //
@@ -1470,6 +1471,30 @@ export function nationsInConfed(confed) { return NATIONS.filter((n) => n.confed 
 // ============================================================ squads
 const SQUAD_TEMPLATE = ['GK', 'GK', 'GK', 'CB', 'CB', 'CB', 'CB', 'LB', 'LB', 'RB', 'RB', 'CDM', 'CDM', 'CM', 'CM',
   'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'ST', 'ST'];
+// Real players for a team, placed into squad slots by position when position data exists.
+// Returns an array indexed by slot (null = keep a generated name). Crawled rosters (REAL_POS: [name, pos] in page order)
+// win over the older name-only lists; without positions, names fill slots in list order.
+const POS_LINE = { GK: 'G', CB: 'D', LB: 'D', RB: 'D', CDM: 'M', CM: 'M', CAM: 'M', LM: 'M', RM: 'M', LW: 'A', RW: 'A', ST: 'A' };
+const realSlotCache = new Map();
+function assignReal(teamId) {
+  if (realSlotCache.has(teamId)) return realSlotCache.get(teamId);
+  let out = null;
+  const roster = REAL_POS[teamId];
+  if (roster && roster.length) {
+    const pool = roster.map(([name, pos], idx) => ({ name, pos, idx, used: false }));
+    out = SQUAD_TEMPLATE.map((slotPos) => {
+      let best = null, bs = 0;
+      for (const c of pool) {
+        if (c.used) continue;
+        const s = c.pos === slotPos ? 3 : !c.pos ? 1 : POS_LINE[c.pos] === POS_LINE[slotPos] ? 2 : 0;
+        if (s > bs) { bs = s; best = c; }
+      }
+      if (!best) return null; best.used = true; return best.name;
+    });
+  } else if (REAL_SQUADS[teamId]) out = REAL_SQUADS[teamId].slice(0, SQUAD_TEMPLATE.length);
+  realSlotCache.set(teamId, out); return out;
+}
+
 // Attribute profile per position: [pace, shooting, passing, dribbling, defending, physical] offsets.
 const PROFILE = {
   GK: [-25, -45, -15, -30, -35, -5],
@@ -1516,13 +1541,14 @@ export function makeSquad(team, seed) {
   };
   // First 11-ish of each position group are "starters": rated around/above team rating.
   const seenPos = {};
+  const realBySlot = assignReal(team.id);
   SQUAD_TEMPLATE.forEach((pos, i) => {
     seenPos[pos] = (seenPos[pos] || 0) + 1;
     const starterSlots = { GK: 1, CB: 2, LB: 1, RB: 1, CDM: 1, CM: 2, CAM: 1, LM: 1, RM: 1, LW: 1, RW: 1, ST: 1 };
     const starter = seenPos[pos] <= starterSlots[pos];
     const [region, , tone] = weightedPick(rng, pop);
     let nm;
-    const real = REAL_SQUADS[team.id] && REAL_SQUADS[team.id][i];
+    const real = realBySlot && realBySlot[i];
     if (real) nm = { name: real, shortName: real.split(' ').slice(-1)[0] };
     else for (let t = 0; t < 6; t++) { nm = genName(region, rng); if (!usedNames.has(nm.name)) break; }
     usedNames.add(nm.name);
