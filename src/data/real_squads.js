@@ -203,4 +203,13 @@ export const REAL_SQUADS = {
   "hibernian-fc": ["Raphael Sallinger", "Jordan Smith", "Freddie Owens", "Rocky Bushiri", "Jason Kerr", "Warren O'Hora", "Jack Iredale", "Grant Hanley", "Kanayo Megwa", "Rudi Molotnikov"],
   "aberdeen-fc": ["Dimitar Mitov", "Nicholas Suman", "Marius Müller"],
   "st-johnstone-fc": ["Toby Steward", "Ross Sinclair", "Kyle Thomson", "Craig Hepburn", "Jonathan Svedberg", "Josh McPake"],
+  "fc-dallas": ["Petar Musa", "Christian Cappis", "Bernard Kamungo"],
+  "new-england-revolution": ["Alex Bono", "Donovan Parisian", "Matt Turner", "Carles Gil", "Brooklyn Raines", "Griffin Yow", "JD Gunn", "Diego Fagundez", "Leonardo Campana", "Brayan Ceballos", "Yusuf Alhassan"],
+  "colorado-rapids": ["Paxten Aaronson", "Noah Cobb", "Kimani Stewart-Baynes", "Wayne Frederick", "Josh Atencio", "Cole Bassett", "Adam Beaudry", "Reggie Cannon", "Ali Fadal", "Rob Holding", "Ted Ku-DiPietro", "Rafael Navarro Leal", "Alexis Manyoma"],
+  "austin-fc": ["Facundo Torres", "Myrto Uzuni", "Brandon Vazquez", "Mateja Djordjevic", "Guilherme Biro", "Osman Bukari", "Mikkel Desler", "Jon Gallagher", "Christian Ramirez", "Jayden Nelson"],
+  "cf-montreal": ["Samsy Keita", "Jalen Neal", "Brayan Ceballos", "Brayan Vera", "Brandan Craig", "Efrain Morales", "Dawid Bugaj", "Viktor Radojević", "Sébastian Breza", "Thomas Gillier", "Jonathan Sirois"],
+  "vancouver-whitecaps-fc": ["Isaac Boehmer", "Yohei Takaoka", "Adrián Zendejas", "Ryan Gauld", "Sergio Córdova", "Thomas Müller"],
+  "san-diego-fc": ["Bryce Duke", "Bryan Zamblé", "Luca Bombino", "Emmanuel Boateng", "Anders Dreyer", "Hirving Lozano", "Corey Baird", "Wilson Eisner", "Lewis Morgan", "Kieran Sargeant", "Osvald Søe"],
+  "al-nassr": ["Cristiano Ronaldo", "Sadio Mane", "Aymeric Laporte", "Jhon Duran"],
+  "al-ahli-saudi-fc": ["Abdulrahman Al Sanbi", "Édouard Mendy", "Abdullah Abdo", "Riyad Mahrez", "Roberto Firmino", "Allan Saint-Maximin", "Franck Kessié"],
 };
