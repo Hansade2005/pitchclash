@@ -28,4 +28,11 @@ export const REAL_SQUADS = {
   "borussia-dortmund": ["Miguel Adje", "Mathis Albert", "Waldemar Anton", "Maximilian Beier", "Jobe Bellingham", "Ramy Bensebaini", "Carney Chukwuemeka"],
   "sen": ["Édouard Mendy", "Mory Diaw", "Yehvann Diouf"],
   "ac-milan": ["Lorenzo Torriani", "Zachary Athekame", "Davide Bartesaghi", "Ismael Bennacer", "Warren Bondo", "Emanuele Borsani"],
+  "aston-villa": ["Emiliano Martínez", "Marco Bizot", "Yasin Ozcan", "Zion Suzuki", "Matty Cash", "Victor Lindelöf", "Taylor Harwood-Bellis", "Tyrone Mings", "Ross Barkley", "John McGinn", "Boubacar Kamara", "Emiliano Buendía", "Nicolas Jackson", "Ollie Watkins", "Tammy Abraham", "Leon Bailey", "Alejandro Garnacho"],
+  "ssc-napoli": ["Contini", "Ferrante", "Meret", "Milinković-Savić", "Turi", "Beukema", "Buongiorno", "D'Avino", "Di Lorenzo", "Gutiérrez", "Marianucci", "Marín", "Mazzocchi", "Obaretin", "Olivera", "Rrahmani", "Spinazzola", "Politano", "McTominay", "Vergara", "Gilmour", "Hojlund"],
+  "bayer-04-leverkusen": ["Flekken", "Arthur", "Quansah", "Tapsoba", "Palacios", "Culbreath", "Maza", "Moreira", "Schick", "Kennet Eichhorn", "Christian Kofane"],
+  "sl-benfica": ["Trubin", "Samuel Soares", "Diogo Ferreira", "Bah", "Banjaqui", "Tomás Araújo", "Dahl", "José Neto", "Obrador", "Claudio Echeverri"],
+  "galatasaray-sk": ["Uğurcan Çakır", "Günay Güvenç", "Jankat Yılmaz", "Enes Emre Büyük", "Rafael Leão", "Renato Nhaga", "Can Armando Güner", "Ismail Jakobs", "El Chadaille Bitshiabu"],
+  "mex": ["Jesús Corona", "Alexis Vega", "Armando León", "Gilberto Mora"],
+  "cr-flamengo": ["Agustín Rossi", "Dyogo Alves", "Everton Cebolinha", "Lucas Paquetá"],
 };
