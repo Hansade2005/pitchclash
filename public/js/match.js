@@ -160,7 +160,7 @@ export class Match {
   say(text, t = 2.2) { this.msg = text; this.msgT = t; }
 
   // ---------- ball actions ----------
-  release(p, cd = 0.4) { this.ball.owner = null; this.ball.last = p; p.cd = cd; this.ball.free = 0; }
+  release(p, cd = 0.4) { this.ball.owner = null; this.ball.last = p; p.cd = cd; this.ball.free = 0; this.ball.rel = (this.ball.rel || 0) + 1; this.ball.pen = false; }
   pass(p, dx, dz, through, aim) {
     const b = this.ball, d = this.dir[p.t]; let best = null, bs = 1e9; const l = Math.hypot(dx, dz), aimed = l > 0.3; if (!aimed) { dx = Math.sin(p.face); dz = Math.cos(p.face); } else { dx /= l; dz /= l; }
     for (const m of this.players) { if (m.t !== p.t || m === p || m.off) continue; const ex = m.x - p.x, ez = m.z - p.z, dd = Math.hypot(ex, ez); if (dd < 3 || dd > 46) continue; const cos = (ex * dx + ez * dz) / dd; if (cos < 0.25) continue; const s = (1 - cos) * 60 + dd * 0.35 + (m.gk ? 14 : 0) - (through ? (m.x - p.x) * d * 0.25 : 0); if (s < bs) { bs = s; best = m; } }
@@ -433,13 +433,65 @@ export class Match {
     return [clamp(tx, -PL + 1, PL - 1), clamp(tz, -PW + 2, PW - 2)];
   }
 
+  // ---- goalkeepers: need time to see a shot, read it with some error, can only dive so far; hold what they can reach, tip / push the rest away
+  kSkill(g) { return clamp(0.5 + (g.skill - 72) * 0.014 + (this.k - 0.95) * 1.4 * (this.humans.some(h => h.side === g.t) ? -0.5 : 1), 0.2, 1); }
+  kReachQ(g, diving) { // 3D "can the hands get there": 0 dead centre .. 1 fingertips, null = out of reach
+    const b = this.ball, sk = this.kSkill(g), dx = b.x - g.x, dz = b.z - g.z, dy = b.y - (diving ? 1.0 : 1.15), m = Math.sqrt((dx * 0.9) ** 2 + dz ** 2 + (dy * 0.85) ** 2), r = (diving ? 1.34 : 0.96) * (0.92 + 0.16 * sk);
+    return m < r ? m / r : null;
+  }
+  kHandle(g, q, diving, sp) {
+    const b = this.ball, sk = this.kSkill(g), spd = Math.hypot(b.vx, b.vz, b.vy * 0.5), s = this.dir[g.t] === 1 ? -1 : 1;
+    const spdF = spd < 14 ? 1 : spd < 20 ? 0.92 : spd < 26 ? 0.8 : spd < 31 ? 0.62 : 0.45;
+    const catchP = clamp(spdF * (0.9 + 0.4 * sk) * (1 - 0.3 * q) - this.wx.fumble - (b.y > 2.1 ? 0.1 : 0) - (diving ? 0.05 : 0), 0.05, 0.98);
+    if (g.diveZ != null && Math.abs(b.z - g.z) > 0.7) { g.m.play((b.z - g.z) * this.dir[g.t] > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight', 0.05, true, 1.4); g.state = 'kick'; g.st = 0.8; g.z += Math.sign(b.z - g.z) * Math.min(1.2, Math.abs(b.z - g.z)); }
+    if (R() < catchP) { b.owner = g; b.last = g; this.offP = null; g.m.play('KeeperCatch', 0.05, true, 1.2); if (spd > 12) { this.A.say(R() < 0.5 ? 'save' : 'catch', 'colour_save'); this.A.cheer('near'); } return; }
+    const out = this.dir[g.t];  // direction away from own goal
+    if (b.y > 1.9 && q > 0.35) { b.vx = -out * (2 + R() * 2); b.vz = (b.z >= 0 ? 1 : -1) * (1 + R() * 3); b.vy = 4.5 + R() * 2; }                      // tipped over the bar
+    else if (R() < 0.03 + 0.14 * (1 - sk)) { b.vx = out * (1.5 + R() * 2.5); b.vz = (R() - 0.5) * 3; b.vy = 1 + R() * 1.5; }                         // spilled in front of goal
+    else { b.vx = out * (2 + R() * 3.5); b.vz = (b.z >= g.z ? 1 : -1) * (5 + R() * (5 + 4 * sk)); b.vy = 2 + R() * 3; }                           // pushed wide
+    g.cd = 0.55 - 0.2 * sk; b.last = g; b.free = 0; this.A.say('save', 'colour_save'); this.A.cheer('near');
+  }
   keeperTarget(p, sp) {
-    const b = this.ball, d = this.dir[p.t], gx = -d * PL, own = b.owner;
+    const b = this.ball, d = this.dir[p.t], gx = -d * PL, own = b.owner, sk = this.kSkill(p), gauss = () => (R() + R() + R() - 1.5) * 2;
     if (own === p) { p.hold = (p.hold || 0) + 0.016; if (p.hold > 1.1) { p.hold = 0; p.m.play('KeeperThrow', 0.1, true, 1.3); this.pass(p, d, (R() - 0.5) * 1.4, false); } return [p.x, p.z, 0]; } p.hold = 0;
-    const toGoal = (b.vx * -d) > 6, tHit = toGoal ? (gx - b.x) / b.vx : 9;
-    if (toGoal && tHit > 0 && tHit < 1.6 && !own) { const pz = b.z + b.vz * tHit; if (Math.abs(pz) < GW + 2) { p.diveZ = pz; return [gx + d * 1.0, clamp(pz, -GW - 0.5, GW + 0.5), 7.5 * this.k + (p.skill - 75) * 0.03]; } }
-    p.diveZ = null;
-    const bd = Math.hypot(b.x - gx, b.z); if (!own && bd < 15 && Math.abs(b.z) < 18 && Math.hypot(b.vx, b.vz) < 9) return [b.x, b.z, sp * 1.1]; // come and collect
+    if (p.smCD > 0) p.smCD -= 0.016; if (p.diveT > 0) { p.diveT -= 0.016; if (p.diveT <= 0) p.diveZ = null; }
+    // 1v1: narrow the angle, then smother (a good dribbler can still beat it)
+    const car = own && own.t !== p.t ? own : null;
+    if (car) {
+      const dg = Math.hypot(car.x - gx, car.z), inBox = Math.abs(car.x - gx) < 16.5 && Math.abs(car.z) < 20;
+      if (inBox && Math.hypot(car.x - p.x, car.z - p.z) < 2.4 && !(p.smCD > 0) && p.state === 'run') {
+        p.smCD = 1.8; const win = clamp(0.38 + 0.4 * sk - (car.skill - 72) / 160 - (this.humans.some(h => h.side === car.t) ? 0.05 : 0), 0.08, 0.85);
+        p.face = Math.atan2(car.x - p.x, car.z - p.z); p.m.play((car.z - p.z) * d > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight', 0.05, true, 1.4);
+        if (R() < win) { b.owner = p; b.last = p; car.cd = 0.6; car.state = 'stun'; car.st = 0.4; p.state = 'kick'; p.st = 0.6; this.A.say('save', 'colour_save'); return [p.x, p.z, 0]; }
+        p.state = 'down'; p.st = 0.9; if (R() < 0.16 && this.phase === 'play') this.foul(p, car); return [p.x, p.z, 0];
+      }
+      if (dg < 24 && Math.abs(car.z) < 20) { const r = clamp((24 - dg) * 0.32 * (0.6 + 0.5 * sk), 0, 7.5), a = Math.atan2(car.z, Math.abs(car.x - gx)); return [gx + d * (1 + Math.cos(a) * r), Math.sin(a) * r * 0.9 + car.z * 0.12, sp * 1.05]; }
+    }
+    const toGoal = (b.vx * -d) > 5 && !own, tHit = toGoal ? (gx - b.x) / b.vx : 9;
+    if (toGoal && tHit > 0 && tHit < 1.6) {
+      const pz = b.z + b.vz * tHit, py = b.y + b.vy * tHit - 11 * tHit * tHit;
+      if (Math.abs(pz) < GW + 0.7 && py < GH + 0.5) {
+        if (b.pen) { // penalty: the keeper has to commit early and pick a side (sometimes reading the taker)
+          if (!p.pg || p.pg.id !== b.rel) { const see = 0.1 + 0.2 * sk, r = R(), side = r < see ? Math.sign(pz || 1) : r < see + 0.14 ? 0 : (R() < 0.5 ? -1 : 1); p.pg = { id: b.rel, z: side * 2.6 }; if (side) { p.diveZ = p.pg.z; p.diveT = 0.9; } }
+          return [gx + d * 1.0, p.pg.z, 7.5 * this.k + (p.skill - 75) * 0.03];
+        }
+        if (b.free >= 0.16 + (1 - sk) * 0.26 + (1 - this.k) * 0.4) {
+          if (!p.seen || p.seen.id !== b.rel) { p.seen = { id: b.rel, z: pz + gauss() * (0.3 + (1 - sk) * 1.15) }; if (Math.abs(p.seen.z - p.z) > 0.6) { p.diveZ = clamp(p.seen.z, -GW - 0.5, GW + 0.5); p.diveT = 0.8; } }
+          return [gx + d * 1.0, clamp(p.seen.z, -GW - 0.5, GW + 0.5), 7.5 * this.k + (p.skill - 75) * 0.03];
+        }
+        return [p.x, p.z, 0];   // still reading the shot
+      }
+    }
+    // high ball into the box: claim it when the keeper can get there first
+    if (!own && b.y > 0.8 && Math.hypot(b.vx, b.vz) > 5 && Math.abs(b.x - gx) < 26 && !(this.shotBy && this.time - this.shotT < 2.5)) {
+      let x = b.x, y = b.y, z = b.z, vx = b.vx, vy = b.vy, vz = b.vz, L = null;
+      for (let t = 0; t < 2.6; t += 0.05) { vy -= 22 * 0.05; x += vx * 0.05; y += vy * 0.05; z += vz * 0.05; if (vy < 0 && y <= 2.3) { L = { x, z, t }; break; } }
+      if (L && Math.abs(L.x - gx) < 15.5 && Math.abs(L.z) < 14 && Math.sign(L.x) === Math.sign(gx)) {
+        const tk = Math.hypot(L.x - p.x, L.z - p.z) / (6.2 + 2.2 * sk) + 0.2 + (1 - sk) * 0.25, ta = this.players.filter(o => o.t !== p.t && !o.off).reduce((m, o) => Math.min(m, Math.hypot(o.x - L.x, o.z - L.z) / 7 + 0.35), 9);
+        if (tk < L.t - 0.05 && tk < ta + 0.35 * sk) return [L.x, L.z, sp * 1.15];
+      }
+    }
+    const bd = Math.hypot(b.x - gx, b.z); if (!own && bd < 20 && Math.abs(b.z) < 18 && Math.hypot(b.vx, b.vz) < 12 && b.y < 1.5) { const rival = this.players.filter(o => o.t !== p.t && !o.off).reduce((m, o) => Math.min(m, Math.hypot(o.x - b.x, o.z - b.z) / 7.5), 9); if (Math.hypot(b.x - p.x, b.z - p.z) / (6.5 + 2 * sk) < rival + 0.25) return [b.x, b.z, sp * 1.1]; } // sweep up a loose ball
     const k = clamp(3.2 / Math.max(bd, 4), 0, 0.8); return [gx + d * 1.2 + (b.x - gx) * k * 0.5, clamp(b.z * k * 1.6, -GW + 0.6, GW - 0.6), sp * 0.8];
   }
 
@@ -455,18 +507,16 @@ export class Match {
       // goal frame + goal check
       for (const s of [-1, 1]) {
         if ((b.x - s * PL) * s > 0 && (b.x - b.vx * dt - s * PL) * s <= 0) {
-          if (Math.abs(b.z) < GW - 0.08 && b.y < GH - 0.05) { const g = this.players.find(p => p.gk && !p.off && this.dir[p.t] === -s), sp0 = Math.hypot(b.vx, b.vz); if (g && g.cd <= 0 && Math.abs(b.z - g.z) < 1.75 * this.kReach(g) && b.y < 2.3 && R() < 0.8) { b.vx = -s * (3 + R() * 4); b.vz = (b.z > g.z ? 1 : -1) * (5 + R() * 6); b.vy = 2 + R() * 3; b.x = s * PL - s * 0.5; g.cd = 0.7; b.last = g; g.m.play(b.z * this.dir[g.t] > g.z * this.dir[g.t] ? 'KeeperDiveLeft' : 'KeeperDiveRight', 0.05, true, 1.4); g.state = 'kick'; g.st = 0.8; this.A.say('save', 'colour_save'); this.A.cheer('near'); return; } return this.goal(s); }
+          if (Math.abs(b.z) < GW - 0.08 && b.y < GH - 0.05) { return this.goal(s); }
           if (Math.abs(Math.abs(b.z) - GW) < 0.22 && b.y < GH + 0.15 || (Math.abs(b.z) < GW && Math.abs(b.y - GH) < 0.2)) { b.vx = -b.vx * 0.55; b.vz += (R() - 0.5) * 6; b.x = s * PL - s * 0.2; this.A.sfx('post'); this.A.say('post', 'colour_post'); this.A.cheer('near'); return; }
         }
       }
       // keeper saves
-      for (const g of this.players) { if (!g.gk || g.cd > 0 || g.off) continue; const dx = b.x - g.x, dz = b.z - g.z, reach = g.diveZ != null ? 2.1 * this.kReach(g) : 0.95;
-        if (Math.abs(dx) < 0.9 && Math.abs(dz) < reach && b.y < 2.45 && (b.last ? b.last.t !== g.t || b.free > 0.5 : true)) {
-          if (g.diveZ != null && Math.abs(dz) > 0.7) { g.m.play(dz * this.dir[g.t] > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight', 0.05, true, 1.4); g.state = 'kick'; g.st = 0.8; g.z += Math.sign(dz) * Math.min(1.2, Math.abs(dz)); }
-          if ((sp < 19 || R() < 0.45) && !(sp > 11 && R() < this.wx.fumble)) { b.owner = g; b.last = g; this.offP = null; g.m.play('KeeperCatch', 0.05, true, 1.2); if (sp > 12) { this.A.say(R() < 0.5 ? 'save' : 'catch', 'colour_save'); this.A.cheer('near'); } }
-          else { b.vx = -b.vx * 0.35 + (R() - 0.5) * 5; b.vz = (R() < 0.5 ? -1 : 1) * (6 + R() * 6); b.vy = 3 + R() * 3; g.cd = 0.6; b.last = g; this.A.say('save', 'colour_save'); this.A.cheer('near'); }
-          return;
-        } }
+      for (const g of this.players) { if (!g.gk || g.cd > 0 || g.off || g.state === 'down') continue;
+        if (b.last && b.last.t === g.t && b.free <= 0.5) continue;
+        const diving = g.diveZ != null, q = this.kReachQ(g, diving); if (q === null || b.y > 2.6) continue;
+        if (sp < 8) { b.owner = g; b.last = g; this.offP = null; g.m.play('KeeperCatch', 0.05, true, 1.2); return; }   // gentle balls are simply collected
+        this.kHandle(g, q, diving, sp); return; }
       // players pick up / control the ball
       if (b.y < 1.5) { let best = null, bd = 0.95; for (const p of this.players) { if (p.cd > 0 || p.gk || p.off || p.state === 'down' || p.state === 'stun') continue; const dd = Math.hypot(p.x - b.x, p.z - b.z); if (dd < bd) { bd = dd; best = p; } }
         if (best && !(b.last === best && b.free < 0.35)) { if (sp > 24 && R() < 0.5) { b.vx = -b.vx * 0.3 + (R() - 0.5) * 6; b.vz = b.vz * 0.3 + (R() - 0.5) * 6; best.cd = 0.5; } else { if (this.offP) { const o = this.offP; this.offP = null; if (o === best) return this.offside(best); } b.owner = best; b.last = best; best.incoming = 0; } } }
@@ -508,7 +558,7 @@ export class Match {
     if (r.type === 'penalty') { b.x = d * (PL - 11); b.z = 0; b.y = 0.11; p.x = b.x - d * 0.7; p.z = 0; p.face = d > 0 ? Math.PI / 2 : -Math.PI / 2;
       const kh = this.humans.find(h => h.side === 1 - p.t), kp = this.players.find(q => q.t === 1 - p.t && q.gk && !q.off);
       if ((human || kh) && kp) { b.owner = null; if (kh) { kh.gkMode = true; kh.autoGk = true; kh.sel = kp; } kp.x = d * (PL - 0.3); kp.z = 0; kp.vx = kp.vz = 0; kp.m.play('KeeperIdle', 0.2); p.m.play('Idle', 0.2); this.penAim = { p, kp, sh: human, kh, aim: 0, aimH: 0, dive: 0, diveH: 0, t: 4 }; this.phase = 'penaim'; this.say('PENALTY', 1.5); return; }
-      const c = human ? this.readH(human) : null; const aim = c ? (c.z > 0.35 ? 1 : c.z < -0.35 ? -1 : 0) : Math.floor(R() * 3) - 1; this.shoot(p, 0.75, aim); return; }
+      const c = human ? this.readH(human) : null; const aim = c ? (c.z > 0.35 ? 1 : c.z < -0.35 ? -1 : 0) : Math.floor(R() * 3) - 1; this.shoot(p, 0.75, aim); this.ball.pen = true; return; }
     if (r.type === 'corner') { b.owner = null; const gx = this.goalX(p.t); const ex = gx - d * 9 - b.x, ez = (R() - 0.5) * 8 - b.z, l = Math.hypot(ex, ez); b.vx = ex / l * 21; b.vz = ez / l * 21; b.vy = 9; p.cd = 1; p.m.play('Shoot', 0.05, true, 1.4); this.A.sfx('kick', 1); }
     else if (r.type === 'goalkick') { b.owner = null; b.vx = d * (19 + R() * 4); b.vz = (R() - 0.5) * 14; b.vy = 11; p.cd = 1; p.m.play('Shoot', 0.05, true, 1.4); this.A.sfx('kick', 1); }
     else if (!human) { this.noOff = r.type === 'throw'; this.pass(p, d * 0.6, -Math.sign(b.z || 1), false); this.noOff = false; } else if (r.type === 'throw') p.m.play('ThrowIn', 0.05, true, 1.3);
@@ -531,7 +581,7 @@ export class Match {
     if (!A.sh) { A.aim = Math.floor(R() * 3) - 1; A.aimH = R() < 0.35 ? 1 : 0; }
     if (!A.kh) { A.dive = 0; } else if (A.kh.gkMode) { A.kh.sel = A.kp; }
     const tz = A.aim * 2.9 * d, hg = A.aimH ? 0.85 : 0;
-    this.shoot(A.p, 0.8, 0, { x: d * (PL + hg * 6), z: tz }, 0, 0.3);
+    this.shoot(A.p, 0.8, 0, { x: d * (PL + hg * 6), z: tz }, 0, 0.3); this.ball.pen = true;
     if (A.kh) { if (A.dive) { this.keeperDive(A.kp, A.dive * d); A.kp.diveZ = clamp(A.dive * d * 2.9, -GW - 0.6, GW + 0.6); } else { A.kp.diveZ = 0; A.kp.diveT = 0.8; } }
   }
 
