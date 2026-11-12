@@ -11,7 +11,7 @@
 * Anthems, rotating music, recorded commentary, team management and tactics
 * 16 distinct player faces (MakeHuman CC0 + CMU motion capture)
 
-All clubs and competitions are fictional. National teams use country names and flag colours only.
+Clubs, leagues and cups use their real names (kit colours are stylised, not official). Players are generated with real-world names drawn from common regional pools; famous players are excluded. National teams use country names and flag colours only.
 
 ## Keyboard (easy mode)
 One keyboard player can use **WASD and the arrow keys at the same time**. **Enter** confirms menus and skips ceremonies / replays.

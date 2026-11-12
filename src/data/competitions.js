@@ -1,5 +1,5 @@
-// Pitch Clash — competition definitions (pure data). All competition names are
-// original; the formats mirror familiar real-world structures.
+// Pitch Clash — competition definitions (pure data). Competition names are real;
+// the formats mirror those competitions.
 //
 // Competition `type`s understood by tournament.js:
 //   'league'      round-robin table (legs: 1|2)
@@ -61,26 +61,26 @@ const TIEBREAK = ['points', 'goalDifference', 'goalsFor', 'headToHead', 'name'];
 
 // ------------------------------------------------------------ domestic
 const DOMESTIC = [
-  { league: 'alb', country: 'eng', league_name: 'Albion Premier Division', lshort: 'APD',
-    cup: 'Albion Challenge Cup', cshort: 'ACC', sup: 'Albion Super Shield', sshort: 'ASS', below: 'alb2' },
-  { league: 'ibe', country: 'esp', league_name: 'Iberian Liga Primera', lshort: 'ILP',
-    cup: 'Copa de la Corona Ibérica', cshort: 'CCI', sup: 'Supercopa Ibérica', sshort: 'SCI', below: 'ibe2' },
-  { league: 'pen', country: 'ita', league_name: 'Lega Peninsulare', lshort: 'LPE',
-    cup: 'Coppa della Penisola', cshort: 'CDP', sup: 'Supercoppa Peninsulare', sshort: 'SCP' },
-  { league: 'teu', country: 'ger', league_name: 'Teutonic Meisterliga', lshort: 'TML',
-    cup: 'Teutonic Pokal', cshort: 'TPO', sup: 'Teutonic Supercup', sshort: 'TSC' },
-  { league: 'hex', country: 'fra', league_name: 'Hexagone Élite', lshort: 'HEX',
-    cup: "Coupe de l'Hexagone", cshort: 'CDH', sup: 'Trophée des Étoiles', sshort: 'TDE' },
-  { league: 'afr', country: null, league_name: 'Pan-African Super League', lshort: 'PSL',
-    cup: 'Pan-African Shield', cshort: 'PAS', sup: 'Pan-African Super Cup', sshort: 'PSC' },
-  { league: 'low', country: 'ned', league_name: 'Lowlands Eerste Klasse', lshort: 'LEK', cup: 'Lowlands Beker', cshort: 'LBE', sup: 'Lowlands Supercup', sshort: 'LSC' },
-  { league: 'lus', country: 'por', league_name: 'Liga Lusitana', lshort: 'LLU', cup: 'Taça Lusitana', cshort: 'TLU', sup: 'Supertaça Lusitana', sshort: 'SLU' },
-  { league: 'ana', country: 'tur', league_name: 'Anatolian Süper Lig', lshort: 'ASL', cup: 'Anatolian Kupa', cshort: 'AKU', sup: 'Anatolian Süper Kupa', sshort: 'ASK' },
-  { league: 'cal', country: 'sco', league_name: 'Caledonian Premiership', lshort: 'CPR', cup: 'Caledonian Cup', cshort: 'CCU', sup: 'Caledonian Shield', sshort: 'CSD' },
-  { league: 'bsr', country: 'bra', league_name: 'Brasa Série Ouro', lshort: 'BSO', cup: 'Copa Brasa', cshort: 'CBR', sup: 'Supercopa Brasa', sshort: 'SBR' },
-  { league: 'pla', country: 'arg', league_name: 'Liga del Plata', lshort: 'LDP', cup: 'Copa del Plata', cshort: 'CDP2', sup: 'Supercopa del Plata', sshort: 'SDP' },
-  { league: 'cam', country: 'usa', league_name: 'Americas Premier Soccer', lshort: 'APS', cup: 'Americas Open Cup', cshort: 'AOC', sup: 'Americas Champions Shield', sshort: 'ACS' },
-  { league: 'gul', country: 'ksa', league_name: 'Gulf Stars League', lshort: 'GSL', cup: 'Gulf Crown Cup', cshort: 'GCC', sup: 'Gulf Super Cup', sshort: 'GSC' },
+  { league: 'alb', country: 'eng', league_name: 'Premier League', lshort: 'EPL',
+    cup: 'FA Cup', cshort: 'FAC', sup: 'FA Community Shield', sshort: 'FCS', below: 'alb2' },
+  { league: 'ibe', country: 'esp', league_name: 'La Liga', lshort: 'LAL',
+    cup: 'Copa del Rey', cshort: 'CDR', sup: 'Supercopa de España', sshort: 'SDE', below: 'ibe2' },
+  { league: 'pen', country: 'ita', league_name: 'Serie A', lshort: 'SRA',
+    cup: 'Coppa Italia', cshort: 'CIT', sup: 'Supercoppa Italiana', sshort: 'SCI' },
+  { league: 'teu', country: 'ger', league_name: 'Bundesliga', lshort: 'BUN',
+    cup: 'DFB-Pokal', cshort: 'DFB', sup: 'DFL-Supercup', sshort: 'DSC' },
+  { league: 'hex', country: 'fra', league_name: 'Ligue 1', lshort: 'L1',
+    cup: 'Coupe de France', cshort: 'CDF', sup: 'Trophée des Champions', sshort: 'TDC' },
+  { league: 'afr', country: null, league_name: 'CAF Champions League', lshort: 'CCL',
+    cup: 'CAF Confederation Cup', cshort: 'CCF', sup: 'CAF Super Cup', sshort: 'CSU' },
+  { league: 'low', country: 'ned', league_name: 'Eredivisie', lshort: 'ERE', cup: 'KNVB Beker', cshort: 'KNB', sup: 'Johan Cruyff Shield', sshort: 'JCS' },
+  { league: 'lus', country: 'por', league_name: 'Primeira Liga', lshort: 'PLI', cup: 'Taça de Portugal', cshort: 'TDP', sup: 'Supertaça Cândido de Oliveira', sshort: 'SCO' },
+  { league: 'ana', country: 'tur', league_name: 'Süper Lig', lshort: 'SLG', cup: 'Türkiye Kupası', cshort: 'TKU', sup: 'Türkiye Süper Kupası', sshort: 'TSK' },
+  { league: 'cal', country: 'sco', league_name: 'Scottish Premiership', lshort: 'SPR', cup: 'Scottish Cup', cshort: 'SCU', sup: 'Scottish League Cup', sshort: 'SLC' },
+  { league: 'bsr', country: 'bra', league_name: 'Campeonato Brasileiro Série A', lshort: 'BRS', cup: 'Copa do Brasil', cshort: 'CDB', sup: 'Supercopa do Brasil', sshort: 'SDB' },
+  { league: 'pla', country: 'arg', league_name: 'Liga Profesional Argentina', lshort: 'LPA', cup: 'Copa Argentina', cshort: 'CAR', sup: 'Supercopa Argentina', sshort: 'SAR' },
+  { league: 'cam', country: 'usa', league_name: 'Major League Soccer', lshort: 'MLS', cup: 'U.S. Open Cup', cshort: 'USO', sup: "Supporters' Shield", sshort: 'SUP' },
+  { league: 'gul', country: 'ksa', league_name: 'Saudi Pro League', lshort: 'SPL', cup: "King's Cup", cshort: 'KGC', sup: 'Saudi Super Cup', sshort: 'SSC' },
 ];
 
 const domesticComps = [];
@@ -112,7 +112,7 @@ for (const d of DOMESTIC) {
 // ------------------------------------------------------------ continental clubs
 const continentalComps = [
   {
-    id: 'continental-champions', name: 'Continental Champions Cup', short: 'CCC', type: 'groups_ko', scope: 'club',
+    id: 'continental-champions', name: 'UEFA Champions League', short: 'UCL', type: 'groups_ko', scope: 'club',
     category: 'continental', confed: 'EUR', defaultSeason: CLUB_SEASON,
     groups: 8, groupSize: 4, groupLegs: 2, advance: 2, bestThirds: 0,
     koLegs: 2, finalLegs: 1, finalNeutral: true, thirdPlace: false,
@@ -131,7 +131,7 @@ const continentalComps = [
     size: 32,
   },
   {
-    id: 'continental-shield', name: 'Continental Shield', short: 'CSH', type: 'groups_ko', scope: 'club',
+    id: 'continental-shield', name: 'UEFA Europa League', short: 'UEL', type: 'groups_ko', scope: 'club',
     category: 'continental', confed: 'EUR', defaultSeason: CLUB_SEASON,
     groups: 4, groupSize: 4, groupLegs: 2, advance: 2, bestThirds: 0,
     koLegs: 2, finalLegs: 1, finalNeutral: true, thirdPlace: false,
@@ -163,9 +163,9 @@ const continentalComps = [
     size: 16,
   },
   {
-    id: 'continental-super', name: 'Continental Super Cup', short: 'CSC', type: 'super', scope: 'club',
+    id: 'continental-super', name: 'UEFA Super Cup', short: 'USC', type: 'super', scope: 'club',
     category: 'continental', neutral: true, extraTime: true, defaultSeason: CLUB_SEASON,
-    participants: ['Continental Champions Cup winner', 'Continental Shield winner'],
+    participants: ['UEFA Champions League winner', 'UEFA Europa League winner'],
     qualify: [
       { from: 'league', league: 'ibe', pos: [1, 1] },
       { from: 'league', league: 'alb', pos: [1, 1] },
@@ -177,21 +177,21 @@ const continentalComps = [
 const NATION_KO = { points: POINTS, tiebreakers: TIEBREAK, neutral: true, groupLegs: 1, groupSize: 4, finalLegs: 1 };
 const nationComps = [
   {
-    ...NATION_KO, id: 'african-nations', name: 'African Nations Crown', short: 'ANC', type: 'groups_ko',
+    ...NATION_KO, id: 'african-nations', name: 'Africa Cup of Nations', short: 'AFN', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: 'AFR', defaultSeason: '2027', interval: 2,
     groups: 6, advance: 2, bestThirds: 4, koLegs: 1, thirdPlace: true, firstKo: 'seeded', koDraw: 'bracket',
     koConstraint: ['group'],
     qualify: [{ from: 'confed', confed: 'AFR', count: 24 }], size: 24,
   },
   {
-    ...NATION_KO, id: 'european-nations', name: 'European Nations Trophy', short: 'ENT', type: 'groups_ko',
+    ...NATION_KO, id: 'european-nations', name: 'UEFA European Championship', short: 'EUR', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: 'EUR', defaultSeason: '2028', interval: 4,
     groups: 6, advance: 2, bestThirds: 4, koLegs: 1, thirdPlace: false, firstKo: 'seeded', koDraw: 'bracket',
     koConstraint: ['group'],
     qualify: [{ from: 'confed', confed: 'EUR', count: 24 }], size: 24,
   },
   {
-    ...NATION_KO, id: 'south-american-nations', name: 'Condor Cup of Nations', short: 'CCN', type: 'groups_ko',
+    ...NATION_KO, id: 'south-american-nations', name: 'Copa América', short: 'CPA', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: 'SAM', defaultSeason: '2028', interval: 4,
     // 10 South American nations + 2 invited guests: 3 groups of 4, top 2 + 2 best thirds → QF.
     groups: 3, advance: 2, bestThirds: 2, koLegs: 1, thirdPlace: true, firstKo: 'seeded', koDraw: 'bracket',
@@ -200,21 +200,21 @@ const nationComps = [
     size: 12,
   },
   {
-    ...NATION_KO, id: 'asian-nations', name: 'Silk Road Nations Cup', short: 'SRN', type: 'groups_ko',
+    ...NATION_KO, id: 'asian-nations', name: 'AFC Asian Cup', short: 'AFA', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: 'ASI', defaultSeason: '2027', interval: 4,
     groups: 6, advance: 2, bestThirds: 4, koLegs: 1, thirdPlace: false, firstKo: 'seeded', koDraw: 'bracket',
     koConstraint: ['group'],
     qualify: [{ from: 'confed', confed: 'ASI', count: 24 }], size: 24,
   },
   {
-    ...NATION_KO, id: 'north-american-nations', name: 'Quetzal Nations Cup', short: 'QNC', type: 'groups_ko',
+    ...NATION_KO, id: 'north-american-nations', name: 'CONCACAF Gold Cup', short: 'GLD', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: 'NCA', defaultSeason: '2027', interval: 2,
     groups: 4, advance: 2, bestThirds: 0, koLegs: 1, thirdPlace: false, firstKo: 'bracket', koDraw: 'bracket',
     koConstraint: ['group'],
     qualify: [{ from: 'confed', confed: 'NCA', count: 16 }], size: 16,
   },
   {
-    ...NATION_KO, id: 'world-nations', name: 'World Nations Cup', short: 'WNC', type: 'groups_ko',
+    ...NATION_KO, id: 'world-nations', name: 'FIFA World Cup', short: 'WC', type: 'groups_ko',
     scope: 'nation', category: 'international', confed: null, defaultSeason: '2030', interval: 4,
     groups: 8, advance: 2, bestThirds: 0, koLegs: 1, thirdPlace: true, firstKo: 'bracket', koDraw: 'bracket',
     groupConstraint: 'confed', confedLimit: { EUR: 2, default: 1 }, koConstraint: ['group'],
@@ -230,8 +230,8 @@ const nationComps = [
 // 22 clubs, home & away; top 2 promoted automatically, 3rd–6th play a promotion play-off
 // (two-legged semis 3v6 / 4v5, one-off final at a neutral ground). The winner is promoted too.
 const SECOND_TIERS = [
-  { league: 'alb2', above: 'alb', country: 'eng', name: 'Albion Second Division', short: 'ASD' },
-  { league: 'ibe2', above: 'ibe', country: 'esp', name: 'Iberian Liga Segunda', short: 'ILS' },
+  { league: 'alb2', above: 'alb', country: 'eng', name: 'EFL Championship', short: 'ECH' },
+  { league: 'ibe2', above: 'ibe', country: 'esp', name: 'Segunda División', short: 'SEG' },
 ];
 for (const t of SECOND_TIERS) {
   domesticComps.push({
@@ -259,10 +259,10 @@ for (const t of SECOND_TIERS) {
   });
 }
 domesticComps.push({
-  id: 'alb-league-cup', name: 'Albion Floodlit Cup', short: 'FLC', type: 'knockout', scope: 'club',
+  id: 'alb-league-cup', name: 'EFL Trophy', short: 'EFT', type: 'knockout', scope: 'club',
   category: 'domestic', league: 'alb', country: 'eng', legs: 1, semiLegs: 2, finalLegs: 1, finalNeutral: true,
   draw: 'random', defaultSeason: CLUB_SEASON, size: 42,
-  // Both Albion divisions; the top-rated clubs get byes through the preliminary round.
+  // Both English divisions; the top-rated clubs get byes through the preliminary round.
   qualify: [{ from: 'pool', pool: 'alb', count: 99 }, { from: 'pool', pool: 'alb2', count: 99 }],
 });
 
@@ -270,7 +270,7 @@ domesticComps.push({
 const CLUB_GROUPS = { points: POINTS, tiebreakers: TIEBREAK, groupSize: 4, advance: 2, bestThirds: 0 };
 continentalComps.push(
   {
-    ...CLUB_GROUPS, id: 'club-world', name: 'Global Club Masters', short: 'GCM', type: 'groups_ko', scope: 'club',
+    ...CLUB_GROUPS, id: 'club-world', name: 'FIFA Club World Cup', short: 'CWC', type: 'groups_ko', scope: 'club',
     category: 'continental', confed: null, defaultSeason: '2029', interval: 4,
     // 32 clubs from every confederation at one host: 8 groups of 4 (single round robin,
     // neutral venues), then single-match knockouts with extra time and penalties.
@@ -294,7 +294,7 @@ continentalComps.push(
     size: 32,
   },
   {
-    ...CLUB_GROUPS, id: 'asian-club', name: 'Silk Road Club Crown', short: 'SRC', type: 'groups_ko', scope: 'club',
+    ...CLUB_GROUPS, id: 'asian-club', name: 'AFC Champions League', short: 'ACL', type: 'groups_ko', scope: 'club',
     category: 'continental', confed: 'ASI', defaultSeason: CLUB_SEASON,
     groups: 4, groupLegs: 2, koLegs: 2, finalLegs: 1, finalNeutral: true, thirdPlace: false,
     firstKo: 'seeded', koDraw: 'random', groupConstraint: 'country', koConstraint: ['group', 'country'],
@@ -302,7 +302,7 @@ continentalComps.push(
     size: 16,
   },
   {
-    ...CLUB_GROUPS, id: 'americas-club', name: 'Hemisphere Club Cup', short: 'HCC', type: 'groups_ko', scope: 'club',
+    ...CLUB_GROUPS, id: 'americas-club', name: 'Copa Libertadores', short: 'CPL', type: 'groups_ko', scope: 'club',
     category: 'continental', confed: null, confeds: ['SAM', 'NCA'], defaultSeason: CLUB_SEASON,
     groups: 4, groupLegs: 2, koLegs: 2, finalLegs: 1, finalNeutral: true, thirdPlace: false,
     firstKo: 'seeded', koDraw: 'random', groupConstraint: 'country', koConstraint: ['group', 'country'],
@@ -356,7 +356,7 @@ for (const conf of ['EUR', 'AFR', 'ASI', 'NCA', 'SAM', 'OCE']) {
   const q = WQ[conf];
   const total = q.sizes.reduce((a, b) => a + b, 0);
   const base = {
-    ...NATION_BASE, id: `wq-${conf.toLowerCase()}`, name: `World Nations Cup Qualifying – ${q.name}`, short: q.short,
+    ...NATION_BASE, id: `wq-${conf.toLowerCase()}`, name: `FIFA World Cup Qualifying – ${q.name}`, short: q.short,
     format: 'staged', category: 'international', confed: conf, defaultSeason: '2029', interval: 4,
     feeds: 'world-nations', slots: { direct: WORLD_CYCLE_SLOTS[conf], playoff: conf === 'EUR' || conf === 'AFR' ? 0 : 1 },
     description: q.format, size: total,
@@ -388,7 +388,7 @@ for (const conf of ['EUR', 'AFR', 'ASI', 'NCA', 'SAM', 'OCE']) {
   });
 }
 qualifierComps.push({
-  ...NATION_BASE, id: 'wq-playoff', name: 'World Nations Cup Intercontinental Play-off', short: 'WQP',
+  ...NATION_BASE, id: 'wq-playoff', name: 'FIFA World Cup Intercontinental Play-off', short: 'WQP',
   type: 'knockout', format: 'staged', category: 'international', confed: null, defaultSeason: '2029', interval: 4,
   feeds: 'world-nations', slots: { direct: 2, playoff: 0 }, size: 4, neutral: true,
   description: 'Two one-off ties at a neutral venue; both winners qualify. Pass opts.teams = worldPlayoffEntrants(states).',
@@ -410,7 +410,7 @@ qualifierComps.push({
 // play-off, then the 32-team finals (8 groups of 4 → R16 … final, third-place match).
 const CYCLE_CONFS = ['EUR', 'AFR', 'ASI', 'NCA', 'SAM', 'OCE'];
 const worldCycle = {
-  ...NATION_BASE, id: 'world-cycle', name: 'World Nations Cup – Full Cycle', short: 'WNC', type: 'groups_ko',
+  ...NATION_BASE, id: 'world-cycle', name: 'FIFA World Cup – Full Cycle', short: 'WC', type: 'groups_ko',
   format: 'staged', category: 'international', confed: null, defaultSeason: '2030', interval: 4,
   description: 'Qualifiers for every confederation, the intercontinental play-off, then the 32-team finals',
   stages: [
@@ -450,7 +450,7 @@ const worldCycle = {
 const tierPool = (id, sizes) => ({ id, name: `League ${id}`, sizes, legs: 2, groupPrefix: id, numbered: true, entrants: { tier: id } });
 const moreNationComps = [
   {
-    ...NATION_BASE, id: 'nations-ladder', name: 'European Nations Ladder', short: 'ENL', type: 'groups_ko',
+    ...NATION_BASE, id: 'nations-ladder', name: 'UEFA Nations League', short: 'UNL', type: 'groups_ko',
     format: 'staged', category: 'international', confed: 'EUR', defaultSeason: '2026/27', interval: 2,
     description: 'Leagues A (4×3), B (3×3), C (2×4) home & away; League A winners to Finals Week; promotion & relegation',
     tiers: { A: 12, B: 9, C: 8 }, tierQualify: [{ from: 'confed', confed: 'EUR', count: 99 }], size: 29,
@@ -471,7 +471,7 @@ const moreNationComps = [
     result: { promoted: ['league.promoted'], relegated: ['league.relegated'] },
   },
   {
-    ...NATION_BASE, id: 'meridian-final', name: 'Meridian Champions Final', short: 'MCF', type: 'knockout',
+    ...NATION_BASE, id: 'meridian-final', name: 'Intercontinental Cup', short: 'ICM', type: 'knockout',
     category: 'international', confed: null, defaultSeason: '2029', interval: 4,
     neutral: true, legs: 1, finalLegs: 1, thirdPlace: true, draw: 'random', extraTime: true, size: 4,
     // Pass opts.teams = [continental champions]; defaults to the best-rated nation of four confederations.
@@ -482,7 +482,7 @@ const moreNationComps = [
     ],
   },
   {
-    ...NATION_KO, id: 'summer-games', name: 'Solstice Games Football Tournament', short: 'SGF', type: 'groups_ko',
+    ...NATION_KO, id: 'summer-games', name: 'Olympic Football Tournament', short: 'OLY', type: 'groups_ko',
     scope: 'nation', category: 'youth', youth: 'u23', confed: null, defaultSeason: '2028', interval: 4,
     groups: 4, advance: 2, bestThirds: 0, koLegs: 1, thirdPlace: true, firstKo: 'bracket', koDraw: 'bracket',
     groupConstraint: 'confed', confedLimit: { EUR: 2, default: 1 }, koConstraint: ['group'],
@@ -491,7 +491,7 @@ const moreNationComps = [
     size: 16,
   },
   {
-    ...NATION_KO, id: 'youth-nations', name: 'World Nations Youth Cup (U-20)', short: 'WNY', type: 'groups_ko',
+    ...NATION_KO, id: 'youth-nations', name: 'FIFA U-20 World Cup', short: 'U20', type: 'groups_ko',
     scope: 'nation', category: 'youth', youth: 'u20', confed: null, defaultSeason: '2027', interval: 2,
     groups: 6, advance: 2, bestThirds: 4, koLegs: 1, thirdPlace: false, firstKo: 'seeded', koDraw: 'bracket',
     groupConstraint: 'confed', confedLimit: { EUR: 2, default: 1 }, koConstraint: ['group'],
@@ -503,7 +503,7 @@ const moreNationComps = [
 // ------------------------------------------------------------ pre-season friendlies
 const friendlyComps = [
   {
-    id: 'summer-invitational', name: 'Midsummer Invitational', short: 'MSI', type: 'knockout', scope: 'club',
+    id: 'summer-invitational', name: 'International Champions Cup', short: 'ICC', type: 'knockout', scope: 'club',
     category: 'friendly', defaultSeason: CLUB_SEASON, neutral: true, legs: 1, finalLegs: 1, thirdPlace: true,
     extraTime: false, draw: 'random', size: 4,
     // 4 invited clubs: semi-finals, third-place match and final; level games go straight to penalties.
@@ -513,7 +513,7 @@ const friendlyComps = [
     ],
   },
   {
-    id: 'harbour-trophy', name: 'Harbour Lights Trophy', short: 'HLT', type: 'league', scope: 'club',
+    id: 'harbour-trophy', name: 'Audi Cup', short: 'AUD', type: 'league', scope: 'club',
     category: 'friendly', defaultSeason: CLUB_SEASON, legs: 1, points: POINTS, tiebreakers: TIEBREAK, size: 3,
     // 3-club round robin: everybody plays everybody once (one club rests each matchday).
     qualify: [

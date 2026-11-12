@@ -560,18 +560,8 @@ const BLOCKED_PLAYERS = ['messi', 'ronaldo', 'neymar', 'mbappe', 'haaland', 'sal
   'maradona', 'pele', 'zidane', 'beckham', 'modric', 'lewandowski', 'de bruyne', 'vinicius junior', 'cruyff', 'pirlo'];
 BLOCKED.push(...BLOCKED_PLAYERS);
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-test('no real-world competition / club names (blocked list)', () => {
-  const hits = [];
-  const names = [
-    ...COMPETITIONS.map((c) => `competition ${c.name}`),
-    ...LEAGUES.map((l) => `league ${l.name}`),
-    ...CLUBS.map((c) => `club ${c.name}`),
-  ];
-  for (const n of names) {
-    const s = ` ${norm(n).replace(/[^a-z0-9.\-]+/g, ' ')} `;
-    for (const b of BLOCKED) if (s.includes(` ${b} `)) hits.push(`${n} ~ ${b}`);
-  }
-  assert.deepEqual(hits, []);
+test('no superstar player names in generated squads (blocked list)', () => {
+  // Club, league and competition names are real by design; only famous players stay out of generated squads.
   // Player names of all new clubs / youth sides avoid famous surnames too.
   const newTeams = [...CLUBS.filter((c) => ['alb2', 'ibe2'].includes(c.league) || (c.pool === 'row' && !['EUR', 'AFR'].includes(c.confed))),
     ...NATIONS.map((n) => getTeam(`${n.id}-u23`)), ...NATIONS.map((n) => getTeam(`${n.id}-u20`))];
