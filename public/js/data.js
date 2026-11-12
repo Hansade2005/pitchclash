@@ -25,7 +25,46 @@ export const TEAMS = [
 ];
 // Clubs in four leagues (real names). Club = [name, shirt, shorts, socks, rating]
 const SHORT = {"Arsenal FC": "ARS", "Manchester City": "MCI", "Chelsea FC": "CHE", "Liverpool FC": "LIV", "Tottenham Hotspur": "TOT", "Newcastle United": "NEW", "Manchester United": "MUN", "Aston Villa": "AVL", "Real Madrid CF": "RMA", "Atlético de Madrid": "ATM", "FC Barcelona": "FCB", "Athletic Club": "ATH", "Real Sociedad": "RSO", "Villarreal CF": "VIL", "Real Betis": "BET", "Girona FC": "GIR", "AC Milan": "MIL", "FC Internazionale Milano": "INT", "AS Roma": "ROM", "Juventus FC": "JUV", "SSC Napoli": "NAP", "Atalanta BC": "ATA", "SS Lazio": "LAZ", "ACF Fiorentina": "FIO", "Coton Sport FC": "CTS", "AS Vita Club": "AVC", "Enyimba International FC": "ENY", "Hearts of Oak SC": "HOO", "Al Ahly SC": "AHL", "Wydad AC": "WAC", "ASC Diaraf": "DIA", "ASEC Mimosas": "ASE"};
-const C = (league, names, list) => list.map(([name, a, b, c, rating], i) => ({ id: league + i, name, defShort: SHORT[name], league, kit: [a, b, c], gk: 0x2a2a2a, rating, flag: ['crest', '#' + a.toString(16).padStart(6, '0'), '#' + b.toString(16).padStart(6, '0')], names, club: true }));
+// Real home kit colours [shirt, shorts, socks] for every club.
+const REAL_KITS = {
+  "Arsenal FC": [0xef0107, 0xffffff, 0xef0107],
+  "Manchester City": [0x6cabdd, 0xffffff, 0x6cabdd],
+  "Chelsea FC": [0x034694, 0x034694, 0xffffff],
+  "Liverpool FC": [0xc8102e, 0xc8102e, 0xc8102e],
+  "Tottenham Hotspur": [0xffffff, 0x132257, 0xffffff],
+  "Newcastle United": [0x111111, 0x111111, 0x111111],
+  "Manchester United": [0xda291c, 0xffffff, 0x111111],
+  "Aston Villa": [0x670e36, 0xffffff, 0x95bfe5],
+  "Real Madrid CF": [0xffffff, 0xffffff, 0xffffff],
+  "Atlético de Madrid": [0xcb3524, 0x1e3f82, 0xcb3524],
+  "FC Barcelona": [0xa50044, 0x004d98, 0x004d98],
+  "Athletic Club": [0xee2523, 0x111111, 0xee2523],
+  "Real Sociedad": [0x0067b1, 0xffffff, 0x0067b1],
+  "Villarreal CF": [0xfbe10f, 0x0a4a97, 0xfbe10f],
+  "Real Betis": [0x00954c, 0xffffff, 0x00954c],
+  "Girona FC": [0xe30613, 0xffffff, 0xe30613],
+  "AC Milan": [0xd6001c, 0xffffff, 0xd6001c],
+  "FC Internazionale Milano": [0x0068a8, 0x111111, 0x111111],
+  "AS Roma": [0x8e1f2f, 0xffffff, 0x8e1f2f],
+  "Juventus FC": [0xffffff, 0x111111, 0xffffff],
+  "SSC Napoli": [0x12a0d7, 0xffffff, 0x12a0d7],
+  "Atalanta BC": [0x1d6fb8, 0x111111, 0x111111],
+  "SS Lazio": [0x87d8f7, 0xffffff, 0x87d8f7],
+  "ACF Fiorentina": [0x5a2d82, 0x5a2d82, 0x5a2d82],
+  "Coton Sport FC": [0x00923f, 0xffffff, 0x00923f],
+  "AS Vita Club": [0x00923f, 0x111111, 0x00923f],
+  "Enyimba International FC": [0x1c5fb4, 0xffffff, 0x1c5fb4],
+  "Hearts of Oak SC": [0xd6001c, 0xffd400, 0xd6001c],
+  "Al Ahly SC": [0xd6001c, 0xffffff, 0xd6001c],
+  "Wydad AC": [0xd6001c, 0xffffff, 0xd6001c],
+  "ASC Diaraf": [0x1c5fb4, 0xffffff, 0x1c5fb4],
+  "ASEC Mimosas": [0xffd400, 0x111111, 0xffd400]
+};
+// crest colours: the shirt colour plus whichever of shorts / socks / white / black contrasts most with it
+const cdist = (a, b) => Math.abs((a >> 16 & 255) - (b >> 16 & 255)) + Math.abs((a >> 8 & 255) - (b >> 8 & 255)) + Math.abs((a & 255) - (b & 255));
+const crestSecond = ([a, b, c]) => [b, c, 0xffffff, 0x111111].reduce((best, x) => cdist(x, a) > cdist(best, a) ? x : best);
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+const C = (league, names, list) => list.map(([name, a0, b0, c0, rating], i) => { const kit = REAL_KITS[name] || [a0, b0, c0]; return { id: league + i, name, defShort: SHORT[name], league, kit, gk: 0x2a2a2a, rating, flag: ['crest', hex(kit[0]), hex(crestSecond(kit))], names, club: true }; });
 export const LEAGUES = [
   { id: 'en', name: 'Premier League' }, { id: 'es', name: 'La Liga' }, { id: 'it', name: 'Serie A' }, { id: 'af', name: 'CAF Champions League' },
 ];
