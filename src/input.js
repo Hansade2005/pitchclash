@@ -7,10 +7,10 @@ const Input = (() => {
   window.addEventListener('mousedown', () => Sound.init());
 
   // Gamepad buttons (standard mapping): 0 A/Cross 1 B/Circle 2 X/Square 3 Y/Triangle 4 LB 5 RB 6 LT 7 RT 8 Back/Share 9 Start/Options 10 LS 11 RS 12-15 D-pad
-  const PAD = { pass: [0], shoot: [1], lob: [2], through: [3], switch: [4], sprint: [5, 7], skill: [6, 11], start: [9], camera: [8] };
+  const PAD = { pass: [0], shoot: [1], lob: [2], through: [3], switch: [4], sprint: [7], skill: [6, 11], send: [5], start: [9], camera: [8] };
   const DEFAULT_KB = {
-    kb1: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', pass: ['KeyJ'], shoot: ['KeyK'], through: ['KeyL'], lob: ['KeyI'], sprint: ['ShiftLeft'], switch: ['KeyQ'], skill: ['KeyE'], start: ['Escape'], camera: ['KeyV'] },
-    kb2: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', pass: ['KeyZ', 'Comma', 'Numpad1'], shoot: ['KeyX', 'Period', 'Numpad2'], through: ['KeyC', 'Slash', 'Numpad3'], lob: ['KeyB', 'Semicolon', 'Numpad5'], sprint: ['Space', 'ShiftRight', 'Numpad0'], switch: ['KeyN', 'KeyM', 'Numpad4'], skill: ['KeyG', 'Quote', 'Numpad6'], start: ['Backspace'], camera: ['Equal', 'NumpadAdd'] },
+    kb1: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', pass: ['KeyJ'], shoot: ['KeyK'], through: ['KeyL'], lob: ['KeyI'], sprint: ['ShiftLeft'], switch: ['KeyQ'], skill: ['KeyE'], send: ['KeyU'], start: ['Escape'], camera: ['KeyV'] },
+    kb2: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', pass: ['KeyZ', 'Comma', 'Numpad1'], shoot: ['KeyX', 'Period', 'Numpad2'], through: ['KeyC', 'Slash', 'Numpad3'], lob: ['KeyB', 'Semicolon', 'Numpad5'], sprint: ['Space', 'ShiftRight', 'Numpad0'], switch: ['KeyN', 'KeyM', 'Numpad4'], skill: ['KeyG', 'Quote', 'Numpad6'], send: ['KeyH', 'Numpad8'], start: ['Backspace'], camera: ['Equal', 'NumpadAdd'] },
   };
   let KB = JSON.parse(JSON.stringify(DEFAULT_KB));
   try { const saved = JSON.parse(localStorage.getItem('pc_keys_v2') || 'null'); if (saved && saved.kb1 && saved.kb2) KB = saved; } catch (e) {}
@@ -19,7 +19,7 @@ const Input = (() => {
   let merge = false;                 // one keyboard player: WASD *and* arrows both work
   let enterFlag = false;
   window.addEventListener('keydown', e => { if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat) enterFlag = true; });
-  const ACTIONS = ['pass', 'shoot', 'through', 'lob', 'sprint', 'switch', 'skill', 'start', 'camera'];
+  const ACTIONS = ['pass', 'shoot', 'through', 'lob', 'sprint', 'switch', 'skill', 'send', 'start', 'camera'];
   const DEAD = 0.2;
   const prev = new Map();
 

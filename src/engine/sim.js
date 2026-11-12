@@ -282,6 +282,8 @@ export class Match {
       if (!this.addedShown[this.half] && this.clock >= hl * (len - 1) / len) { this.addedShown[this.half] = true; this.addedFixed = this.addedFixed || []; this.addedFixed[this.half] = this.addedMinutes(); this.officials[3].board = 6; this.emit('added', { minutes: this.addedMinutes() }); }
       if (this.clock >= this.periodSeconds() && !this.ball.shot) return this.endOfPeriod();
     }
+    if (this.surge) { this.surge[0] = Math.max(0, this.surge[0] - dt); this.surge[1] = Math.max(0, this.surge[1] - dt); }
+    if (this.callFor) { this.callFor.t -= dt; if (this.callFor.t <= 0) this.callFor = null; }
     this.updateOfficials(dt);
     if (this.phase === 'injury') { this.updateInjury(dt); this.moveAll(dt, null, true); return; }
     if (this.phase === 'var') { this.moveAll(dt, null, true); if (this.phaseT > 4.5) this.resolveVar(); return; }
@@ -443,8 +445,9 @@ export class Match {
     const skill = p.shooting / 100;
     const pressure = this.pressureOn(p);
     const over = Math.max(0, power - 0.88) * 4;
-    const errH = (0.025 + (1 - skill) * 0.06 + pressure * 0.04 + over * 0.04) * (Math.random() * 2 - 1);
-    const errV = (0.25 + (1 - skill) * 0.5 + over * 1.6) * (Math.random() * 2 - 1) + over * 0.9;
+    const steady = p.human !== null && this.cfg.assist !== false ? 0.55 : 1;   // human shooters get a steadier aim
+    const errH = (0.025 + (1 - skill) * 0.06 + pressure * 0.04 * steady + over * 0.04) * steady * (Math.random() * 2 - 1);
+    const errV = (0.25 + (1 - skill) * 0.5 + over * 1.6) * steady * (Math.random() * 2 - 1) + over * 0.9;
     const speed = 17 + power * 15 + skill * 4;
     const dx = target.x - b.x, dz = target.z - b.z, d = hyp(dx, dz);
     const a = Math.atan2(dz, dx) + errH;
@@ -598,7 +601,9 @@ export class Match {
         else if (t) this.passTo(p, t.p, 'lob'); else this.lobTo(p, { x: p.x + Math.sin(p.face) * 28, z: p.z + Math.cos(p.face) * 28 }, false);
       }
       else if (press('skill')) { this.skillMove(p, stick); }
+      else if (press('send')) { this.sendForward(p.team); }
     } else if (!sp) {
+      if (press('send') && b.owner && b.owner.team === p.team && b.owner.human === null) this.callForBall(p);
       if (press('pass') && this.canFirstTime(p)) { const t = this.smartPass(p, stick); if (t) this.passTo(p, t.p); }
       if (press('lob') && this.canFirstTime(p)) { const gx = this.goalX(p.team), d = this.dir(p.team); this.lobTo(p, { x: gx - d * 9, z: 0 }, true); }
     }
@@ -607,8 +612,14 @@ export class Match {
   // keyboard / pad shot: where it is aimed and how hard it is hit for a given charge (0..1.1)
   shotAim(p, stick, c) {
     const G = PITCH.GOAL_W / 2;
-    const z = Math.abs(stick.z) >= 0.25 ? clamp(stick.z, -1, 1) * (G - 0.6) : clamp(-p.z * 0.15, -G + 0.8, G - 0.8);
-    return { x: this.goalX(p.team), y: 0.35 + c, z };
+    let z;
+    if (Math.abs(stick.z) >= 0.25) z = clamp(stick.z, -1, 1) * (G - 0.6);
+    else { // no aim: pick the corner the keeper is furthest from
+      const k = this.keeper(1 - p.team); const kz = k ? k.z : 0;
+      z = Math.abs(kz) > 0.5 ? -Math.sign(kz) * (G - 0.75) : (p.z > 0 ? -1 : 1) * (G - 0.9);
+      if (Math.abs(p.z) > 14) z *= 0.8;
+    }
+    return { x: this.goalX(p.team), y: 0.35 + Math.min(1.1, c) * 1.0, z };
   }
   shotPowerKey(c) { return Math.min(1.1, Math.max(c, this.cfg.assist === false ? 0 : 0.3) + 0.15); }
   // gauge value 0..1 for a charge, and where the red "over-hit" zone starts (power 0.88 → charge 0.73)
@@ -723,6 +734,10 @@ export class Match {
 
   canFirstTime(p) { const b = this.ball; return !b.owner && b.heldBy === null && this.dist(p, b) < 1.5 && b.y < 2.2 && p.kickCD <= 0; }
 
+  // team command: the whole side pushes forward and runs into space for a few seconds
+  sendForward(team) { this.surge = this.surge || [0, 0]; this.surge[team] = 7; this.emit('send', { team }); }
+  // ask the teammate who has the ball to play it to you
+  callForBall(p) { this.callFor = { team: p.team, player: p, t: 3 }; this.emit('call', { p }); }
   // ------------------------------------------------------------------ skill moves
   // SKILL + stick direction (relative to where the player faces); press SKILL twice quickly for the advanced version:
   //   sideways: sidestep / double: drag-back cut      forwards: step-over / double: nutmeg      backwards: roulette spin / double: rainbow flick
@@ -999,6 +1014,7 @@ export class Match {
     const blockShift = attacking ? clamp(bx * 0.55 + 10 + tc.mentality * 3.5, -12, 34) : clamp(bx * 0.55 - 6 + (tc.line - 1) * 6 + tc.mentality * 2, -26, 20);
     const depth = attacking ? 0.52 + tc.mentality * 0.02 : 0.4 - (tc.line - 1) * 0.03;
     let x = s.x * HL * depth + blockShift;
+    if (this.surge && this.surge[t] > 0 && attacking) x += s.x > 0.1 ? 15 : s.x > -0.45 ? 10 : 5;   // 'send forward' command
     const lineMin = attacking ? -HL + 14 : -HL + 6;
     x = clamp(x, lineMin, HL - 6);
     const width = attacking ? 0.72 + tc.width * 0.13 : 0.52 + tc.width * 0.08;
@@ -1114,6 +1130,7 @@ export class Match {
     p.aiSprint = pressure < 0.3 && distGoal > 18 && p.stamina > 0.3;
     if (p.aiT > 0 || p.kickCD > 0) return;
     p.aiT = this.diff.react + 0.15 + Math.random() * 0.25;
+    { const cf = this.callFor; if (cf && cf.team === p.team && cf.player !== p && !cf.player.sentOff && this.dist(p, cf.player) < 45) { this.callFor = null; this.passTo(p, cf.player); return; } }
     { const foe = this.nearestFoe(p, 2.6, 0.2); if (foe && p.dribbling > 68 && p.skillCD <= 0 && Math.random() < 0.2 + (p.dribbling - 68) / 120) { const r = Math.random(); this.doSkill(p, r < 0.3 ? 'stepover' : r < 0.55 ? 'sidestep' : r < 0.72 ? 'roulette' : r < 0.86 ? 'cut' : r < 0.95 ? 'nutmeg' : 'rainbow', Math.random() < 0.5 ? -1 : 1); return; } }
     // shoot?
     const angleOk = Math.abs(p.z) < 16 || distGoal < 12;
@@ -1353,9 +1370,9 @@ export class Match {
   // the keeper gets a hand/hands to the ball: hold it, tip it over, or push it away - speed, placement, weather and keeper quality decide
   keeperHandle(k, q, diving) {
     const b = this.ball, sk = this.keeperSkill(k), spd = hyp(b.vx, b.vz, b.vy * 0.5);
-    const spdF = spd < 8 ? 1 : spd < 14 ? 0.92 : spd < 20 ? 0.76 : spd < 26 ? 0.55 : 0.34;
+    const spdF = spd < 14 ? 1 : spd < 20 ? 0.92 : spd < 26 ? 0.8 : spd < 31 ? 0.62 : 0.45;
     const w = this.cfg.weather, wet = w === 'storm' ? 0.18 : w === 'rain' ? 0.12 : w === 'snow' ? 0.05 : 0;
-    const catchP = clamp(spdF * (0.5 + 0.55 * sk) * (1 - 0.55 * q) - wet - (b.y > 2.1 ? 0.12 : 0) - (diving ? 0.1 : 0), 0.03, 0.97);
+    const catchP = clamp(spdF * (0.68 + 0.42 * sk) * (1 - 0.38 * q) - wet - (b.y > 2.1 ? 0.1 : 0) - (diving ? 0.05 : 0), 0.05, 0.98);
     if (Math.random() < catchP) this.keeperCatch(k);
     else this.parry(k, b.y > 1.9 && q > 0.35);
   }
@@ -1376,7 +1393,7 @@ export class Match {
   parry(k, tip) {
     const b = this.ball, d = this.dir(k.team), sk = this.keeperSkill(k);
     if (tip) { b.vx = -d * (2 + Math.random() * 2); b.vz = (b.z >= 0 ? 1 : -1) * (1 + Math.random() * 3); b.vy = 4.5 + Math.random() * 2; }       // tipped over the bar
-    else if (Math.random() < 0.08 + 0.3 * (1 - sk)) { b.vx = d * (1.5 + Math.random() * 2.5); b.vz = (Math.random() - 0.5) * 3; b.vy = 1 + Math.random() * 1.5; } // spilled in front of goal
+    else if (Math.random() < 0.03 + 0.14 * (1 - sk)) { b.vx = d * (1.5 + Math.random() * 2.5); b.vz = (Math.random() - 0.5) * 3; b.vy = 1 + Math.random() * 1.5; } // spilled in front of goal
     else { b.vx = d * (2 + Math.random() * 3.5); b.vz = (b.z >= k.z ? 1 : -1) * (5 + Math.random() * (5 + 4 * sk)); b.vy = 2 + Math.random() * 3; }              // pushed wide
     b.lastTouch = k; b.shot = null; b.intended = null;
     k.kickCD = 0.55 - 0.2 * sk; k.controlCD = 0.55 - 0.2 * sk; k.dive = 0;

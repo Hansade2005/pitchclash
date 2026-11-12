@@ -306,9 +306,9 @@ function controlsScreen(back) {
   let remap = null;
   const km = () => Input.getKeymap();
   const rows = [
-    ['Move', 'Left stick / D-pad', 'move'], ['Short pass · Press (defending)', 'A / ✕', 'pass'], ['Shoot (hold for power) · Slide tackle', 'B / ○', 'shoot'],
-    ['Through ball · Standing tackle', 'Y / △', 'through'], ['Lob pass · Cross', 'X / □', 'lob'], ['Sprint', 'RB / R1 · RT / R2', 'sprint'],
-    ['Switch player', 'LB / L1', 'switch'], ['Skill moves (stick direction; tap twice for the flashy ones)', 'LT / L2 · Right stick flick', 'skill'], ['Pause', 'Start / Options', 'start'], ['Change camera', 'Back / Share', 'camera'],
+    ['Move', 'Left stick / D-pad', 'move'], ['Low pass · Press (defending)', 'A / ✕', 'pass'], ['Shoot (hold for power) · Slide tackle', 'B / ○', 'shoot'],
+    ['Through ball · Standing tackle', 'Y / △', 'through'], ['Long pass over the top · Cross', 'X / □', 'lob'], ['Sprint', 'RT / R2', 'sprint'], ['Send team forward · Call for the ball', 'RB / R1', 'send'],
+    ['Switch player', 'LB / L1', 'switch'], ['Skill move (tap twice for more)', 'LT / L2', 'skill'], ['Pause', 'Start / Options', 'start'], ['Change camera', 'Back / Share', 'camera'],
   ];
   const keyName = c => (c || '').replace(/^Key/, '').replace(/^Digit/, '').replace('Numpad', 'Num ').replace('Arrow', '').replace('ShiftLeft', 'L-Shift').replace('ShiftRight', 'R-Shift');
   const kb = (layout, a) => a === 'move' ? ['up', 'left', 'down', 'right'].map(d => keyName(km()[layout][d])).join(' ') : (km()[layout][a] || []).map(keyName).join(' / ');
@@ -317,10 +317,7 @@ function controlsScreen(back) {
       <table class="ctl"><tr><th>Action</th><th>Controller</th><th>Keyboard P1</th><th>Keyboard P2</th></tr>
       ${rows.map(([n, pad, a]) => `<tr><td>${n}</td><td>${pad}</td><td class="nav" data-act="kb1:${a}">${remap === 'kb1:' + a ? '<b>press a key…</b>' : kb('kb1', a)}</td><td class="nav" data-act="kb2:${a}">${remap === 'kb2:' + a ? '<b>press a key…</b>' : kb('kb2', a)}</td></tr>`).join('')}
       </table>
-      <div class="tips"><b>Mouse / touchpad (keyboard players):</b> move the pointer to aim — a dotted line shows the exact path of the ball · <b>click</b> = pass to the aimed spot or the player nearest it · <b>hold click</b> and release = shoot (longer = harder) · <b>right-click</b> = lob / cross / free-kick over the wall. Works on throw-ins, corners, free kicks and penalties too.<br>
-      <b>Keyboard extras:</b> you sprint automatically while moving · <b>E / G</b> = skill move: sideways = sidestep (twice: drag-back), forwards = step-over (twice: nutmeg through the defender), backwards = roulette spin (twice: rainbow flick over his head) · a ring shows who your next pass goes to · <b>Enter</b> skips ceremonies, replays and waits · <b>F1</b> shows this help in a match · <b>Esc</b> or <b>P</b> pauses.</div>
-      <div class="tips"><b>Tips:</b> Hold shoot longer for power, but too long sends it over the bar · Aim shots with the stick · Lob from the wing = cross into the box ·
-      Defending: hold A to press the ball carrier, B to slide (from behind = foul!), Y for a standing tackle · Passing auto-switches you to the receiver.</div>
+      <div class="tips">Skill move: stick sideways / forwards / backwards, tap twice for the flashy versions · Hold shoot for power · Defending: hold pass to chase, shoot to slide, through for a standing tackle</div>
       <div class="opts" style="margin-top:14px"><div class="opt nav" data-act="reset"><span>Reset keyboard keys</span><span></span></div><div class="opt nav" data-act="back"><span>Back</span><span></span></div></div>
       <div class="hint">Select a keyboard cell and press <span class="key">A</span>/<span class="key">Enter</span> to remap it</div></div>`,
     action: act => {
@@ -443,7 +440,7 @@ function buildMatch(ctx) {
   renderer.setAtmosphere(settings.time, weather);
   Sound.music(false); Sound.weather(weather); Sound.preload();
   renderer.colorCrowd(kit0.shirt, kit1.shirt);
-  run = { help: { until: performance.now() + 35000, pinned: false }, ctx, t: 0, replay: null, shootout: null, paused: false, goalT: 0, excite: [0, 0], lastEvent: 0, tension: 0 };
+  run = { help: { until: performance.now() + 9000, pinned: false }, ctx, t: 0, replay: null, shootout: null, paused: false, goalT: 0, excite: [0, 0], lastEvent: 0, tension: 0 };
   try { renderer.renderer.compile(renderer.scene, renderer.camera); renderer.render(); } catch (e) { console.warn('prewarm', e); }
   $('loading').classList.add('hidden');
   buildHud(t0, t1, kit0, kit1);
@@ -496,19 +493,17 @@ const tname = t => M.teams[t].def.name;
 
 const moveLabel = d => d.type === 'pad' ? 'Left stick' : d.type === 'kb2' && !M.humans.some(h => h.device.type === 'kb1') ? 'WASD / Arrows' : d.type === 'kb1' && !M.humans.some(h => h.device.type === 'kb2') ? 'WASD / Arrows' : d.type === 'kb1' ? 'W A S D' : '← ↑ ↓ →';
 function keyHelpHtml() {
+  // one short line per player
   return M.humans.map(h => {
     const d = h.device, k = a => `<b>${esc(Input.keyLabel(d, a))}</b>`;
-    return `<div class="khrow"><span class="khp" style="background:${HUMAN_COLORS[h.id]}">P${h.id + 1}</span>
-      MOVE <b>${moveLabel(d)}</b> <i>${settings.autoSprint && d.type !== 'pad' ? '(you sprint automatically)' : ''}</i> · PASS ${k('pass')} · SHOOT ${k('shoot')} <i>(hold = power)</i> · LOB / CROSS ${k('lob')} · THROUGH ${k('through')} · FEINT ${k('skill')} · SWITCH ${k('switch')}</div>
-      ${['kb1', 'kb2'].includes(d.type) && settings.mouseAim ? `<div class="khrow">🖱 <b>MOUSE / TOUCHPAD</b>: <b>click an opponent</b> when defending = chase &amp; tackle · aim the dotted line · <b>click</b> = pass · <b>hold click</b> = shoot (release) · <b>right-click</b> = lob / cross / free-kick</div>` : ''}
-      <div class="khrow dim">Defending: hold ${k('pass')} to chase the ball · ${k('shoot')} near the carrier = slide tackle · ${k('through')} = standing tackle · ${d.type === 'pad' ? 'Start' : 'Esc'} = pause</div>`;
+    return `<div class="khrow"><span class="khp" style="background:${HUMAN_COLORS[h.id]}">P${h.id + 1}</span> Pass ${k('pass')} · Long ${k('lob')} · Through ${k('through')} · Shoot ${k('shoot')} · Skill ${k('skill')} · Send team ${k('send')}</div>`;
   }).join('');
 }
 function updatePrompts() {
   const pr = $('prompt'), kh = $('keyhelp'); if (!pr || !kh) return;
   // key cheat-sheet: first 35 s of the match, F1 pins it
   const showHelp = run.help.pinned || (performance.now() < run.help.until && !run.ceremony);
-  if (showHelp !== kh._on) { kh._on = showHelp; kh.classList.toggle('show', showHelp); if (showHelp) kh.innerHTML = keyHelpHtml() + '<div class="khrow dim">F1 shows / hides this help</div>'; }
+  if (showHelp !== kh._on) { kh._on = showHelp; kh.classList.toggle('show', showHelp); if (showHelp) kh.innerHTML = keyHelpHtml(); }
   // set-piece prompt for the human who has to take it
   let msg = '';
   const sp = M.phase === 'setpiece' && M.setPiece;
@@ -625,6 +620,7 @@ function onEvent(type, d) {
     }
     case 'slide': Sound.slide(); renderer.emit(d.p.x, 0.05, d.p.z, 24, { color: 0x6b8f3a, speed: 2.5 }); break;
     case 'skill': { const L = { sidestep: 'Sidestep', stepover: 'Step-over!', roulette: 'Roulette!', cut: 'Drag-back!', nutmeg: 'Nutmeg!', rainbow: 'Rainbow flick!' }[d.name]; if (L && d.p.human !== null) ticker(L); if (['roulette', 'nutmeg', 'rainbow'].includes(d.name) && Math.random() < 0.5) Sound.comment('skill', { pri: 0 }); break; }
+    case 'send': ticker(d.team === (M.humans[0] ? M.humans[0].team : 0) ? 'Attack!' : ''); break;
     case 'tackle': if (d.won) { Sound.tackle(); if (d.slide) { ticker(`Superb tackle by ${pname(d.p)}`); Sound.comment('tackle', { pri: 0 }); } } break;
     case 'foul': {
       Sound.whistle(0.4); Sound.boo();
