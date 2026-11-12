@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-const MODELS = ['footballer_a', 'footballer_b', 'footballer_c', 'footballer_e', 'footballer_g', 'footballer_j', 'footballer_m', 'footballer_p', 'keeper'];
+const MODELS = [...'abcdefghijklmnop'].map(c => 'footballer_' + c).concat('keeper');
 const lib = {};
 export async function loadAll(onProgress) {
   const loader = new GLTFLoader(); let done = 0;
@@ -15,7 +15,7 @@ export async function loadAll(onProgress) {
 const kitCache = {};
 // kit = [shirt, shorts, socks] colours; keeper models also tint gloves
 export function makePlayer(i, kit, keeper) {
-  const name = keeper ? 'keeper' : MODELS[i % 8], src = lib[name], root = SkeletonUtils.clone(src.scene), key = name + kit.join('_');
+  const name = keeper ? 'keeper' : MODELS[((i % 16) + 16) % 16], src = lib[name], root = SkeletonUtils.clone(src.scene), key = name + kit.join('_');
   root.traverse(o => {
     if (!o.isMesh) return;
     const tint = m => { const col = { Shirt: kit[0], Shorts: kit[1], Socks: kit[2], Gloves: 0xf5f5f5 }[m.name]; if (col == null) return m; const k = key + m.name; if (!kitCache[k]) { kitCache[k] = m.clone(); kitCache[k].color.set(col); } return kitCache[k]; };

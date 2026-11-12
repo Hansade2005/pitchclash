@@ -19,7 +19,7 @@ const game = { renderer, scene: new THREE.Scene(), match: null, togglePause };
 let resScale = S.quality === 'low' ? 0.7 : S.quality === 'high' ? 1 : 0.85;
 function resize() { renderer.setPixelRatio(Math.min(devicePixelRatio || 1, S.quality === 'high' ? 1.5 : 1) * resScale); renderer.setSize(innerWidth, innerHeight, false); }
 addEventListener('resize', resize); resize();
-addEventListener('pointerdown', audio.initAudio); addEventListener('keydown', audio.initAudio);
+addEventListener('pointerdown', audio.initAudio); addEventListener('keydown', audio.initAudio); addEventListener('gamepadconnected', audio.initAudio);
 const cyc = (arr, cur, d = 1) => arr[(arr.indexOf(cur) + d + arr.length) % arr.length];
 const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const flag = (t, cls = '') => `<img class="${cls}" src="${esc(flagURL(t))}" alt="">`;
@@ -78,7 +78,7 @@ function hud() {
 
 // ---------------- menus ----------------
 function mainMenu() {
-  const c = save.comp;
+  const c = save.comp; audio.music('menu');
   ui.menu({ id: 'main', title: 'GOAL NATION 2026', logo: true, cls: 'narrow main', sub: `Played ${save.played} · Won ${save.wins} · Goals ${save.goals} · Trophies ${save.trophies.length}`, items: [
     c ? { label: 'Continue: ' + compDef(c.id).name, hint: stageName(c), cls: 'primary', onClick: compMenu } : null,
     { label: 'Kick-off', hint: 'Friendly: any two teams, 1 or 2 players', cls: c ? '' : 'primary', onClick: () => kickMenu(false) },
@@ -111,7 +111,7 @@ function friendly() {
 }
 const evIcon = e => e.card ? (e.card === 'Y' ? '🟨' : e.card === 'YR' ? '🟨🟥' : '🟥') : e.sub ? '🔁' : e.inj ? '🩹' : '⚽';
 function resultMenu(A, B, r, o) {
-  $('hud').style.display = 'none'; const side = o.side || 0, my = r.score[side], th = r.score[1 - side], pens = r.pens && [r.pens[side], r.pens[1 - side]];
+  $('hud').style.display = 'none'; audio.music('menu'); const side = o.side || 0, my = r.score[side], th = r.score[1 - side], pens = r.pens && [r.pens[side], r.pens[1 - side]];
   const agg = o.agg ? [o.agg[0] + r.score[0], o.agg[1] + r.score[1]] : null;
   const won = pens ? pens[0] > pens[1] : agg ? agg[0] > agg[1] : my > th, drew = !pens && (agg ? agg[0] === agg[1] : my === th);
   save.played++; save.goals += my; if (won) save.wins++; persist(); if (won) audio.sfx('win');
@@ -268,7 +268,7 @@ function settingsMenu() {
   ui.menu({ id: 'settings', title: 'Settings', items: [
     opt('Difficulty', S.diff, d => S.diff = cyc(Object.keys(DIFFS), S.diff, d)), opt('Half length', S.half + ' minutes', d => S.half = cyc([2, 3, 4, 5, 8], S.half, d)),
     opt('Graphics', S.quality, d => S.quality = cyc(['auto', 'low', 'medium', 'high'], S.quality, d), 'Restart the game to apply'),
-    opt('Commentary', Math.round(S.commentary * 100) + '%', d => S.commentary = cyc(vols, near(S.commentary), d)), opt('Crowd & effects', Math.round(S.sfx * 100) + '%', d => S.sfx = cyc(vols, near(S.sfx), d)),
+    opt('Music', Math.round((S.music ?? 0.5) * 100) + '%', d => S.music = cyc(vols, near(S.music ?? 0.5), d)), opt('Commentary', Math.round(S.commentary * 100) + '%', d => S.commentary = cyc(vols, near(S.commentary), d)), opt('Crowd & effects', Math.round(S.sfx * 100) + '%', d => S.sfx = cyc(vols, near(S.sfx), d)),
   ], back: mainMenu });
 }
 function howMenu() {
@@ -278,7 +278,8 @@ function howMenu() {
     <tr><td>Sprint</td><td>RT / RB</td><td>Shift or Space</td><td>Right Shift</td></tr><tr><td>Switch player</td><td>LB</td><td>Q</td><td>M</td></tr><tr><td>Pause · substitutions</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
     <p class="tip"><b>Rules:</b> offside is given when a pass finds a team-mate beyond the second-last defender. Tackles from behind are fouls and can bring yellow or red cards; a foul in the box is a penalty. Players tire as the match goes on – use your 5 substitutions from the pause menu. Cup ties level after 90 minutes (or on aggregate) go to extra time and penalties.</p>
     <p class="tip"><b>Penalties:</b> point left / centre / right and press Shoot; when defending in a shoot-out, point the way you want to dive.</p>
-    <p class="tip dim">GOAL NATION 2026 © 2026 Anye Happiness Ade — AI Engineer, Cameroon. All clubs, squads and competitions are fictional unless you rename them in Edit mode.</p>` }], back: mainMenu });
+    <p class="tip">After a goal, press Pass or Shoot to skip the replay. At kick-off, press Pass to skip the walk-out.</p>
+    <p class="tip dim">Commentary voices, crowd recordings, chants and the original music come from the Pitch Clash library. GOAL NATION 2026 © 2026 Anye Happiness Ade — AI Engineer, Cameroon. All clubs, squads and competitions are fictional unless you rename them in Edit mode.</p>` }], back: mainMenu });
 }
 
 // ---------------- loop ----------------

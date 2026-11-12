@@ -7,13 +7,14 @@
 - **Rules**: offside, fouls, yellow and red cards, penalties for fouls in the box, injuries, 5 substitutions with player fitness, extra time and penalty shoot-outs, aggregate scores.
 - **Online match**: play a friend on the same Wi-Fi / LAN (one hosts a room, the other joins with a 4-digit code).
 - **Edit mode**: rename teams, short names, squads and competitions, change kit colours, import your own badge images, and export/import the edit file. Edits stay on your PC.
-- Recorded commentary, stadium crowd, broadcast camera, radar.
+- **Match day**: two-voice recorded commentary (lead and colour commentator, team names for every side), crowd recordings, chants when a team attacks, kick-off jingle, walk-out music, goal celebrations with a slow-motion replay, original generative music in the menus, broadcast camera and radar.
+- 16 different player models.
 
 All clubs, squads and competitions are fictional out of the box; national teams use country names and flag colours only.
 
 ## Run
 
-Install with `GOAL-NATION-2026-1.1.0-Setup.exe`, or from source: `npm install` once, then `start.bat` (or `npm start`).
+Install with `GOAL-NATION-2026-1.2.0-Setup.exe`, or from source: `npm install` once, then `start.bat` (or `npm start`).
 
 ## Controls
 
@@ -30,4 +31,4 @@ Install with `GOAL-NATION-2026-1.1.0-Setup.exe`, or from source: `npm install` o
 ## Credits
 
 GOAL NATION 2026 © 2026 **Anye Happiness Ade** — AI Engineer, Cameroon.
-Player models, crowd audio and commentary come from the owner's Pitch Clash asset library (MakeHuman CC0 bodies). Built with three.js.
+Player models, crowd recordings, commentary voices and the music module (`public/js/music.js`) come from the owner's Pitch Clash library: MakeHuman CC0 bodies, CMU motion capture, Kokoro-generated commentary, original code-synthesised music, and royalty-free recordings by BombinSound, JonathanSlatterMusic, Arunangshu Banerjee, DJArtMusic, FreeSound Community and ZoeDit. The club names are Pitch Clash's fictional clubs. Built with three.js.
