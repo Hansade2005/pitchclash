@@ -5,6 +5,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { CLUBS as MAIN_CLUBS } from '../src/data/teams.js';
 import { REAL_SQUADS } from '../src/data/real_squads.js';
+import { REAL_POS } from '../src/data/real_positions.js';
 
 const root = process.argv[2];
 const tmp = path.join(root, 'public/js/.data_tmp.mjs');
@@ -16,9 +17,23 @@ const mainByName = new Map(MAIN_CLUBS.map((c) => [c.name, c.id]));
 // slot order in goal-nation: GK, 4 DF, 4 MF, 2 FW, then 5 subs. Real lists usually start with 3 keepers,
 // so use the first keeper as the starter, outfield names next, and the other keepers on the bench.
 const order = (l) => (l.length >= 6 ? [l[0], ...l.slice(3), l[1], l[2]] : l).slice(0, 16);
+// Position-aware placement (Wikipedia GK/DF/MF/FW tags): exact 3, unknown 1.
+// Slots: GK, 4 DF, 4 MF, 2 FW, then bench GK, DF, MF, FW, MF.
+const SLOTS = ['GK','DF','DF','DF','DF','MF','MF','MF','MF','FW','FW','GK','DF','MF','FW','MF'];
+function place(roster) {
+  const pool = roster.map(([name, pos]) => ({ name, pos, used: false }));
+  const res = SLOTS.map((sp) => {
+    const c = pool.find((x) => !x.used && x.pos === sp);
+    if (!c) return null; c.used = true; return c.name; });
+  // slots a position could not fill take any unused player (empty string = generated name in game)
+  return res.map((n) => n || (pool.find((x) => !x.used && (x.used = true)) || {}).name || '');
+}
 const out = {};
 for (const t of [...gn.TEAMS, ...gn.CLUBS]) {
   const mid = t.club ? mainByName.get(t.name) : t.id;
+  const roster = mid && REAL_POS[mid];
+  const placed = roster && roster.length >= 11 ? place(roster) : null;
+  if (placed) { out[t.id] = placed; continue; }
   const list = mid && REAL_SQUADS[mid];
   if (list && list.length) out[t.id] = order(list);
 }
