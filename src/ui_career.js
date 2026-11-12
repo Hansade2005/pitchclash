@@ -41,7 +41,7 @@ function newCareer() {
       const l = leagues[li], clubs = [...l.clubs].sort((a, b) => b.rating - a.rating);
       return `<div class="panel wide"><div class="title" style="font-size:38px">CHOOSE YOUR CLUB</div><div class="sub">Pick a league, then the club you will manage. Small clubs are a bigger challenge (and a better story).</div>
         <div class="tabs">${leagues.map((x, i) => `<div class="tab nav ${i === li ? 'on' : ''}" data-act="lg:${i}">${esc(x.name)}</div>`).join('')}</div>
-        <div class="teamgrid">${clubs.map((t, i) => `<div class="btn nav" data-act="cl:${t.id}"><span class="tn">${api.kitSwatch(t, false)} ${esc(t.name)}</span><small>${api.stars(t.rating)} ${t.rating} · ${i < 3 ? 'Title contender' : i < clubs.length * 0.4 ? 'Upper table' : i < clubs.length * 0.75 ? 'Mid-table' : 'Relegation fight'} · ~${Math.round(5 + (t.rating - 60))}M budget</small></div>`).join('')}</div>
+        <div class="teamgrid">${clubs.map((t, i) => `<div class="btn nav" data-act="cl:${t.id}"><span class="tn">${api.badgeSwatch(t, false)} ${esc(t.name)}</span><small>${api.stars(t.rating)} ${t.rating} · ${i < 3 ? 'Title contender' : i < clubs.length * 0.4 ? 'Upper table' : i < clubs.length * 0.75 ? 'Mid-table' : 'Relegation fight'} · ~${Math.round(5 + (t.rating - 60))}M budget</small></div>`).join('')}</div>
         <div class="actions"><div class="btn nav" data-act="back">← Back</div></div><div class="hint">Click a league tab (or <span class="key">Q</span>/<span class="key">E</span>) · arrows + <span class="key">Enter</span> pick a club · <span class="key">Esc</span> back</div></div>`;
     },
     tab: d => { li = (li + d + leagues.length) % leagues.length; api.setFocus(li); },
@@ -64,7 +64,7 @@ export function hub() {
     focus: TABS.length,
     render: () => {
       const c = career, k = club(), po = pos(), ev = C.currentEvent(c);
-      const head = `<div class="mlhead"><div><b>${esc(k.name)}</b> ${api.kitSwatch(k, false)} <small>${esc(c.season)} · Year ${c.year} · ${esc(c.manager)}</small></div><div class="mlstats"><span>💰 <b>${M(c.budget)}</b></span><span>👔 Board ${confBar(c.confidence)}</span><span>${esc(C.windowText(c))}</span></div></div>`;
+      const head = `<div class="mlhead"><div><b>${esc(k.name)}</b> ${api.badgeSwatch(k, false)} <small>${esc(c.season)} · Year ${c.year} · ${esc(c.manager)}</small></div><div class="mlstats"><span>💰 <b>${M(c.budget)}</b></span><span>👔 Board ${confBar(c.confidence)}</span><span>${esc(C.windowText(c))}</span></div></div>`;
       let body = '';
       if (tab === 0) body = overview(c, ev, po);
       else if (tab === 1) body = squadTab(c);

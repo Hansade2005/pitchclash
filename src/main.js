@@ -39,6 +39,7 @@ export const CATEGORIES = (() => {
 })();
 export function teamById(id) { return NATIONS.find(t => t.id === id) || CLUBS.find(t => t.id === id); }
 export function stars(r) { const s = clamp((r - 55) / 7, 0.5, 5); return '★'.repeat(Math.floor(s)) + (s % 1 >= 0.5 ? '½' : ''); }
+function badgeSwatch(t) { return `<img class="rowbadge" src="${badgeSrc(t)}" alt="" onerror="this.remove()">`; }
 function kitSwatch(t, alt) { const k = alt ? (t.colors.alt || t.colors) : t.colors; return `<span class="kit"><i style="background:${k.shirt}"></i><i style="background:${k.shorts}"></i><i style="background:${k.socks}"></i></span>`; }
 
 // ------------------------------------------------------------------ menu framework
@@ -1203,9 +1204,9 @@ async function boot() {
   requestAnimationFrame(t => { last = t; loop(t); });
   $('loading').classList.add('hidden');
   await bootSequence();
-  Career.init({ show, setFocus, renderScreen, mainMenu, kitSwatch, stars, sideSelect, matchSettings, teamManagement, venueFor, sportsbook: () => Bet.sportsbook() });
-  Bet.init({ show, setFocus, renderScreen, mainMenu, kitSwatch }, { hasCareer: () => Career.hasCareer(), fund: id => Career.fundScreen(id) });
-  Comp.init({ show, renderScreen, setFocus, mainMenu, sideSelect, matchSettings, startMatch, teamById, stars, CATEGORIES, esc, kitSwatch, settings });
+  Career.init({ show, setFocus, renderScreen, mainMenu, kitSwatch, badgeSwatch, stars, sideSelect, matchSettings, teamManagement, venueFor, sportsbook: () => Bet.sportsbook() });
+  Bet.init({ show, setFocus, renderScreen, mainMenu, kitSwatch, badgeSwatch }, { hasCareer: () => Career.hasCareer(), fund: id => Career.fundScreen(id) });
+  Comp.init({ show, renderScreen, setFocus, mainMenu, sideSelect, matchSettings, startMatch, teamById, stars, CATEGORIES, esc, kitSwatch, badgeSwatch, settings });
   startIcons(); startFx();
   mainMenu();
   if (window.Music) Music.onTrackChange = d => { const el = $('nowplaying'); if (!el || !d) return; el.innerHTML = `♪ <b>${esc(d.title)}</b> — ${esc(d.artist)}`; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 4500); };

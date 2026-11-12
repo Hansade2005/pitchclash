@@ -1,4 +1,5 @@
 import { REAL_SQUADS } from './real_squads.js';
+import { REAL_KITS } from './real_kits.js';
 // Pitch Clash — team data: national teams, real club names, formations,
 // and deterministic squad generation.
 //
@@ -1417,6 +1418,14 @@ for (const [name, short, rating, s, sh, so, as, ash, aso, country] of ROW_EXTRA)
     colors: { shirt: s, shorts: sh, socks: so, alt: { shirt: as, shorts: ash, socks: aso } },
     rating, style: deriveStyle(id, rating), formation: clubFormation(id, rating), pop,
   });
+}
+
+// Real kit colours for known clubs; alternative kit is white (or black on light home kits).
+const kitLum = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.2126 * (n >> 16 & 255) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255; };
+for (const c of CLUBS) {
+  const k = REAL_KITS[c.name]; if (!k) continue;
+  const alt = kitLum(k[0]) > 0.6 ? '#111111' : '#ffffff';
+  c.colors = { shirt: k[0], shorts: k[1], socks: k[2], alt: { shirt: alt, shorts: alt, socks: alt } };
 }
 
 // ============================================================ lookups

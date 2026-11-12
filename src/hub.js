@@ -71,7 +71,7 @@ function chooseTeams(compId) {
     render: () => `<div class="panel wide"><div class="title">${esc(state.name)}</div>
       <div class="sub">${esc(state.season)} · ${teams.length} teams · ${picks.length === 0 ? '<b>Click or press Enter on YOUR team</b>' : `Player 1: <b>${esc(name(picks[0]))}</b> — now pick a rival for Player 2, or start with one team`}</div>
       <div class="actions"><div class="btn nav" data-act="back">← ${picks.length ? 'Undo' : 'Back'}</div><div class="btn nav" data-act="random">🎲 Random team</div>${picks.length ? '<div class="btn nav go" data-act="start1">▶ Start with one team</div>' : '<div class="btn" style="opacity:.0;pointer-events:none">.</div>'}</div>
-      <div class="teamgrid">${teams.map(id => { const t = info(id); return `<div class="btn nav ${picks.includes(id) ? 'picked' : ''}" data-act="t:${id}"><span class="tn">${api.kitSwatch(t, false)} ${esc(t.name)}</span><small>${api.stars(t.rating)} ${t.rating}${t.formation ? ' · ' + esc(t.formation) : ''}</small></div>`; }).join('')}</div>
+      <div class="teamgrid">${teams.map(id => { const t = info(id); return `<div class="btn nav ${picks.includes(id) ? 'picked' : ''}" data-act="t:${id}"><span class="tn">${api.badgeSwatch(t, false)} ${esc(t.name)}</span><small>${api.stars(t.rating)} ${t.rating}${t.formation ? ' · ' + esc(t.formation) : ''}</small></div>`; }).join('')}</div>
       <div class="hint">Arrows move · <span class="key">Enter</span> / click choose · <span class="key">Y</span> random · <span class="key">Esc</span> ${picks.length ? 'undo' : 'back to competitions'}</div></div>`,
     action: act => {
       if (act === 'back') { Sound.back(); if (picks.length) { picks.pop(); api.renderScreen(); api.setFocus(ACT); return; } return competitionsMenu(); }

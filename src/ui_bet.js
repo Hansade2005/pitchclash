@@ -6,7 +6,7 @@ let api = null, activeId = null, msg = '', msgOk = true, hook = {};
 export function init(a, h) { api = a; hook = h || {}; }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const NAMES = ['Alex', 'Sam', 'Jo', 'Mo', 'Ade', 'Lee', 'Kim', 'Ray', 'Zed', 'Ola', 'Tia', 'Max'];
-const kit = t => api.kitSwatch(t, false);
+const kit = t => api.badgeSwatch(t, false);
 const active = () => { let b = Bank.bettor(activeId); if (!b) { b = Bank.bettors[0]; activeId = b.id; } return b; };
 const say = (m, ok = true) => { msg = m; msgOk = ok; };
 

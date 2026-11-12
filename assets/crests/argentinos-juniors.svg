@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Argentinos Juniors">
   <defs><clipPath id="s"><path d="M10 6 H90 V58 Q90 84 50 96 Q10 84 10 58 Z"/></clipPath></defs>
   <g clip-path="url(#s)">
-    <rect x="0" y="0" width="50" height="100" fill="#e2001a"/>
+    <rect x="0" y="0" width="50" height="100" fill="#d6001c"/>
     <rect x="50" y="0" width="50" height="100" fill="#ffffff"/>
   </g>
   <path d="M10 6 H90 V58 Q90 84 50 96 Q10 84 10 58 Z" fill="none" stroke="#111111" stroke-width="3"/>
