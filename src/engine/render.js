@@ -648,8 +648,8 @@ export class Renderer {
       const p = ch.player;
       ch.holder.visible = !p.sentOff;
       if (p.sentOff) continue;
-      ch.holder.position.set(p.x, 0, p.z);
-      ch.holder.rotation.y = p.face;
+      ch.holder.position.set(p.x, p.hop > 0 ? Math.sin(Math.min(1, p.hop) * Math.PI) * 0.22 : 0, p.z);
+      ch.holder.rotation.y = p.face + (p.spinT > 0 ? (1 - p.spinT / 0.6) * Math.PI * 2 * (p.spinDir || 1) : 0);
       const anim = p.anim || 'Idle';
       const sp = p.speed || 0;
       const rate = anim === 'Jog' ? clamp(sp / 4.5, 0.6, 1.3) : anim === 'Run' ? clamp(sp / 6.4, 0.8, 1.3) : anim === 'Sprint' ? clamp(sp / 8.4, 0.9, 1.35) : 1;

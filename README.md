@@ -26,6 +26,7 @@ One keyboard player can use **WASD and the arrow keys at the same time**. **Ente
 | Sprint | Shift or Space |
 | Switch player | Q or N |
 | Pause | Esc · F1 shows/hides the on-screen key help |
+| Skill moves | E or G, plus stick direction (sideways = sidestep, forwards = step-over, backwards = roulette); tap twice for drag-back, nutmeg and rainbow flick |
 
 Also: you **sprint automatically** while moving, **E / G** = feint, a ring shows who your next pass goes to, **Enter** skips ceremonies/replays, **Esc / P** pauses.
 

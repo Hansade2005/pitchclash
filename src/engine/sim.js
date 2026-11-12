@@ -452,7 +452,7 @@ export class Match {
     const ty = clamp(target.y + errV, 0.1, 6);
     const vy = (ty - b.y + 0.5 * GRAV * T * T) / T;
     this.kickBall(p, Math.cos(a) * speed, vy, Math.sin(a) * speed, curve, 'shot');
-    b.shot = { by: p, t: 0 };
+    b.shot = { by: p, t: 0, pen: this.phase === 'setpiece' && this.setPiece && this.setPiece.type === 'penalty' };
     this.stats[p.team].shots++; p.ps.shots++;
     // on target?
     const zAtGoal = b.z + Math.sin(a) * speed * T;
@@ -597,7 +597,7 @@ export class Match {
         if (wide) { const gx = this.goalX(p.team), d = this.dir(p.team); this.lobTo(p, { x: gx - d * (7 + Math.random() * 5), z: -Math.sign(p.z) * Math.random() * 6 }, true); }
         else if (t) this.passTo(p, t.p, 'lob'); else this.lobTo(p, { x: p.x + Math.sin(p.face) * 28, z: p.z + Math.cos(p.face) * 28 }, false);
       }
-      else if (press('skill')) { this.feint(p, stick); }
+      else if (press('skill')) { this.skillMove(p, stick); }
     } else if (!sp) {
       if (press('pass') && this.canFirstTime(p)) { const t = this.smartPass(p, stick); if (t) this.passTo(p, t.p); }
       if (press('lob') && this.canFirstTime(p)) { const gx = this.goalX(p.team), d = this.dir(p.team); this.lobTo(p, { x: gx - d * 9, z: 0 }, true); }
@@ -723,15 +723,57 @@ export class Match {
 
   canFirstTime(p) { const b = this.ball; return !b.owner && b.heldBy === null && this.dist(p, b) < 1.5 && b.y < 2.2 && p.kickCD <= 0; }
 
-  // skill move: sidestep with the ball + burst; the ball is shielded while it lasts
-  feint(p, stick) {
-    const fx = Math.sin(p.face), fz = Math.cos(p.face), px = fz, pz = -fx;            // right-hand perpendicular
-    let side = stick.x * px + stick.z * pz; side = Math.abs(side) > 0.25 ? Math.sign(side) : (Math.random() < 0.5 ? -1 : 1);
-    p.vx += px * side * 5.2 + fx * 1.5; p.vz += pz * side * 5.2 + fz * 1.5;
-    p.burst = 0.45; p.shield = 0.5; p.stamina = Math.max(0, p.stamina - 0.04);
-    p.animOnce = 'Dribble'; p.animOnceT = 0.4;
-    this.emit('feint', { p });
+  // ------------------------------------------------------------------ skill moves
+  // SKILL + stick direction (relative to where the player faces); press SKILL twice quickly for the advanced version:
+  //   sideways: sidestep / double: drag-back cut      forwards: step-over / double: nutmeg      backwards: roulette spin / double: rainbow flick
+  skillMove(p, stick) {
+    if (p.skillCD > 0 || p.action || p.stun > 0) return;
+    const now = this.clock, dbl = now - (p.lastSkillAt || -9) < 0.4; p.lastSkillAt = now;
+    const fx = Math.sin(p.face), fz = Math.cos(p.face), px = fz, pz = -fx, mag = hyp(stick.x, stick.z);
+    const f = mag > 0.25 ? stick.x * fx + stick.z * fz : 0, sd = mag > 0.25 ? stick.x * px + stick.z * pz : 0;
+    const dir = Math.abs(f) > 0.55 && Math.abs(f) > Math.abs(sd) ? (f > 0 ? 'fwd' : 'back') : 'side', side = Math.abs(sd) > 0.2 ? Math.sign(sd) : (Math.random() < 0.5 ? -1 : 1);
+    const name = dir === 'fwd' ? (dbl ? 'nutmeg' : 'stepover') : dir === 'back' ? (dbl ? 'rainbow' : 'roulette') : (dbl ? 'cut' : 'sidestep');
+    this.doSkill(p, name, side);
   }
+  nearestFoe(p, range, cone) {
+    const fx = Math.sin(p.face), fz = Math.cos(p.face); let best = null, bd = range;
+    for (const o of this.active(this.opp(p.team))) { if (o.isGK) continue; const dx = o.x - p.x, dz = o.z - p.z, d = hyp(dx, dz); if (d < bd && (cone === undefined || (dx * fx + dz * fz) / (d || 1) > cone)) { bd = d; best = o; } }
+    return best;
+  }
+  doSkill(p, name, side) {
+    const b = this.ball, has = b.owner === p, fx = Math.sin(p.face), fz = Math.cos(p.face), px = fz, pz = -fx;
+    const wrongFoot = (o, t, chance) => { if (o && Math.random() < chance) { o.wrong = t; o.vx *= 0.3; o.vz *= 0.3; } };
+    const win = o => clamp(0.55 + (p.dribbling - (o ? o.defending : 70)) / 140, 0.15, 0.92);
+    p.skillT = 0.9; p.skillCD = 0.45; p.stamina = Math.max(0, p.stamina - 0.045);
+    switch (name) {
+      case 'sidestep': // quick sidestep + burst
+        p.vx += px * side * 5.4 + fx * 1.6; p.vz += pz * side * 5.4 + fz * 1.6; p.burst = 0.45; p.shield = 0.5; p.animOnce = 'Dribble'; p.animOnceT = 0.4; p.hop = 0.3;
+        wrongFoot(this.nearestFoe(p, 2.6), 0.4, win()); break;
+      case 'stepover': // step-over: freezes the defender in front, then bursts past
+        p.vx += fx * 3.4 + px * side * 2.2; p.vz += fz * 3.4 + pz * side * 2.2; p.burst = 0.65; p.shield = 0.6; p.animOnce = 'Dribble'; p.animOnceT = 0.5; p.hop = 0.45;
+        wrongFoot(this.nearestFoe(p, 3.2, 0.3), 0.6, win(this.nearestFoe(p, 3.2, 0.3))); break;
+      case 'roulette': { // 360° spin away from the nearest defender
+        const o = this.nearestFoe(p, 3.5); let away = side; if (o) away = Math.sign((o.x - p.x) * px + (o.z - p.z) * pz) * -1 || side;
+        p.vx = px * away * 4.8 + fx * 2.2; p.vz = pz * away * 4.8 + fz * 2.2; p.spinT = 0.6; p.spinDir = away; p.shield = 0.8; p.burst = 0.5; p.animOnce = 'Dribble'; p.animOnceT = 0.6;
+        wrongFoot(o, 0.5, win(o)); break; }
+      case 'cut': // drag-back / Cruyff turn: reverse and go the other way
+        p.face += side * 2.1; p.vx = Math.sin(p.face) * 5.2; p.vz = Math.cos(p.face) * 5.2; p.burst = 0.55; p.shield = 0.6; p.hop = 0.35; p.animOnce = 'Dribble'; p.animOnceT = 0.45;
+        for (const o of this.active(this.opp(p.team))) if (!o.isGK && hyp(o.x - p.x, o.z - p.z) < 3 && Math.random() < win(o) * 0.8) { o.wrong = 0.5; o.vx *= 0.3; o.vz *= 0.3; } break;
+      case 'nutmeg': { // push the ball through the legs of the defender in front
+        const o = this.nearestFoe(p, 2.8, 0.35);
+        if (has && o) {
+          if (Math.random() < win(o)) { b.owner = null; b.vx = fx * 9.5; b.vz = fz * 9.5; b.vy = 0.3; b.lastTouch = p; p.controlCD = 0; p.burst = 0.9; o.wrong = 0.9; o.stun = 0.5; this.emit('nutmeg', { p, o }); }
+          else { this.looseBall(p, o, 3); p.controlCD = 0.4; }
+        } else { p.vx += fx * 3; p.vz += fz * 3; p.burst = 0.5; p.shield = 0.5; }
+        p.animOnce = 'Dribble'; p.animOnceT = 0.5; break; }
+      case 'rainbow': // flick the ball up and over the defender's head
+        if (has) { b.owner = null; b.vx = fx * 5.2; b.vz = fz * 5.2; b.vy = 6.3; b.lastTouch = p; b.shot = null; p.controlCD = 0.5; p.burst = 1.0; p.hop = 0.7; for (const o of this.active(this.opp(p.team))) if (hyp(o.x - p.x, o.z - p.z) < 5) o.controlCD = Math.max(o.controlCD, 0.9); this.emit('rainbow', { p }); }
+        else { p.vx += fx * 3; p.vz += fz * 3; p.burst = 0.6; }
+        p.animOnce = 'Dribble'; p.animOnceT = 0.6; break;
+    }
+    this.emit('skill', { p, name });
+  }
+  feint(p, stick) { this.skillMove(p, stick); }
   header(p, target) {
     const b = this.ball, dx = target.x - b.x, dz = target.z - b.z, d = hyp(dx, dz);
     const sp = 14 + p.physical / 20;
@@ -743,7 +785,7 @@ export class Match {
   }
 
   tryTackle(p, slide) {
-    if (p.action || p.stun > 0 || p.isGK) return;
+    if (p.action || p.stun > 0 || p.isGK || p.wrong > 0) return;
     if (slide) {
       p.action = 'slide'; p.actionT = 0.85;
       const b = this.ball;
@@ -1072,6 +1114,7 @@ export class Match {
     p.aiSprint = pressure < 0.3 && distGoal > 18 && p.stamina > 0.3;
     if (p.aiT > 0 || p.kickCD > 0) return;
     p.aiT = this.diff.react + 0.15 + Math.random() * 0.25;
+    { const foe = this.nearestFoe(p, 2.6, 0.2); if (foe && p.dribbling > 68 && p.skillCD <= 0 && Math.random() < 0.2 + (p.dribbling - 68) / 120) { const r = Math.random(); this.doSkill(p, r < 0.3 ? 'stepover' : r < 0.55 ? 'sidestep' : r < 0.72 ? 'roulette' : r < 0.86 ? 'cut' : r < 0.95 ? 'nutmeg' : 'rainbow', Math.random() < 0.5 ? -1 : 1); return; } }
     // shoot?
     const angleOk = Math.abs(p.z) < 16 || distGoal < 12;
     // is the shooting lane blocked?
@@ -1112,33 +1155,72 @@ export class Match {
       }
       return;
     }
-    // positioning
+    const sk = this.keeperSkill(k), gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 2;
+    if (k.smotherCD > 0) k.smotherCD -= dt;
+    // positioning: on the line between ball and goal, coming out to close the angle as the attacker gets closer
     const base = this.formationTarget(k, b, false);
     k.aiTarget = base; k.aiSprint = false;
-    // rush out for loose balls in the box
     const inBox = Math.abs(b.x - og) < BOX_D - 2 && Math.abs(b.z) < BOX_W / 2 - 4 && Math.sign(b.x) === Math.sign(og);
-    if (!b.owner && inBox && hyp(b.vx, b.vz) < 12 && b.y < 1.5) { k.aiTarget = this.interceptPoint(k); k.aiSprint = true; }
-    if (b.owner && b.owner.team !== t && inBox && this.dist(b.owner, k) < 6) { k.aiTarget = { x: b.owner.x, z: b.owner.z }; k.aiSprint = true; }
-    // shot coming? dive towards where the ball will cross the keeper's own plane
-    if (!b.owner && (b.vx * -d) > 6 && k.dive <= 0 && k.kickCD <= 0) {
+    const carrier = b.owner && b.owner.team !== t ? b.owner : null;
+    if (carrier && !k.dive) {
+      const dg = hyp(carrier.x - og, carrier.z);
+      if (dg < 24 && Math.abs(carrier.z) < 20) { // narrow the angle
+        const r = clamp((24 - dg) * 0.32 * (0.6 + 0.5 * sk), 0, 7.5), a = Math.atan2(carrier.z, (carrier.x - og) * d);
+        k.aiTarget = { x: og + d * (1 + Math.cos(a) * r), z: Math.sin(a) * r * 0.9 + carrier.z * 0.12 }; k.aiSprint = r > 3;
+      }
+      // smother: dive at the feet of a carrier who is within reach (a good dribbler can still beat it)
+      if (inBox && this.dist(k, carrier) < 2.4 && k.smotherCD <= 0 && !k.stun) {
+        k.smotherCD = 1.8;
+        const win = clamp(0.38 + 0.4 * sk - (carrier.dribbling - 70) / 160 - (carrier.shield > 0 ? 0.3 : 0) - (carrier.skillT > 0 ? 0.3 : 0), 0.08, 0.85);
+        k.face = Math.atan2(carrier.x - k.x, carrier.z - k.z);
+        k.animOnce = (carrier.z - k.z) * -d > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight'; k.animOnceT = 0.9;
+        if (Math.random() < win) { b.owner = null; this.keeperCatch(k); return; }
+        k.stun = 0.9; if (Math.random() < 0.16 && this.phase === 'play') this.foul(k, carrier, { x: carrier.x, z: carrier.z });
+        return;
+      }
+    }
+    // loose ball in or just outside the box: sweep it up if the keeper wins the race
+    if (!b.owner && b.y < 1.5 && hyp(b.vx, b.vz) < 14 && Math.abs(b.x - og) < BOX_D + 4 && Math.abs(b.z) < BOX_W / 2) {
+      const ip = this.interceptPoint(k), rival = this.active(this.opp(t)).reduce((m, o) => Math.min(m, this.dist(o, ip) / 7.5), 9);
+      if (this.dist(k, ip) / (6.5 + 2 * sk) < rival + 0.25) { k.aiTarget = ip; k.aiSprint = true; }
+    }
+    // high ball into the box (cross, corner): claim it when the keeper can get there first
+    if (!b.owner && !b.shot && b.y > 0.8 && hyp(b.vx, b.vz) > 5 && Math.abs(b.x - og) < BOX_D + 10) {
+      const L = this.landing(b);
+      if (L && Math.abs(L.x - og) < BOX_D - 1 && Math.abs(L.z) < 14 && Math.sign(L.x) === Math.sign(og)) {
+        const tk = this.dist(k, L) / (6.2 + 2.2 * sk) + 0.2 + (1 - sk) * 0.25, ta = this.active(this.opp(t)).reduce((m, o) => Math.min(m, this.dist(o, L) / 7 + 0.35), 9);
+        if (tk < L.t - 0.05 && tk < ta + 0.35 * sk) { k.aiTarget = { x: L.x, z: L.z }; k.aiSprint = true; }
+      }
+    }
+    // shot coming: the keeper needs time to see it, reads the flight with some error, and can only dive so far in the time left
+    if (!b.owner && (b.vx * -d) > 4 && k.dive <= 0 && k.kickCD <= 0) {
       const Tg = (og - b.x) / b.vx;
-      if (Tg > 0 && Tg < 1.2) {
+      if (Tg > 0 && Tg < 1.6) {
         const zGoal = b.z + b.vz * Tg, yGoal = b.y + b.vy * Tg - 0.5 * 9.81 * Tg * Tg;
-        if (Math.abs(zGoal) < GHW + 0.6 && yGoal < GOAL_H + 0.5) {
-          const Tk = Math.max(0.02, (k.x - b.x) / b.vx);
-          const zAt = b.z + b.vz * Tk, yAt = b.y + b.vy * Tk - 0.5 * 9.81 * Tk * Tk;
-          const skill = this.keeperSkill(k);
-          const reach = 1.0 + 2.4 * skill;
-          const reacts = Tk > 0.1 + (1 - skill) * 0.22;
-          k.aiTarget = { x: k.x, z: clamp(zAt, -GHW - 0.5, GHW + 0.5) };
-          if (Math.abs(zAt - k.z) > 0.8 && reacts) {
-            k.dive = 0.9; k.diveDir = Math.sign(zAt - k.z); k.diveReach = Math.min(reach, Math.abs(zAt - k.z) + 0.3); k.diveZ = zAt; k.diveY = yAt;
-            const leftOfKeeper = k.diveDir * -d > 0;
-            k.animOnce = leftOfKeeper ? 'KeeperDiveLeft' : 'KeeperDiveRight'; k.animOnceT = 1.0;
+        if (Math.abs(zGoal) < GHW + 0.7 && yGoal < GOAL_H + 0.5) {
+          const since = b.shot ? b.shot.t : b.lastKick ? b.lastKick.t : 0, pen = b.shot && b.shot.pen;
+          if (pen && !k.penGuess) { // penalty: the keeper must commit early, picking a side (sometimes reading the taker)
+            const see = 0.1 + 0.2 * sk, r = Math.random(); k.penGuess = r < see ? Math.sign(zGoal || 1) : r < see + 0.14 ? 0 : (Math.random() < 0.5 ? -1 : 1);
+            if (k.penGuess) { k.dive = 0.9; k.diveDir = k.penGuess; k.diveReach = 2.5 + sk * 0.6; k.diveZ = k.penGuess * 2.6; k.diveY = 0.6; k.animOnce = k.diveDir * -d > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight'; k.animOnceT = 1.0; }
+          } else if (!pen && since >= 0.16 + (1 - sk) * 0.26 + this.diff.react * 0.1) {
+            const Tk = Math.max(0.02, (k.x - b.x) / b.vx), zAt = b.z + b.vz * Tk, yAt = b.y + b.vy * Tk - 0.5 * 9.81 * Tk * Tk;
+            const sigma = 0.3 + (1 - sk) * 1.15 + Math.min(1.2, Math.abs(b.spin || 0) * 0.25), zP = zAt + gauss() * sigma, need = zP - k.z;
+            k.aiTarget = { x: k.x, z: clamp(zP, -GHW - 0.5, GHW + 0.5) };
+            if (Math.abs(need) > 0.6) {
+              const frac = clamp(Tk / 0.4, 0.3, 1), reach = Math.min((1.2 + 1.3 * sk) * frac, Math.abs(need) + 0.3);
+              k.dive = 0.9; k.diveDir = Math.sign(need); k.diveReach = reach; k.diveZ = zP; k.diveY = yAt;
+              k.animOnce = k.diveDir * -d > 0 ? 'KeeperDiveLeft' : 'KeeperDiveRight'; k.animOnceT = 1.0;
+            }
           }
         }
       }
-    }
+    } else if (!b.shot || b.shot.pen === false) k.penGuess = 0;
+  }
+  // where (and when) a flying ball comes down within the keeper's reach
+  landing(b) {
+    let x = b.x, y = b.y, z = b.z, vx = b.vx, vy = b.vy, vz = b.vz;
+    for (let t = 0; t < 2.6; t += 0.05) { vy -= GRAV * 0.05; x += vx * 0.05; y += vy * 0.05; z += vz * 0.05; if (vy < 0 && y <= 2.3) return { x, z, t }; }
+    return null;
   }
   keeperSkill(k) { const base = ((k.info.rating || 70) - 50) / 45; return clamp(base * 0.6 + (k.human === null ? this.diff.keeper * 0.4 : 0.3), 0.2, 1); }
 
@@ -1148,6 +1230,8 @@ export class Match {
     for (const p of this.all) {
       if (p.sentOff) continue;
       p.kickCD = Math.max(0, p.kickCD - dt); p.controlCD = Math.max(0, p.controlCD - dt); if (p.shield > 0) p.shield -= dt;
+      if (p.skillT > 0) p.skillT -= dt; if (p.skillCD > 0) p.skillCD -= dt; if (p.hop > 0) p.hop = Math.max(0, p.hop - dt * 2.2); if (p.spinT > 0) p.spinT -= dt;
+      if (p.wrong > 0) { p.wrong -= dt; p.vx *= Math.exp(-10 * dt); p.vz *= Math.exp(-10 * dt); }
       if (p.animOnceT > 0) { p.animOnceT -= dt; if (p.animOnceT <= 0) p.animOnce = null; }
       if (p.stun > 0) p.stun -= dt;
       let mx = 0, mz = 0, sprint = false;
@@ -1255,31 +1339,47 @@ export class Match {
     }
   }
 
+  // 3D "can the hands get there" test; returns 0 (dead centre) .. 1 (fingertips) or null when out of reach
+  keeperReachQ(k, diving) {
+    const b = this.ball, dx = b.x - k.x, dz = b.z - k.z, dy = b.y - (diving ? 1.0 : 1.15), sk = this.keeperSkill(k);
+    const m = Math.sqrt((dx * 0.9) ** 2 + dz ** 2 + (dy * 0.85) ** 2), R = (diving ? 1.3 : 1.05) * (0.92 + 0.16 * sk);
+    return m < R ? m / R : null;
+  }
   keeperSave(k) {
     const b = this.ball;
     if (b.owner || k.keeperHold > 0 || k.kickCD > 0 || b.heldBy) return;
-    const dx = b.x - k.x, dz = b.z - k.z, d = hyp(dx, dz);
-    if (d < 1.25 && b.y < 2.7) {
-      const sp = hyp(b.vx, b.vz);
-      const skill = this.keeperSkill(k);
-      const catchP = clamp(skill * 1.15 - sp / 45, 0.08, 0.95);
-      if (Math.random() < catchP) this.keeperCatch(k);
-      else this.parry(k);
-    }
+    const q = this.keeperReachQ(k, true); if (q !== null) this.keeperHandle(k, q, true);
+  }
+  // the keeper gets a hand/hands to the ball: hold it, tip it over, or push it away - speed, placement, weather and keeper quality decide
+  keeperHandle(k, q, diving) {
+    const b = this.ball, sk = this.keeperSkill(k), spd = hyp(b.vx, b.vz, b.vy * 0.5);
+    const spdF = spd < 8 ? 1 : spd < 14 ? 0.92 : spd < 20 ? 0.76 : spd < 26 ? 0.55 : 0.34;
+    const w = this.cfg.weather, wet = w === 'storm' ? 0.18 : w === 'rain' ? 0.12 : w === 'snow' ? 0.05 : 0;
+    const catchP = clamp(spdF * (0.5 + 0.55 * sk) * (1 - 0.55 * q) - wet - (b.y > 2.1 ? 0.12 : 0) - (diving ? 0.1 : 0), 0.03, 0.97);
+    if (Math.random() < catchP) this.keeperCatch(k);
+    else this.parry(k, b.y > 1.9 && q > 0.35);
+  }
+  // control branch: a ball reaches the keeper standing in his box
+  keeperStand(k) {
+    const b = this.ball, q = this.keeperReachQ(k, false); if (q === null) return false;
+    if (hyp(b.vx, b.vz) < 8) { this.keeperCatch(k); return true; }   // collects gentle balls
+    this.keeperHandle(k, q, false); return true;
   }
   keeperCatch(k) {
-    const b = this.ball;
+    const b = this.ball, fast = hyp(b.vx, b.vz) > 12 || b.shot;
     b.owner = null; b.heldBy = k; b.vx = b.vy = b.vz = 0; b.shot = null; b.intended = null;
-    if (b.shot || hyp(b.vx, b.vz) > 12) { k.ps.saves++; k.ps.rating += 0.45; }
+    if (fast) { k.ps.saves++; k.ps.rating += 0.45; }
     k.keeperHold = 1.6; k.dive = 0; b.lastTouch = k;
     k.animOnce = 'KeeperCatch'; k.animOnceT = 0.6;
     this.emit('save', { k, caught: true });
   }
-  parry(k) {
-    const b = this.ball, d = this.dir(k.team);
-    b.vx = Math.abs(b.vx) * 0.35 * d + d * 2; b.vz = (b.z >= k.z ? 1 : -1) * (4 + Math.random() * 6); b.vy = 2 + Math.random() * 3;
+  parry(k, tip) {
+    const b = this.ball, d = this.dir(k.team), sk = this.keeperSkill(k);
+    if (tip) { b.vx = -d * (2 + Math.random() * 2); b.vz = (b.z >= 0 ? 1 : -1) * (1 + Math.random() * 3); b.vy = 4.5 + Math.random() * 2; }       // tipped over the bar
+    else if (Math.random() < 0.08 + 0.3 * (1 - sk)) { b.vx = d * (1.5 + Math.random() * 2.5); b.vz = (Math.random() - 0.5) * 3; b.vy = 1 + Math.random() * 1.5; } // spilled in front of goal
+    else { b.vx = d * (2 + Math.random() * 3.5); b.vz = (b.z >= k.z ? 1 : -1) * (5 + Math.random() * (5 + 4 * sk)); b.vy = 2 + Math.random() * 3; }              // pushed wide
     b.lastTouch = k; b.shot = null; b.intended = null;
-    k.kickCD = 0.6; k.controlCD = 0.6;
+    k.kickCD = 0.55 - 0.2 * sk; k.controlCD = 0.55 - 0.2 * sk; k.dive = 0;
     this.emit('save', { k, caught: false });
   }
 
@@ -1395,9 +1495,9 @@ export class Match {
       // contested by opponents (shielding vs strength)
       const o = b.owner;
       for (const q of this.active(this.opp(o.team))) {
-        if (q.stun > 0 || q.action || q.isGK || (q.human !== null && this.cfg.assist === false)) continue;
-        if (o.shield > 0) continue;
-        if (this.dist(q, b) < 0.8 && Math.random() < (1 / 120) * 0.6 * (q.defending / o.dribbling) * (this.assistOn(o) ? 0.5 : 1)) { this.looseBall(o, q, 3); o.controlCD = 0.4; break; }
+        if (q.stun > 0 || q.action || q.isGK || q.wrong > 0 || (q.human !== null && this.cfg.assist === false)) continue;
+        if (o.shield > 0 || o.skillT > 0) continue;
+        if (this.dist(q, b) < 0.8 && Math.random() < (1 / 120) * 0.38 * (q.defending / o.dribbling) * (o.burst > 0 ? 0.5 : 1) * (this.assistOn(o) ? 0.5 : 1)) { this.looseBall(o, q, 3); o.controlCD = 0.4; break; }
       }
       return;
     }
@@ -1429,8 +1529,7 @@ export class Match {
     }
     this.offsideSnap = null;
     if (p.isGK && this.inOwnBox(p) && (b.lastTouch === null || b.lastTouch.team !== p.team || b.lastKick?.kind !== 'pass')) {
-      if (relSpeed < 26 || Math.random() < this.keeperSkill(p)) { this.keeperCatch(p); return; }
-      this.parry(p); return;
+      if (this.keeperStand(p)) return;
     }
     const controlLimit = 14 + p.dribbling / 8 + (b.intended === p ? 6 : 0) + (this.assistOn(p) ? 6 : 0);
     if (relSpeed < controlLimit) {

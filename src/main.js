@@ -308,7 +308,7 @@ function controlsScreen(back) {
   const rows = [
     ['Move', 'Left stick / D-pad', 'move'], ['Short pass · Press (defending)', 'A / ✕', 'pass'], ['Shoot (hold for power) · Slide tackle', 'B / ○', 'shoot'],
     ['Through ball · Standing tackle', 'Y / △', 'through'], ['Lob pass · Cross', 'X / □', 'lob'], ['Sprint', 'RB / R1 · RT / R2', 'sprint'],
-    ['Switch player', 'LB / L1', 'switch'], ['Skill burst / feint', 'LT / L2 · Right stick', 'skill'], ['Pause', 'Start / Options', 'start'], ['Change camera', 'Back / Share', 'camera'],
+    ['Switch player', 'LB / L1', 'switch'], ['Skill moves (stick direction; tap twice for the flashy ones)', 'LT / L2 · Right stick flick', 'skill'], ['Pause', 'Start / Options', 'start'], ['Change camera', 'Back / Share', 'camera'],
   ];
   const keyName = c => (c || '').replace(/^Key/, '').replace(/^Digit/, '').replace('Numpad', 'Num ').replace('Arrow', '').replace('ShiftLeft', 'L-Shift').replace('ShiftRight', 'R-Shift');
   const kb = (layout, a) => a === 'move' ? ['up', 'left', 'down', 'right'].map(d => keyName(km()[layout][d])).join(' ') : (km()[layout][a] || []).map(keyName).join(' / ');
@@ -318,7 +318,7 @@ function controlsScreen(back) {
       ${rows.map(([n, pad, a]) => `<tr><td>${n}</td><td>${pad}</td><td class="nav" data-act="kb1:${a}">${remap === 'kb1:' + a ? '<b>press a key…</b>' : kb('kb1', a)}</td><td class="nav" data-act="kb2:${a}">${remap === 'kb2:' + a ? '<b>press a key…</b>' : kb('kb2', a)}</td></tr>`).join('')}
       </table>
       <div class="tips"><b>Mouse / touchpad (keyboard players):</b> move the pointer to aim — a dotted line shows the exact path of the ball · <b>click</b> = pass to the aimed spot or the player nearest it · <b>hold click</b> and release = shoot (longer = harder) · <b>right-click</b> = lob / cross / free-kick over the wall. Works on throw-ins, corners, free kicks and penalties too.<br>
-      <b>Keyboard extras:</b> you sprint automatically while moving · <b>E / G</b> = feint (sidestep and shield the ball) · a ring shows who your next pass goes to · <b>Enter</b> skips ceremonies, replays and waits · <b>F1</b> shows this help in a match · <b>Esc</b> or <b>P</b> pauses.</div>
+      <b>Keyboard extras:</b> you sprint automatically while moving · <b>E / G</b> = skill move: sideways = sidestep (twice: drag-back), forwards = step-over (twice: nutmeg through the defender), backwards = roulette spin (twice: rainbow flick over his head) · a ring shows who your next pass goes to · <b>Enter</b> skips ceremonies, replays and waits · <b>F1</b> shows this help in a match · <b>Esc</b> or <b>P</b> pauses.</div>
       <div class="tips"><b>Tips:</b> Hold shoot longer for power, but too long sends it over the bar · Aim shots with the stick · Lob from the wing = cross into the box ·
       Defending: hold A to press the ball carrier, B to slide (from behind = foul!), Y for a standing tackle · Passing auto-switches you to the receiver.</div>
       <div class="opts" style="margin-top:14px"><div class="opt nav" data-act="reset"><span>Reset keyboard keys</span><span></span></div><div class="opt nav" data-act="back"><span>Back</span><span></span></div></div>
@@ -624,6 +624,7 @@ function onEvent(type, d) {
       run.tension = 0; break;
     }
     case 'slide': Sound.slide(); renderer.emit(d.p.x, 0.05, d.p.z, 24, { color: 0x6b8f3a, speed: 2.5 }); break;
+    case 'skill': { const L = { sidestep: 'Sidestep', stepover: 'Step-over!', roulette: 'Roulette!', cut: 'Drag-back!', nutmeg: 'Nutmeg!', rainbow: 'Rainbow flick!' }[d.name]; if (L && d.p.human !== null) ticker(L); if (['roulette', 'nutmeg', 'rainbow'].includes(d.name) && Math.random() < 0.5) Sound.comment('skill', { pri: 0 }); break; }
     case 'tackle': if (d.won) { Sound.tackle(); if (d.slide) { ticker(`Superb tackle by ${pname(d.p)}`); Sound.comment('tackle', { pri: 0 }); } } break;
     case 'foul': {
       Sound.whistle(0.4); Sound.boo();
