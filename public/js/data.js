@@ -107,7 +107,7 @@ const def = () => ({
   owned: Object.fromEntries(['fox', 'cruiser', 'skiff', 'hornet', 'skylark', 'comet'].map(i => [i, { eng: 0, grip: 0, nitro: 0 }])),
   sel: { car: 'fox', bike: 'cruiser', boat: 'skiff', heli: 'hornet', plane: 'skylark', space: 'comet' }, paint: {},
   tour: { car: {}, bike: {}, boat: {}, heli: {}, plane: {}, space: {} }, xp: 0, best: {}, stats: { races: 0, wins: 0, wrecks: 0, busted: 0 },
-  settings: { quality: 'auto', music: 0.4, sfx: 0.8, assist: 'easy', autoGas: false },
+  settings: { quality: 'auto', music: 0.4, sfx: 0.8, engine: 0.8, assist: 'easy', autoGas: false },
 });
 export let save = def();
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) save = { ...def(), ...s, settings: { ...def().settings, ...s.settings }, tour: { ...def().tour, ...s.tour }, sel: { ...def().sel, ...s.sel }, owned: { ...def().owned, ...s.owned }, stats: { ...def().stats, ...s.stats } }; } catch (e) {}

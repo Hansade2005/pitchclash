@@ -108,11 +108,17 @@ export function hudLayout(n, T, rule) {
   for (let i = 0; i < n; i++) {
     const r = viewRect(i, n), d = document.createElement('div'); d.className = 'hudv' + (n > 1 ? ' small' : '') + (n > 2 ? ' tiny' : '');
     d.style.cssText = `left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%`;
-    d.innerHTML = `<div class="pos"><b></b><span></span></div><div class="lap"></div><div class="info"></div><div class="speed"><b>0</b><span>km/h</span><div class="nitro"><i></i></div><em>NITRO</em></div><div class="speedfx"></div><div class="lights"><i></i><i></i><i></i><i></i><i></i></div><div class="big"></div><div class="msg"></div><div class="arms"><div class="hp"><i></i></div><div class="wpn"></div></div><div class="bust"><span>POLICE</span><div><i></i></div></div><canvas class="map" width="${S}" height="${S}"></canvas><div class="board"></div>`;
+    d.innerHTML = `<div class="pos"><b></b><span></span></div><div class="lap"></div><div class="info"></div><div class="speed"><b>0</b><span>km/h</span><div class="nitro"><i></i></div><em>NITRO</em><div class="clean"><i></i><span>CLEAN DRIVING</span></div></div><div class="feed"></div><div class="speedfx"></div><div class="lights"><i></i><i></i><i></i><i></i><i></i></div><div class="big"></div><div class="msg"></div><div class="arms"><div class="hp"><i></i></div><div class="wpn"></div></div><div class="bust"><span>POLICE</span><div><i></i></div></div><canvas class="map" width="${S}" height="${S}"></canvas><div class="board"></div>`;
     $hud.appendChild(d);
     const q = s => d.querySelector(s);
-    huds.push({ d, pos: q('.pos b'), tot: q('.pos span'), lap: q('.lap'), info: q('.info'), kmh: q('.speed b'), nitro: q('.nitro i'), nbox: q('.nitro'), big: q('.big'), msg: q('.msg'), lights: q('.lights'), speedfx: q('.speedfx'), arms: q('.arms'), hp: q('.hp i'), wpn: q('.wpn'), bust: q('.bust'), busti: q('.bust i'), gauge: q('.speed'), map: q('.map').getContext('2d'), board: q('.board'), c: {}, f: 0 });
+    huds.push({ d, pos: q('.pos b'), tot: q('.pos span'), lap: q('.lap'), info: q('.info'), kmh: q('.speed b'), nitro: q('.nitro i'), nbox: q('.nitro'), big: q('.big'), msg: q('.msg'), lights: q('.lights'), speedfx: q('.speedfx'), feed: q('.feed'), clean: q('.clean'), cleani: q('.clean i'), arms: q('.arms'), hp: q('.hp i'), wpn: q('.wpn'), bust: q('.bust'), busti: q('.bust i'), gauge: q('.speed'), map: q('.map').getContext('2d'), board: q('.board'), c: {}, f: 0 });
   }
+}
+// reward feed: short stacked call-outs (NEAR MISS +NITRO, TAKEDOWN! +BOOST ...)
+export function feed(i, label, sub, hot) {
+  const h = huds[i]; if (!h) return; const e = document.createElement('div'); e.className = hot ? 'hot' : '';
+  e.innerHTML = `${esc(label)}${sub ? `<b>${esc(sub)}</b>` : ''}`; h.feed.prepend(e);
+  while (h.feed.children.length > 4) h.feed.lastChild.remove(); setTimeout(() => e.remove(), 2300);
 }
 export function hudClear() { $hud.innerHTML = ''; huds = []; $hud.style.display = 'none'; }
 export function hudVisible(v) { $hud.style.visibility = v ? 'visible' : 'hidden'; }
@@ -128,6 +134,8 @@ export function hud(i, s) {
   if (c.boost !== s.boosting) { c.boost = s.boosting; h.nbox.classList.toggle('on', !!s.boosting); }
   if (c.big !== s.big) { c.big = s.big; h.big.textContent = s.big; h.big.classList.remove('pop'); void h.big.offsetWidth; if (s.big) h.big.classList.add('pop'); }
   set('msg', h.msg, s.msg);
+  const cw = s.clean < 0 ? -1 : Math.round(Math.min(1, s.clean) * 50) * 2; if (c.cw !== cw) { c.cw = cw; h.clean.style.visibility = cw < 0 ? 'hidden' : 'visible'; h.cleani.style.width = Math.max(0, cw) + '%'; h.clean.classList.toggle('full', cw >= 80); }
+  if (c.surge !== s.surge) { c.surge = s.surge; h.gauge.classList.toggle('surge', !!s.surge); }
   const bl = Math.round(Math.min(1, s.blur || 0) * 20) / 20; if (c.bl !== bl) { c.bl = bl; h.speedfx.style.opacity = bl; }
   const lit = s.count < 0 ? -1 : s.count > 3 ? 0 : Math.min(5, Math.floor((3 - s.count) / 3 * 5) + 1);
   if (c.lit !== lit) { c.lit = lit; h.lights.style.display = lit < 0 ? 'none' : 'flex'; [...h.lights.children].forEach((e, k) => e.classList.toggle('on', k < lit)); }

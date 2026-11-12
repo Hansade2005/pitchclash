@@ -129,3 +129,17 @@ button.card.focus .shine { animation: shine 1.1s ease-out; } button.card.focus .
 .res b { width: 30px; } .champ { display: flex; align-items: center; justify-content: center; gap: 10px; } .champ .ico { width: 34px; height: 34px; }
 .crow { background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border-radius: 12px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, 0.06); }
 @media (max-width: 760px) { .cards, .cards.n3 { grid-template-columns: 1fr; } button.card { height: 140px; } }
+/* v3.1 reward feed + clean-driving meter */
+.hudv .feed { position: absolute; right: 26px; top: 34%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+.hudv .feed div { font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: 1px; color: #fff; padding: 3px 16px 3px 30px; background: linear-gradient(90deg, transparent, rgba(6, 10, 22, 0.72) 30%); border-right: 4px solid var(--c); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); animation: feedIn 0.22s ease-out, feedOut 0.45s 1.8s forwards; white-space: nowrap; }
+.hudv .feed div b { display: block; font-size: 13px; font-style: normal; font-weight: 700; letter-spacing: 2px; color: var(--c); text-align: right; }
+.hudv .feed div.hot { border-color: var(--y); color: var(--y); } .hudv .feed div.hot b { color: #fff; }
+.hudv .feed div:not(:first-child) { opacity: 0.75; transform: scale(0.88); transform-origin: right; }
+@keyframes feedIn { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes feedOut { to { transform: translateX(40px); opacity: 0; } }
+.hudv .clean { position: relative; width: 210px; height: 6px; margin: 7px 0 0 auto; background: rgba(0, 0, 0, 0.5); border-radius: 4px; overflow: hidden; transform: skewX(-18deg); }
+.hudv .clean i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2ee68a, #b8ff5a); transition: width 0.3s linear; }
+.hudv .clean span { position: absolute; right: 0; top: 8px; font-size: 10px; letter-spacing: 2px; color: #8ff0b8; transform: skewX(18deg); }
+.hudv .clean { overflow: visible; margin-bottom: 14px; } .hudv .clean.full i { animation: blink 0.4s infinite; }
+.hudv .speed.surge b { color: #ffd84a; text-shadow: 0 0 18px rgba(255, 190, 40, 0.8); }
+.hudv.small .feed div { font-size: 18px; } .hudv.small .feed { right: 12px; top: 30%; } .hudv.small .clean { width: 150px; }

@@ -30,6 +30,11 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 **Settings → Driving help: Easy** (default) brakes for corners and steers you off walls.
 **Auto-accelerate** makes it steer-only.
 
+## What's new in 3.1
+
+- **Reward chain**: near misses, takedowns (+ free boost), 20 s of clean driving (+ nitro, boost and extra top speed), slipstream and slingshot, perfect starts, long drifts, big air, overtakes and taking the lead. Quick successions build a ×2–×5 chain worth bonus credits. Rewards appear in a feed on the right; a green bar under the nitro meter tracks clean driving.
+- **Softer, more realistic engines**: the steady synthetic hum under the engine is gone. Cars and bikes crossfade two real engine recordings by rpm, go muffled when you lift off the throttle, and dip briefly on each gear change. New *Engine volume* setting.
+
 ## What's new in 3.0
 
 - **Track structures**: elevated flyovers on pillars with a busy street underneath, river bridges with steel arches, tunnels, and **shortcuts** – a gap in the barrier, a SHORTCUT sign and a construction road with a smashable fence that saves 25–90 m. Boost pads on the straights.

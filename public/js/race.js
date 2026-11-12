@@ -16,7 +16,7 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const trackCache = {};
 export const getTrack = id => trackCache[id] || (trackCache[id] = buildTrackData(TRACKS.find(t => t.id === id)));
-const ELIM_FIRST = 35, ELIM_EVERY = 20, ORB_TIME = 90, KD_TIME = 120, TOXIC_MAX = 150, CATCH_TIME = 110, SCORE_RULES = ['orbs', 'knockdown', 'gates'];
+const ELIM_FIRST = 35, ELIM_EVERY = 20, ORB_TIME = 90, KD_TIME = 120, TOXIC_MAX = 150, CATCH_TIME = 110, CLEAN_TIME = 20, SCORE_RULES = ['orbs', 'knockdown', 'gates'];
 
 export class Race {
   // cfg: { track, laps, rule, entrants:[{id,name,veh,up,color,type:'local'|'ai'|'remote',device,skill,person}], demo, net, isHost, onEnd }
@@ -143,9 +143,12 @@ export class Race {
     if (this.cops.length) this.copLogic(dt);
     // drafting
     for (const v of vs) {
-      if (v.remote) continue; v.draft = false; if (v.vf < 25) continue;
-      const fx_ = Math.sin(v.h), fz = Math.cos(v.h);
-      for (const o of vs) { if (o === v || o.eliminated || o.inactive) continue; const dx = o.x - v.x, dz = o.z - v.z, al = dx * fx_ + dz * fz; if (al > 3 && al < 24 && Math.abs(dx * fz - dz * fx_) < 1.8) { v.draft = true; break; } }
+      if (v.remote) continue; const was = v.draft; v.draft = false;
+      if (v.vf >= 25) { const fx_ = Math.sin(v.h), fz = Math.cos(v.h);
+        for (const o of vs) { if (o === v || o.eliminated || o.inactive) continue; const dx = o.x - v.x, dz = o.z - v.z, al = dx * fx_ + dz * fz; if (al > 3 && al < 24 && Math.abs(dx * fz - dz * fx_) < 1.8) { v.draft = true; break; } } }
+      if (this.state !== 'racing' || !this.racers.includes(v)) { v.draftT = 0; continue; }
+      if (v.draft) { const t0 = v.draftT || 0; v.draftT = t0 + dt; if (t0 < 1.5 && v.draftT >= 1.5) this.reward(v, 'SLIPSTREAM', 0.08, { cr: 20 }); }
+      else { if (was && v.draftT >= 1.5 && v.vf > 25 && v.crashT <= 0) this.reward(v, 'SLINGSHOT!', 0.05, { surge: 1.2, cr: 40 }); v.draftT = 0; }
     }
     for (const v of vs) v.update(dt, T, this.fx, this.time);
     for (const v of vs) v.lastHit = null;
@@ -175,7 +178,7 @@ export class Race {
     if (this.peds) this.peds.update(dt, this.views.map(v => v.cam));
     if (this.gates && this.state === 'racing') for (const v of this.racers) { // flying through a gate tops up nitro
       if (v.remote || v.eliminated) continue; const g = this.gates[v.gateK = v.gateK ?? 0]; if (!g) { if (v.idx < 30) v.gateK = 0; continue; }
-      if (v.idx >= g.i && v.idx < g.i + 30) { v.gateK++; const d = lateral(T, g.i, v.x, v.z) - g.off; if (d * d + (v.y - g.y) ** 2 < g.r * g.r) { v.nitro = Math.min(1, v.nitro + 0.16); v.gatesHit = (v.gatesHit || 0) + 1; this.fx.burst(v.x, v.alt + v.y, v.z, 0.3, 1, 1); if (v.type === 'local') { audio.sfx('orb'); v.trickMsg = 'GATE!  +NITRO'; v.trickT = 0.9; } } }
+      if (v.idx >= g.i && v.idx < g.i + 30) { v.gateK++; const d = lateral(T, g.i, v.x, v.z) - g.off; if (d * d + (v.y - g.y) ** 2 < g.r * g.r) { v.nitro = Math.min(1, v.nitro + 0.16); v.gatesHit = (v.gatesHit || 0) + 1; this.fx.burst(v.x, v.alt + v.y, v.z, 0.3, 1, 1); if (v.type === 'local') this.feed(v, 'GATE', '+NITRO'); } }
     }
     for (const v of this.racers) { if (v.remote) continue; if (!this.combat && v.hp < 100 && v.crashT <= 0) v.hp = Math.min(100, v.hp + 2.5 * dt); if (v.punchCd > 0) v.punchCd -= dt; if (v.type !== 'local') { v.landed = null; v.formChanged = null; if (v.ai && (this.rule === 'combat' || this.rule === 'rush') && this.state === 'racing' && Math.random() < dt * 0.3) this.melee(v, true); } }
     // rubber band + ranking
@@ -262,21 +265,47 @@ export class Race {
     if (ai && ai.orbOff == null && ai.cap == null) { const di = (g.i - v.idx + this.T.N) % this.T.N; ai.fixed = di < 70 ? g.off * 0.9 + ai.lane : null; }
   }
 
+  // ---- reward chain: everything stylish tops up nitro; quick successions build a ×2..×5 chain worth more credits
+  reward(v, label, nitro, o = {}) {
+    if (!v || v.remote || v.eliminated) return;
+    v.nitro = Math.min(1, v.nitro + nitro);
+    if (o.surge) v.padT = Math.max(v.padT, o.surge);
+    if (o.speed) v.topBonusT = Math.max(v.topBonusT || 0, o.speed);
+    if (v.type !== 'local') return;
+    v.chain = (v.chainT ?? -9) > this.time - 4 ? Math.min(5, (v.chain || 1) + 1) : 1; v.chainT = this.time;
+    const cr = Math.round((o.cr || 20) * v.chain); v.mayhem = (v.mayhem || 0) + cr; v.rewards = (v.rewards || 0) + 1;
+    this.feed(v, label, (o.tag || (o.surge ? '+BOOST' : nitro > 0 ? '+NITRO' : '')) + (v.chain > 1 ? `  CHAIN ×${v.chain}` : '') + `  +${cr} cr`, o.hot);
+    audio.sfx('reward', v.chain); input.rumble(v.device, 0.15, 60);
+  }
+  feed(v, label, sub, hot) { const k = this.views.findIndex(w => w.v === v); if (k >= 0 && !this.cfg.demo) ui.feed(k, label, sub, hot); }
+  // per-player style tracking: perfect start, clean driving, long drifts, overtakes
+  style(v, dt, gas) {
+    if (this.state === 'countdown') { if (gas > 0.5) { if (v.gasAt == null) v.gasAt = this.count; } else v.gasAt = null; return; }
+    if (this.state !== 'racing' || v.finished || v.eliminated) return;
+    if (!v.startDone) { v.startDone = true; if (v.gasAt != null && v.gasAt < 0.75 && !this.cfg.demo) this.reward(v, 'PERFECT START', 0.15, { surge: 1.6, cr: 60 }); }
+    const hit = (v.impact > 3 && !v.justLanded) || v.crashT > 0 || v.offCourse > 0 || v.hitCone || v.wrongT > 1; v.justLanded = false;
+    if (hit) { if ((v.cleanT || 0) > 8) this.feed(v, 'CLEAN STREAK LOST', ''); v.cleanT = 0; v.cleanN = 0; v.driftT = 0; }
+    else if (Math.abs(v.vf) > 12) { v.cleanT = (v.cleanT || 0) + dt;
+      if (v.cleanT >= CLEAN_TIME) { v.cleanT = 0; v.cleanN = (v.cleanN || 0) + 1; this.reward(v, v.cleanN > 1 ? `CLEAN DRIVING ×${v.cleanN}` : 'CLEAN DRIVING', 0.4, { surge: 2.5, speed: 10, cr: 150 * v.cleanN, tag: '+NITRO +TOP SPEED', hot: 1 }); } }
+    if (this.rule !== 'gates' && !v.air) { if (v.drift && v.crashT <= 0) v.driftT = (v.driftT || 0) + dt; else { if ((v.driftT || 0) > 1.8) this.reward(v, `DRIFT ${v.driftT.toFixed(1)}s`, Math.min(0.25, v.driftT * 0.05), { cr: Math.round(v.driftT * 20) }); v.driftT = 0; } }
+    if (this.lapRule && this.order) { const p = this.order.indexOf(v); if (v.lastPos != null && p >= 0 && p < v.lastPos && this.time > 6 && (v.otT ?? -9) < this.time - 1.5) { v.otT = this.time; this.reward(v, p === 0 ? 'TOOK THE LEAD!' : 'OVERTAKE', p === 0 ? 0.1 : 0.05, { cr: p === 0 ? 50 : 20 }); } if (p >= 0) v.lastPos = p; }
+  }
+
   // racing events each frame: takedowns, near misses, smashes, traffic hits, toxic tag, catching the runner
   events(dt) {
     const T = this.T, local = v => v.type === 'local';
     for (const v of this.vehicles) {
-      if (v.crashT > 0 && v.wreckedBy && !v.tdDone) { v.tdDone = true; const a = v.wreckedBy; a.kills = (a.kills || 0) + 1; if (this.rule === 'knockdown' && !a.npc) a.score++; a.nitro = Math.min(1, a.nitro + 0.5);
-        this.fx.burst(v.x, 1 + (v.ey || 0), v.z, 1, 0.6, 0.15); if (local(a) || local(v)) { if (!this.net) this.slow = 0.9; audio.sfx('boom', 1); } if (local(a)) { a.trickMsg = 'TAKEDOWN!'; a.trickT = 1.6; } if (local(v)) { v.trickMsg = 'WRECKED!'; v.trickT = 1.6; } }
+      if (v.crashT > 0 && v.wreckedBy && !v.tdDone) { v.tdDone = true; const a = v.wreckedBy; a.kills = (a.kills || 0) + 1; if (this.rule === 'knockdown' && !a.npc) a.score++; this.reward(a, 'TAKEDOWN!', 0.5, { surge: 2, cr: 100, hot: 1 });
+        this.fx.burst(v.x, 1 + (v.ey || 0), v.z, 1, 0.6, 0.15); if (local(a) || local(v)) { if (!this.net) this.slow = 0.9; audio.sfx('boom', 1); } if (local(v)) { v.trickMsg = 'WRECKED!'; v.trickT = 1.6; } }
       if (v.crashT <= 0 && v.tdDone) { v.tdDone = false; v.wreckedBy = null; }
-      if (v.smashAt) { const [x, z, kind] = v.smashAt; v.smashAt = null; for (let k = 0; k < 3; k++) this.fx.burst(x, 0.8, z, kind ? 1 : 0.7, kind ? 0.45 : 0.5, kind ? 0.1 : 0.35); if (!v.npc) { v.mayhem = (v.mayhem || 0) + 150; if (local(v)) { v.trickMsg = '+150 MAYHEM'; v.trickT = 1.1; audio.sfx('hit', 6); } } }
-      if (v.padHit) { v.padHit = false; if (local(v)) { v.trickMsg = 'BOOST!'; v.trickT = 0.8; audio.sfx('nitro'); } }
+      if (v.smashAt) { const [x, z, kind] = v.smashAt; v.smashAt = null; for (let k = 0; k < 3; k++) this.fx.burst(x, 0.8, z, kind ? 1 : 0.7, kind ? 0.45 : 0.5, kind ? 0.1 : 0.35); if (!v.npc) { v.mayhem = (v.mayhem || 0) + 150; if (local(v)) { this.feed(v, 'SMASHED IT', '+150 cr', 1); audio.sfx('hit', 6); } } }
+      if (v.padHit) { v.padHit = false; if (local(v)) { this.feed(v, 'BOOST PAD', 'SPEED!'); audio.sfx('nitro'); } }
       if (v.lastHit && v.lastHit.type === 'traffic' && v.impact > 7 && !v.npc && !v.remote) this.wanted(v, 20);
     }
     // near misses: skim past traffic or a rival at speed for nitro (and a moment of slow motion)
     for (const v of this.locals) { if (v.eliminated || v.crashT > 0) continue; const fx = Math.sin(v.h), fz = Math.cos(v.h);
       for (const o of this.vehicles) { if (o === v || o.inactive || o.eliminated || o.air) continue; const dx = o.x - v.x, dz = o.z - v.z; if (dx * dx + dz * dz > 20) continue; const al = dx * fx + dz * fz, sd = Math.abs(dx * fz - dz * fx);
-        if (Math.abs(al) < 1.2 && sd > 1.9 && sd < 3.3 && v.vf - o.vf > 9 && v.lastHit !== o && (o.nm || -9) < this.time - 2) { o.nm = this.time; v.nitro = Math.min(1, v.nitro + 0.12); v.trickMsg = 'NEAR MISS!  +NITRO'; v.trickT = 1.1; audio.sfx('orb'); if (o.type === 'traffic' && !this.net && this.slow <= 0) this.slow = 0.4; } } }
+        if (Math.abs(al) < 1.2 && sd > 1.9 && sd < 3.6 && v.vf - o.vf > 8 && v.lastHit !== o && (o.nm || -9) < this.time - 2) { o.nm = this.time; this.reward(v, o.type === 'traffic' ? 'NEAR MISS' : o.cop ? 'COP DODGED' : 'CLOSE CALL', 0.15, { cr: 30 }); if (o.type === 'traffic' && !this.net && this.slow <= 0) this.slow = 0.4; } } }
     // toxic tag
     if (this.rule === 'toxic' && this.state === 'racing') {
       if (!this.toxicStarted) { this.toxicStarted = true; const pool = this.racers.filter(v => !v.eliminated); this.infect(pool[Math.floor(Math.random() * pool.length)], null); }
@@ -351,13 +380,15 @@ export class Race {
     inp.steer = steer; inp.gas = gas; inp.brake = brake; inp.hand = c.hand; inp.nitro = c.nitro; v.fire = c.fire;
     if (this.gates) { inp.climb = c.climb; if (Math.abs(c.climb) < 0.12 && a !== 'pro') this.flyTo(v, null, false); }
     if (c.punch) this.melee(v);
-    if (v.landed) { v.trickMsg = v.landed === 'bad' ? 'BAD LANDING!' : `${v.landed}× TRICK!  +NITRO`; v.trickT = 1.8; audio.sfx(v.landed === 'bad' ? 'out' : 'orb'); v.landed = null; }
+    if (v.landed) { if (v.landed === 'bad') { v.trickMsg = 'BAD LANDING!'; v.trickT = 1.8; audio.sfx('out'); } else this.reward(v, `${v.landed}× TRICK`, 0, { cr: 60 * v.landed, tag: '+NITRO' }); v.landed = null; }
+    if (v.bigAir) { this.reward(v, `BIG AIR ${v.bigAir.toFixed(1)}s`, 0.12, { cr: 40 }); v.bigAir = 0; }
     if (v.formChanged) { v.trickMsg = v.formChanged === 'boat' ? 'WATER! ALL ABOARD' : 'BACK ON THE ROAD'; v.trickT = 1.8; audio.sfx('nitro'); v.formChanged = null; }
     if (v.trickT > 0) v.trickT -= dt;
     if (c.nitro && v.nitro > 0.05 && !v.wasBoost) audio.sfx('nitro'); v.wasBoost = c.nitro && v.nitro > 0.05;
     if (c.reset || v.wrongT > 6) { v.wrongT = 0; v.reset(T); }
     if (c.cam) { const vw = this.views.find(x => x.v === v); if (vw) vw.mode = (vw.mode + 1) % 3; }
     if (c.pause && !this.cfg.demo) this.game.togglePause();
+    this.style(v, dt, gas);
     if (v.impact > 3) { const vw = this.views.find(x => x.v === v); if (vw) vw.shake = Math.min(1, v.impact * 0.06); audio.sfx('hit', v.impact); input.rumble(v.device, v.impact * 0.07); }
     if (v.hitCone) { v.hitCone = false; audio.sfx('hit', 2); input.rumble(v.device, 0.25, 80); }
     v.impact = 0;
@@ -426,7 +457,7 @@ export class Race {
     else if (this.lapRule && v.started && v.lapsDone === this.laps - 1 && this.time - v.lapStart < 2.5 && this.laps > 1) msg = 'FINAL LAP';
     const alive = this.racers.filter(x => !x.eliminated).length, wp = v.weapon;
     ui.hud(i, {
-      pos, total: this.racers.length, lapRule: this.lapRule && this.rule !== 'gates' || this.rule === 'gates', blur: Math.min(1, Math.max(0, (v.kmh - 170) / 170)) * 0.6 + (v.boosting ? 0.45 : 0) + (this.slow > 0 ? 0.3 : 0), hp: this.combat || v.hp < 99 ? v.hp : null, weapon: !this.combat ? '' : (wp ? WEAPONS[wp.type].name + (wp.ammo > 1 ? '  ×' + wp.ammo : '') : '— no weapon —'), bust: this.cops.length ? v.bustT / 2.5 : null, count: this.state === 'countdown' ? this.count : -1, lap: Math.min(this.laps, v.lapsDone + 1), laps: this.laps, kmh: v.kmh, nitro: v.nitro, boosting: v.boosting, time: this.time, big, msg, rule: this.rule,
+      pos, total: this.racers.length, lapRule: this.lapRule && this.rule !== 'gates' || this.rule === 'gates', blur: Math.min(1, Math.max(0, (v.kmh - 170) / 170)) * 0.6 + (v.boosting ? 0.45 : 0) + (this.slow > 0 ? 0.3 : 0), hp: this.combat || v.hp < 99 ? v.hp : null, weapon: !this.combat ? '' : (wp ? WEAPONS[wp.type].name + (wp.ammo > 1 ? '  ×' + wp.ammo : '') : '— no weapon —'), bust: this.cops.length ? v.bustT / 2.5 : null, count: this.state === 'countdown' ? this.count : -1, lap: Math.min(this.laps, v.lapsDone + 1), laps: this.laps, kmh: v.kmh, nitro: v.nitro, boosting: v.boosting, clean: this.state === 'racing' && !v.finished ? (v.cleanT || 0) / CLEAN_TIME : -1, surge: v.padT > 0 || v.topBonusT > 0, time: this.time, big, msg, rule: this.rule,
       info: this.rule === 'knockdown' ? `TAKEDOWNS ${v.score}  ·  ${Math.max(0, Math.ceil(KD_TIME - this.time))}s` : this.rule === 'toxic' ? (v.toxic > 0 ? `YOU ARE TOXIC – PASS IT ON!  ${Math.ceil(v.toxic)}s` : `CLEAN  ·  ${alive} LEFT  ·  infections ${v.score}`) : this.rule === 'gates' ? `GATE POINTS ${v.score}  ·  combo ×${v.combo || 1}` : this.rule === 'catch' ? (this.caughtBy ? 'CAUGHT!' : `TARGET ${this.runner ? Math.round(Math.hypot(v.x - this.runner.x, v.z - this.runner.z)) : 0} m  ·  ${Math.max(0, Math.ceil(CATCH_TIME - this.time))}s`) : this.rule === 'elim' ? `KNOCKOUT IN ${Math.max(0, Math.ceil(this.elimAt - this.time))}s  ·  ${alive} LEFT` : this.rule === 'orbs' ? `ORBS ${v.score}  ·  ${Math.max(0, Math.ceil(ORB_TIME - this.time))}s` : this.rule === 'trial' ? (this.cfg.record ? 'RECORD ' + ui.fmtTime(this.cfg.record) : 'SET A LAP TIME') : this.rule === 'pursuit' ? `${this.cops.filter(c => !c.inactive && !c.block).length} COPS ON YOUR TAIL` : this.gates && this.rule !== 'orbs' && this.rule !== 'elim' ? `ALT ${Math.round(v.alt + v.y)} m  ·  GATES ${v.gatesHit || 0}/${this.gates.length * (this.lapRule ? this.laps : 1)}` : (this.heat[v.id] || 0) > this.time ? `WANTED!  POLICE ALERTED  ·  ${Math.ceil(this.heat[v.id] - this.time)}s` : '',
       danger: v.toxic > 0 || (this.heat[v.id] || 0) > this.time || this.rule === 'elim' && !v.eliminated && order.filter(x => !x.eliminated).pop() === v && alive > 1,
       board: this.views.length === 1 ? order : null, me: v, vehicles: this.vehicles, best: v.bestLap,

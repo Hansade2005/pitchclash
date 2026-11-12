@@ -136,7 +136,7 @@ function npcEntrants(rule, cops = 0, traffic = 0, kind = 'car', police = false) 
   return out;
 }
 function award(pos, total, bonus = 0) { const xp = 40 + Math.max(0, total - pos) * 15 + bonus, before = levelOf(save.xp); save.xp += xp; save.stats.races++; if (pos === 1) save.stats.wins++; persist(); if (levelOf(save.xp) > before) ui.toast(`LEVEL UP!  You are now Level ${levelOf(save.xp)} · ${rankOf(levelOf(save.xp))}`); return xp; }
-function statRow(me_, xp) { return `<div class="statrow"><div><b>${me_.best ? ui.fmtTime(me_.best) : '—'}</b>best lap</div><div><b>${me_.top || 0}</b>top km/h</div><div><b>${me_.kills || 0}</b>takedowns</div>${me_.mayhem ? `<div><b>+${me_.mayhem}</b>mayhem cr</div>` : ''}<div><b>+${xp}</b>XP</div></div>`; }
+function statRow(me_, xp) { return `<div class="statrow"><div><b>${me_.best ? ui.fmtTime(me_.best) : '—'}</b>best lap</div><div><b>${me_.top || 0}</b>top km/h</div><div><b>${me_.kills || 0}</b>takedowns</div>${me_.mayhem ? `<div><b>+${me_.mayhem}</b>bonus cr</div>` : ''}<div><b>+${xp}</b>XP</div></div>`; }
 
 const q = { kind: 'car', veh: null, country: 'cm', track: 'douala', laps: 3, ai: 5, diff: 'medium', rule: 'sprint', traffic: 0, police: false, weather: 'auto' };
 function quickMenu() {
@@ -244,6 +244,7 @@ function settingsMenu() {
     opt('Graphics', S.quality[0].toUpperCase() + S.quality.slice(1), d => S.quality = cyc(['auto', 'low', 'medium', 'high'], S.quality, d), 'Restart the game to apply'),
     opt('Music volume', Math.round(S.music * 100) + '%', d => S.music = cyc(vols, near(S.music), d)),
     opt('Sound volume', Math.round(S.sfx * 100) + '%', d => S.sfx = cyc(vols, near(S.sfx), d)),
+    opt('Engine volume', Math.round(S.engine * 100) + '%', d => S.engine = cyc(vols, near(S.engine), d), 'How loud the engines are compared with other sounds'),
     { input: true, key: 'name', label: 'Player name', value: save.name, max: 12, onInput: v => { save.name = v.trim().slice(0, 12) || 'Racer'; persist(); } },
     { label: 'Reset all progress', cls: 'danger', onClick: () => { if (confirm('Erase career, credits and garage?')) { resetSave(); location.reload(); } } },
   ], back: mainMenu });
@@ -264,6 +265,7 @@ function howMenu() {
     <tr><td>Back on track</td><td>Back / Select</td><td>R</td><td>Backspace</td></tr>
     <tr><td>Pause</td><td>Start</td><td>Esc</td><td>Esc</td></tr></table>
     <p class="tip"><b>Stages:</b> <i>Combat</i> – grab crates for guns, rockets, mines and shields (firing alerts the police). <i>Police Chase</i> – don't get stopped beside a cop. <i>City Rush</i> – traffic and pedestrians; knock someone over and you are wanted. <i>Land &amp; Sea Relay</i> – the water section turns your ride into a boat. <i>Ramps</i> – spin and flip in the air, but land straight or you wreck.</p>
+    <p class="tip"><b>Rewards (nitro &amp; boost):</b> <i>Near miss</i> – skim past traffic or a rival · <i>Takedown</i> – ram a rival into a wreck for nitro plus a free boost · <i>Clean driving</i> – 20 seconds with no hits or scrapes (watch the green bar) gives nitro, a boost and extra top speed, and it doubles if you keep going · <i>Slipstream &amp; slingshot</i> – sit behind a rival, then pull out for a burst · <i>Perfect start</i> – press accelerate in the last half-second before GO, not earlier · plus long drifts, big air, overtakes and taking the lead. Rewards that come within 4 seconds of each other build a <b>chain ×2…×5</b> worth more credits.</p>
     <p class="tip"><b>Tips:</b> Drift round corners and tuck in behind rivals to fill your <b>nitro</b>. With <b>Driving help: Easy</b> the game brakes for corners and nudges you off the walls – just hold accelerate and steer. Plug in a controller any time; it is picked up automatically.</p>
     <p class="tip"><b>Play with friends:</b> MultiClash → <i>Split-screen</i> for up to 4 players on this PC, or <i>Host a room</i> and give friends on the same Wi-Fi the address shown plus the 4-digit room code.</p>
     <p class="tip"><b>APEX CLASH</b> © 2026 <b>Anye Happiness Ade</b> — AI Engineer, Cameroon.</p>

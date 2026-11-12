@@ -78,9 +78,9 @@ export class Vehicle {
     const sr = (this.isBike ? 4.2 : 5.2) * dt; this.steer += clamp(inp.steer - this.steer, -sr, sr);
     let fx_ = Math.sin(this.h), fz = Math.cos(this.h);
     let vf = this.vx * fx_ + this.vz * fz, vl = this.vx * fz - this.vz * fx_;
-    if (this.padT > 0) this.padT -= dt;
+    if (this.padT > 0) this.padT -= dt; if (this.topBonusT > 0) this.topBonusT -= dt;
     this.boosting = (inp.nitro && this.nitro > 0.02 && vf > 4) || (this.padT > 0 && vf > 2);
-    const top = st.top * (this.boosting ? 1.2 : 1) * (this.draft ? 1.04 : 1) * (this.boatForm ? 0.8 : 1), acc = st.acc * (this.boosting ? 1.0 + 0.9 * st.nitro : 1);
+    const top = st.top * (this.boosting ? 1.2 : 1) * (this.draft ? 1.04 : 1) * (this.topBonusT > 0 ? 1.06 : 1) * (this.boatForm ? 0.8 : 1), acc = st.acc * (this.boosting ? 1.0 + 0.9 * st.nitro : 1);
     if (inp.gas > 0 && vf < top) { const r = Math.max(0, vf / top); vf += acc * inp.gas * Math.max(0.12, 1 - r * r) * dt; }
     if (inp.brake > 0) { if (vf > 0.5) vf -= 42 * inp.brake * dt; else if (!this.crashT) vf = Math.max(-13, vf - 10 * inp.brake * dt); else vf = 0; }
     if (!inp.gas && !inp.brake) vf -= Math.sign(vf) * Math.min(Math.abs(vf), (2 + Math.abs(vf) * 0.06) * dt);
@@ -137,9 +137,9 @@ export class Vehicle {
       this.airT += dt; this.vy -= 22 * dt; this.y += this.vy * dt;
       if (!this.ai && !this.frozen) { this.trickYaw += this.input.steer * 6.5 * dt; if (this.input.brake > 0.3) this.trickFlip -= 5.5 * dt; if (this.input.hand) this.trickFlip += 5.5 * dt; }
       if (this.y <= 0 && this.vy < 0) {
-        this.y = 0; this.airT = 0; this.vy = 0; const bad = Math.abs(wrap(this.trickYaw)) > 0.95 || Math.abs(wrap(this.trickFlip)) > 0.95;
+        const dur = this.airT; this.y = 0; this.airT = 0; this.vy = 0; const bad = Math.abs(wrap(this.trickYaw)) > 0.95 || Math.abs(wrap(this.trickFlip)) > 0.95;
         const n = Math.round(Math.abs(this.trickYaw) / (Math.PI * 2)) + Math.round(Math.abs(this.trickFlip) / (Math.PI * 2)); this.trickYaw = this.trickFlip = 0;
-        if (bad) { this.hp = Math.max(1, this.hp - 30); this.crash(); this.landed = 'bad'; } else { this.impact = Math.max(this.impact, 4); if (n > 0) { this.tricks += n; this.nitro = Math.min(1, this.nitro + 0.3 * n); this.landed = n; } }
+        if (bad) { this.hp = Math.max(1, this.hp - 30); this.crash(); this.landed = 'bad'; } else { this.impact = Math.max(this.impact, 4); this.justLanded = true; if (n === 0 && dur > 0.85) this.bigAir = dur; if (n > 0) { this.tricks += n; this.nitro = Math.min(1, this.nitro + 0.3 * n); this.landed = n; } }
       }
     }
     // free flight: climb and dive

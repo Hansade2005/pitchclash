@@ -1,6 +1,6 @@
 {
   "name": "apex-clash",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "APEX CLASH - city street racing for cars and bikes, 1-8 players",
   "main": "electron-main.js",
   "scripts": {
