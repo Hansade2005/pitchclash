@@ -103,7 +103,7 @@ export function hudLayout(n, T, rule) {
   let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9; for (let i = 0; i < T.N; i++) { minX = Math.min(minX, T.x[i]); maxX = Math.max(maxX, T.x[i]); minZ = Math.min(minZ, T.z[i]); maxZ = Math.max(maxZ, T.z[i]); }
   mapS = (S - 24) / Math.max(maxX - minX, maxZ - minZ); mapOx = (S - (maxX - minX) * mapS) / 2 - minX * mapS; mapOz = (S - (maxZ - minZ) * mapS) / 2 - minZ * mapS;
   const g = mapBase.getContext('2d'); g.lineJoin = 'round';
-  if (T.cut) { const C = T.cut; g.setLineDash([4, 4]); g.lineWidth = 3; g.strokeStyle = '#ffb21a'; g.beginPath(); g.moveTo(S - (C.x[0] * mapS + mapOx), C.z[0] * mapS + mapOz); g.lineTo(S - (C.x[C.n] * mapS + mapOx), C.z[C.n] * mapS + mapOz); g.stroke(); g.setLineDash([]); }
+  for (const C of T.cuts || []) { if (C.wet && rule === 'relay') continue; g.setLineDash([4, 4]); g.lineWidth = 3; g.strokeStyle = { build: '#ffb21a', stunt: '#ff3fa0', dirt: '#c08a52' }[C.type] || '#ffb21a'; g.beginPath(); for (let k = 0; k <= C.n; k += 3) g[k ? 'lineTo' : 'moveTo'](S - (C.x[k] * mapS + mapOx), C.z[k] * mapS + mapOz); g.lineTo(S - (C.x[C.n] * mapS + mapOx), C.z[C.n] * mapS + mapOz); g.stroke(); g.setLineDash([]); }
   for (const [w, c] of [[7, 'rgba(0,0,0,0.6)'], [4, 'rgba(255,255,255,0.92)']]) { g.beginPath(); for (let i = 0; i <= T.N; i += 3) { const k = i % T.N, x = S - (T.x[k] * mapS + mapOx), y = T.z[k] * mapS + mapOz; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.closePath(); g.lineWidth = w; g.strokeStyle = c; g.stroke(); }
   for (let i = 0; i < n; i++) {
     const r = viewRect(i, n), d = document.createElement('div'); d.className = 'hudv' + (n > 1 ? ' small' : '') + (n > 2 ? ' tiny' : '');

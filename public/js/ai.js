@@ -4,6 +4,12 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 
 // Highest speed we may carry right now and still make every corner in braking range.
+// the same corner-speed rule along a shortcut route (from sample j0; dist0 metres before reaching it)
+export function routeSafe(v, C, j0, k = 1, dist0 = 0) {
+  const sp = Math.max(0, v.vf), step = C.len / C.n, range = (sp * sp / 60 + 24 - dist0) / step; let allow = 999;
+  for (let j = 0; j < range && j0 + j <= C.n; j++) { const c = C.curv[j0 + j]; if (c < 0.002) continue; const vm = Math.sqrt(v.st.grip * 0.9 / c) * k, a = Math.sqrt(vm * vm + 2 * 20 * (dist0 + j * step)); if (a < allow) allow = a; }
+  return allow;
+}
 export function safeSpeed(v, T, k = 1) {
   const sp = Math.max(0, v.vf), range = (sp * sp / 60 + 24) / T.step; let allow = 999;
   for (let j = 0; j < range; j += 2) {

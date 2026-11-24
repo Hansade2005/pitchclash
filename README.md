@@ -30,6 +30,13 @@ Menus work fully with a controller (D-pad/stick, A = select, B = back).
 **Settings → Driving help: Easy** (default) brakes for corners and steers you off walls.
 **Auto-accelerate** makes it steer-only.
 
+## What's new in 3.3
+
+- **More shortcuts and stunt routes.** Every circuit has at least one side route and most have two or three (62 in total): the construction shortcut, a pink **stunt route** with a big kicker ramp, and a brown **dirt trail** with bumps where bikes are faster and cars slower. Routes now curve smoothly out of and back into the main road. All routes appear on the minimap; finishing one pays a bonus. Routes over the water section close in Land & Sea Relay.
+- **More stunt ramps on the main road**: up to 5 per circuit (70 in total, up from about 23).
+- **Better bike racing**: hold DRIFT on a straight for a **wheelie** (charges nitro, a little faster), **stoppies** under hard braking, deeper lean into corners, a camera that tilts with the bike, a stronger slipstream, **LANE SPLIT** bonuses through traffic, and riders who fall less often on Easy/Normal help. Computer bikes pull wheelies too.
+- Computer racers choose between all the routes (bikes favour the dirt trail), brake for route bends, and give up a route they have missed instead of hitting the wall. In testing, computer bikes crashed about 40% less than in 3.2 while using the routes far more.
+
 ## What's new in 3.2
 
 - **World Tour grows to 15 countries and 30 circuits (360 levels).** New: Nigeria (Lagos Lights, Abuja Ring), Mexico (Mexico City Fiesta, Cancún Coast), Germany (Berlin Gate, Black Forest Ring), South Africa (Cape Town Coast, Johannesburg Gold), Egypt (Cairo Pyramids, Nile Nights), China (Shanghai Bund, Great Wall Pass) and Australia (Sydney Harbour, Outback Blaze).

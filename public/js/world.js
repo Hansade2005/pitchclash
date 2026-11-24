@@ -74,7 +74,13 @@ function textures() {
   const barrel = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#ff6a00'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(0, 14, w, 8); g.fillRect(0, 40, w, 8); }, false);
   const cloud = canvasTex(256, 96, (g) => { for (let i = 0; i < 26; i++) { const x = 40 + Math.random() * 176, y = 34 + Math.random() * 30, r = 18 + Math.random() * 26, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); } }, false);
   const checker = canvasTex(128, 32, (g) => { for (let y = 0; y < 2; y++) for (let x = 0; x < 8; x++) { g.fillStyle = (x + y) % 2 ? '#fff' : '#111'; g.fillRect(x * 16, y * 16, 16, 16); } });
-  return (TEX = { road, walk, ground, barrier, facades, glow, checker, cloud, water, ramp, cut, jersey, cutSign, pad, fence, barrel });
+  const signTex = (txt, bg, fg) => canvasTex(512, 160, (g, w, h) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 10; g.strokeRect(6, 6, w - 12, h - 12); g.fillStyle = fg; g.font = '900 68px Arial'; g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillText(txt, w / 2 - 30, h / 2 + 4); g.beginPath(); g.moveTo(w - 70, 40); g.lineTo(w - 26, h / 2); g.lineTo(w - 70, h - 40); g.fill(); }, false);
+  const stuntSign = signTex('STUNT JUMP', '#ff3fa0', '#fff'), dirtSign = signTex('DIRT TRAIL', '#6b4a2b', '#ffe9b8');
+  const stuntRoad = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#2c2d34'; g.fillRect(0, 0, w, h); noise(g, w, h, 7000, 0.1); g.fillStyle = '#ff3fa0'; for (let y = 0; y < h; y += 64) { g.beginPath(); g.moveTo(w * 0.3, y + 50); g.lineTo(w / 2, y + 14); g.lineTo(w * 0.7, y + 50); g.lineTo(w * 0.7, y + 60); g.lineTo(w / 2, y + 26); g.lineTo(w * 0.3, y + 60); g.fill(); } g.fillStyle = '#f5f5f5'; g.fillRect(6, 0, 6, h); g.fillRect(w - 12, 0, 6, h); });
+  const stuntRail = canvasTex(256, 128, (g, w) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#fff' : '#ff3fa0'; g.fillRect(i * 32, 0, 32, 64); } g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 56, w, 8); });
+  const dirt = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#7a5434'; g.fillRect(0, 0, w, h); noise(g, w, h, 14000, 0.22); g.fillStyle = 'rgba(40,25,12,0.35)'; for (const x of [0.3, 0.68]) for (let y = 0; y < h; y += 4) g.fillRect(w * x + Math.sin(y * 0.15) * 3, y, 14, 3); });
+  const wood = canvasTex(256, 128, (g, w) => { g.fillStyle = '#8a5f3c'; g.fillRect(0, 0, w, 64); g.fillStyle = '#5e3e24'; for (let i = 0; i < 8; i++) g.fillRect(i * 32 + 13, 0, 6, 64); g.fillRect(0, 10, w, 5); g.fillRect(0, 38, w, 5); });
+  return (TEX = { road, walk, ground, barrier, facades, glow, checker, cloud, water, ramp, cut, jersey, cutSign, pad, fence, barrel, stuntSign, dirtSign, stuntRoad, stuntRail, dirt, wood });
 }
 
 function ribbon(T, offA, offB, yA, yB, vScale, uA = 0, uB = 1, from = 0, to = -1) {
@@ -200,12 +206,14 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
   const ground = add(new THREE.PlaneGeometry(4800, 4800, 60, 60), new THREE.MeshLambertMaterial({ color: new THREE.Color(env.ground ?? th.ground).multiplyScalar(th.night ? 0.42 : th.lit > 0.3 ? 0.8 : 1), map: gt }));
   ground.rotation.x = -Math.PI / 2; ground.position.set(cx, -0.2, cz); ground.updateMatrix();
   const inT = i => mode !== 'air' && i > T.tunnel[0] - 5 && i < T.tunnel[1] + 5;
-  const road = mode === 'road', E = i => (T.elev ? T.elev[((i % T.N) + T.N) % T.N] : 0), C = road ? T.cut : null;
+  const road = mode === 'road', E = i => (T.elev ? T.elev[((i % T.N) + T.N) % T.N] : 0), CUTS = road && T.cuts ? T.cuts.filter(c => !(opt.relay && c.wet)) : [], C = CUTS.find(c => c.type === 'build') || null;
+  const wetI = i => opt.relay && i > T.water[0] - 3 && i < T.water[1] + 3;
   const zone = (i, alongHalf, acrossHalf) => { const k = Math.floor(i); return { x: T.x[k], z: T.z[k], tx: T.tx[k], tz: T.tz[k], a: alongHalf, c: acrossHalf }; };
   const cross = road && T.flyover ? zone((T.flyover[0] + T.flyover[1]) / 2, 9, 120) : null, river = T.bridge && mode !== 'space' ? zone((T.bridge[0] + T.bridge[1]) / 2, 21, 320) : null;
   const inZone = (z, x, y, m = 0) => { if (!z) return false; const dx = x - z.x, dy = y - z.z, al = dx * z.tx + dy * z.tz, ac = dx * z.tz - dy * z.tx; return Math.abs(al) < z.a + m && Math.abs(ac) < z.c + m; };
-  const cutD = (x, z) => { if (!C) return 1e9; const dx = x - C.x[0], dz = z - C.z[0], t = Math.max(0, Math.min(C.len, dx * C.tx + dz * C.tz)); return Math.hypot(x - (C.x[0] + C.tx * t), z - (C.z[0] + C.tz * t)); };
-  const blocked = (x, z, m = 0) => cutD(x, z) < C?.half + 3 + m || inZone(cross, x, z, m) || inZone(river, x, z, m);
+  const cutD1 = (C, x, z) => { let b = 1e18; for (let k = 0; k <= C.n; k++) { const d = (x - C.x[k]) ** 2 + (z - C.z[k]) ** 2; if (d < b) b = d; } return Math.sqrt(b); };
+  const cutGap = (x, z, m) => CUTS.some(c => cutD1(c, x, z) < c.half + m);
+  const blocked = (x, z, m = 0) => cutGap(x, z, 3 + m) || inZone(cross, x, z, m) || inZone(river, x, z, m);
   const waterMat = () => new THREE.MeshLambertMaterial({ map: tex.water, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8, emissive: 0x0a2a44 });
   if (opt.relay) add(ribbon(T, half + 0.3, -half - 0.3, 0.05, 0.05, 24, 0, 1, T.water[0], T.water[1]), waterMat());
   if (mode !== 'air') { // tunnel shell with ceiling lights
@@ -220,7 +228,7 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.1), new THREE.MeshBasicMaterial({ map: textPanel('TUNNEL  ·  LIGHTS ON', 512, 64, '#0d57d8', '#fff'), side: THREE.DoubleSide })); sg.position.set(T.x[k], H + 0.6, T.z[k]); sg.rotation.y = fr.rotation.y; sg.translateZ(e === ta ? -0.62 : 0.62); group.add(sg); }
   }
   if (mode === 'road') for (const rp of T.ramps) { // stunt ramps
-    const k = rp.i, g = new THREE.Group(), slope = new THREE.Mesh(new THREE.PlaneGeometry(rp.w * 2, 7.2), new THREE.MeshLambertMaterial({ map: tex.ramp, side: THREE.DoubleSide }));
+    if (wetI(rp.i)) continue; const k = rp.i, g = new THREE.Group(), slope = new THREE.Mesh(new THREE.PlaneGeometry(rp.w * 2, 7.2), new THREE.MeshLambertMaterial({ map: tex.ramp, side: THREE.DoubleSide }));
     slope.rotation.x = -Math.PI / 2 - Math.atan2(1.7, 7); slope.position.set(0, 0.85, -3.5); const back = new THREE.Mesh(new THREE.PlaneGeometry(rp.w * 2, 1.7), new THREE.MeshLambertMaterial({ color: 0x2a2c33, side: THREE.DoubleSide })); back.position.set(0, 0.85, 0);
     g.add(slope, back); g.position.set(T.x[k] + T.tz[k] * rp.off, 0.03, T.z[k] - T.tx[k] * rp.off); g.rotation.y = Math.atan2(T.tx[k], T.tz[k]); group.add(g);
   }
@@ -238,7 +246,7 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
     for (const s of [1, -1]) {
       const o = (half + 0.35) * s, o2 = (half + 0.75) * s;
       const a = [T.x[i] + T.tz[i] * o, ei, T.z[i] - T.tx[i] * o], b = [T.x[j] + T.tz[j] * o, ej, T.z[j] - T.tx[j] * o];
-      if (C && cutD(a[0], a[2]) < C.half + 0.9) continue;   // gap where the shortcut leaves / rejoins
+      if (cutGap(a[0], a[2], 0.9)) continue;   // gaps where the shortcuts leave / rejoin
       const a2 = [T.x[i] + T.tz[i] * o2, ei + 0.95, T.z[i] - T.tx[i] * o2], b2 = [T.x[j] + T.tz[j] * o2, ej + 0.95, T.z[j] - T.tx[j] * o2];
       const at = [a[0], ei + 0.95, a[2]], bt = [b[0], ej + 0.95, b[2]];
       bq.push(s > 0 ? [b, a, at, bt, u1, v0, u0, v1] : [a, b, bt, at, u1, v0, u0, v1]);
@@ -280,19 +288,34 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
     }
     // boost pads
     if (road) for (const pd of T.pads) { const i = pd.i, m = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 7), new THREE.MeshBasicMaterial({ map: tex.pad, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); m.rotation.order = 'YXZ'; m.rotation.set(-Math.PI / 2, Math.atan2(T.tx[i], T.tz[i]), 0); m.position.set(T.x[i] + T.tz[i] * pd.off, E(i) + 0.06, T.z[i] - T.tx[i] * pd.off); group.add(m); pads.push(m); disposables.push(m.geometry, m.material); }
-    // the shortcut: a construction-site road with its own barriers and a smashable fence at the entrance
-    if (C) {
-      const cr = (offA, offB, y, vs) => { const n = C.n, pos = new Float32Array((n + 1) * 6), uv = new Float32Array((n + 1) * 4), idx = [], lx = C.tz, lz = -C.tx;
-        for (let k = 0; k <= n; k++) { pos.set([C.x[k] + lx * offA, y, C.z[k] + lz * offA, C.x[k] + lx * offB, y, C.z[k] + lz * offB], k * 6); uv.set([0, k * C.len / n / vs, 1, k * C.len / n / vs], k * 4); if (k < n) { const q = k * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); } }
+    // shortcuts: a construction road (smashable fence), a stunt route (big kicker ramp) and a dirt trail (bumps; bikes love it)
+    const mainD = (x, z) => { let b = 1e9; for (let i = 0; i < T.N; i += 2) b = Math.min(b, (x - T.x[i]) ** 2 + (z - T.z[i]) ** 2); return Math.sqrt(b); };
+    const routeLook = { build: { map: tex.cut, rail: tex.jersey, sign: tex.cutSign }, stunt: { map: tex.stuntRoad, rail: tex.stuntRail, sign: tex.stuntSign }, dirt: { map: tex.dirt, rail: tex.wood, sign: tex.dirtSign } };
+    for (const C of CUTS) {
+      const L = routeLook[C.type] || routeLook.build;
+      const cr = (offA, offB, y, vs) => { const n = C.n, pos = new Float32Array((n + 1) * 6), uv = new Float32Array((n + 1) * 4), idx = [];
+        for (let k = 0; k <= n; k++) { const lx = C.uz[k], lz = -C.ux[k]; pos.set([C.x[k] + lx * offA, y, C.z[k] + lz * offA, C.x[k] + lx * offB, y, C.z[k] + lz * offB], k * 6); uv.set([0, k * C.len / n / vs, 1, k * C.len / n / vs], k * 4); if (k < n) { const q = k * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); } }
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g; };
-      add(cr(C.half + 0.3, -C.half - 0.3, 0.015, 12), new THREE.MeshLambertMaterial({ map: tex.cut, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
-      const cq = [], mainD = (x, z) => { let b = 1e9; for (let i = 0; i < T.N; i += 2) b = Math.min(b, (x - T.x[i]) ** 2 + (z - T.z[i]) ** 2); return Math.sqrt(b); };
-      for (let k = 0; k < C.n; k++) for (const sd of [1, -1]) { const o = (C.half + 0.3) * sd, ax = C.x[k] + C.tz * o, az = C.z[k] - C.tx * o, bx = C.x[k + 1] + C.tz * o, bz = C.z[k + 1] - C.tx * o; if (mainD(ax, az) < half + 1.5) continue; const u0 = (k % 4) / 4; cq.push(sd > 0 ? [[bx, 0, bz], [ax, 0, az], [ax, 0.9, az], [bx, 0.9, bz], u0 + 0.25, 0.02, u0, 0.48] : [[ax, 0, az], [bx, 0, bz], [bx, 0.9, bz], [ax, 0.9, az], u0, 0.02, u0 + 0.25, 0.48]); }
-      add(quadGeo(cq), new THREE.MeshLambertMaterial({ map: tex.jersey, side: THREE.DoubleSide }));
-      const k0 = Math.min(C.n - 1, Math.round(22 / (C.len / C.n))), sg = new THREE.Group(), pole = new THREE.MeshLambertMaterial({ color: 0x30343c });
-      const board = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 2.2), new THREE.MeshBasicMaterial({ map: tex.cutSign, side: THREE.DoubleSide })); board.position.y = 4.3; sg.add(board);
+      add(cr(C.half + 0.3, -C.half - 0.3, 0.015, 12), new THREE.MeshLambertMaterial({ map: L.map, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+      const cq = [], rh = C.type === 'dirt' ? 0.75 : 0.9;
+      for (let k = 0; k < C.n; k++) for (const sd of [1, -1]) { const o = (C.half + 0.3) * sd, ax = C.x[k] + C.uz[k] * o, az = C.z[k] - C.ux[k] * o, bx = C.x[k + 1] + C.uz[k + 1] * o, bz = C.z[k + 1] - C.ux[k + 1] * o; if (mainD(ax, az) < half + 1.5) continue; const u0 = (k % 4) / 4; cq.push(sd > 0 ? [[bx, 0, bz], [ax, 0, az], [ax, rh, az], [bx, rh, bz], u0 + 0.25, 0.02, u0, 0.48] : [[ax, 0, az], [bx, 0, bz], [bx, rh, bz], [ax, rh, az], u0, 0.02, u0 + 0.25, 0.48]); }
+      add(quadGeo(cq), new THREE.MeshLambertMaterial({ map: L.rail, side: THREE.DoubleSide }));
+      let kSep = 1; while (kSep < C.n / 3 && mainD(C.x[kSep], C.z[kSep]) < half + C.half + 1.5) kSep++; C.kSep = kSep;   // first point where the route is clear of the main road
+      const k0 = Math.min(C.n - 1, kSep + 3), sg = new THREE.Group(), pole = new THREE.MeshLambertMaterial({ color: 0x30343c });
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 2.2), new THREE.MeshBasicMaterial({ map: L.sign, side: THREE.DoubleSide })); board.position.y = 4.3; sg.add(board);
       for (const sd of [-1, 1]) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.25, 4.3, 0.25), pole); pl.position.set(sd * 3, 2.15, 0); sg.add(pl); }
-      sg.position.set(C.x[k0] + C.tz * (C.half + 2.2), 0, C.z[k0] - C.tx * (C.half + 2.2)); sg.rotation.y = Math.atan2(C.tx, C.tz) + Math.PI; group.add(sg);
+      sg.position.set(C.x[k0] + C.uz[k0] * (C.half + 2.2), 0, C.z[k0] - C.ux[k0] * (C.half + 2.2)); sg.rotation.y = Math.atan2(C.ux[k0], C.uz[k0]) + Math.PI; group.add(sg);
+      for (const r of C.ramps) { // kicker ramps across the whole route (stunt) or dirt mounds (trail)
+        const g = new THREE.Group(), w = C.half * 2, len = r.big ? 9 : 5.5, ht = r.big ? 2.6 : 1.0;
+        if (r.big) { const slope = new THREE.Mesh(new THREE.PlaneGeometry(w, Math.hypot(len, ht)), new THREE.MeshLambertMaterial({ map: tex.ramp, side: THREE.DoubleSide })); slope.rotation.x = -Math.PI / 2 - Math.atan2(ht, len); slope.position.set(0, ht / 2, -len / 2); const back = new THREE.Mesh(new THREE.PlaneGeometry(w, ht), new THREE.MeshLambertMaterial({ color: 0x2a2c33, side: THREE.DoubleSide })); back.position.set(0, ht / 2, 0); g.add(slope, back);
+          for (const sd of [-1, 1]) { const f = new THREE.Mesh(new THREE.BoxGeometry(0.5, ht + 3, 0.5), new THREE.MeshBasicMaterial({ color: 0xff3fa0 })); f.position.set(sd * (C.half + 0.6), (ht + 3) / 2, 0); g.add(f); } }
+        else { const m = new THREE.Mesh(new THREE.CylinderGeometry(len / 2, len / 2, w, 12, 1, false, 0, Math.PI), new THREE.MeshLambertMaterial({ color: th.night ? 0x4a3524 : 0x8a5f3c })); m.rotation.z = Math.PI / 2; m.scale.set(ht / (len / 2), 1, 1); m.position.set(0, -0.05, -len / 2); g.add(m); }
+        const j = r.j, px = C.x[j], pz = C.z[j]; g.position.set(px, 0.02, pz); g.rotation.y = Math.atan2(C.ux[j], C.uz[j]); group.add(g);
+      }
+      if (C.type === 'stunt') { // stacked tyres and arrows along the stunt route
+        const tyreG = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 10), tyreM = new THREE.MeshLambertMaterial({ color: 0x1b1b1e }), ids = []; for (let k = 10; k < C.n - 10; k += 4) for (const sd of [1, -1]) { const x = C.x[k] + C.uz[k] * (C.half + 1.6) * sd, z = C.z[k] - C.ux[k] * (C.half + 1.6) * sd; if (mainD(x, z) > half + 4) ids.push([x, z]); }
+        const tm = new THREE.InstancedMesh(tyreG, tyreM, ids.length * 3), d = new THREE.Object3D(); ids.forEach(([x, z], q) => { for (let l = 0; l < 3; l++) { d.position.set(x, 0.23 + l * 0.45, z); d.updateMatrix(); tm.setMatrixAt(q * 3 + l, d.matrix); } }); group.add(tm); disposables.push(tyreG, tyreM);
+      }
     }
   }
 
@@ -461,7 +484,7 @@ export function buildWorld(scene, renderer, T, quality, opt = {}) {
     if (W === 'snow') group.traverse(o => { if (o.material && o.material.color && o.material.map === tex.ground) o.material.color.lerp(new THREE.Color(0xeef2f7), 0.7); });
   }
   const smash = [], dk2 = new THREE.Object3D();
-  if (C) { const k = Math.min(C.n - 1, Math.round(10 / (C.len / C.n))); for (let q = -2; q <= 2; q++) smash.push({ kind: 0, x: C.x[k] + C.tz * q * 2.2, y: 0, z: C.z[k] - C.tx * q * 2.2, h: Math.atan2(C.tx, C.tz), vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, live: false, done: false }); }
+  if (C) { const k = Math.min(C.n - 1, (C.kSep || 5) + 1); for (let q = -2; q <= 2; q++) smash.push({ kind: 0, x: C.x[k] + C.uz[k] * q * 2.2, y: 0, z: C.z[k] - C.ux[k] * q * 2.2, h: Math.atan2(C.ux[k], C.uz[k]), vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, live: false, done: false }); }
   if (road) for (let i = 50, k = 0; i < T.N - 40; i += Math.floor(T.N / 14), k++) { if (inT(i) || E(i) > 0.2 || blocked(T.x[i], T.z[i], 6)) continue; const sd = k % 2 ? 1 : -1, o = (half - 0.9) * sd; for (let q = 0; q < 3; q++) { const j = (i + q * 2) % T.N; smash.push({ kind: 1, x: T.x[j] + T.tz[j] * o, y: 0, z: T.z[j] - T.tx[j] * o, h: 0, vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, live: false, done: false }); } }
   const smashMesh = [new THREE.InstancedMesh(new THREE.BoxGeometry(2.1, 1.1, 0.18), new THREE.MeshLambertMaterial({ map: tex.fence }), Math.max(1, smash.filter(s => !s.kind).length)), new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.42, 1.05, 10), new THREE.MeshLambertMaterial({ map: tex.barrel }), Math.max(1, smash.filter(s => s.kind).length))];
   smashMesh.forEach(m => { m.frustumCulled = false; group.add(m); });

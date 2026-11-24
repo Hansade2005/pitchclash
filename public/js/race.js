@@ -1,9 +1,9 @@
 // One race session: vehicles, rules (sprint / elimination / orb rush), cameras, split-screen and net sync.
 import * as THREE from 'three';
-import { TRACKS, buildTrackData, lateral, nearestIdx, cutPos, elevAt } from './track.js';
+import { TRACKS, buildTrackData, lateral, nearestIdx, cutPos, nearCut as nearCutOf, elevAt } from './track.js';
 import { buildWorld, rng } from './world.js';
 import { Vehicle, collide } from './vehicle.js';
-import { makeAI, aiDrive, safeSpeed, steerTo } from './ai.js';
+import { makeAI, aiDrive, safeSpeed, steerTo, routeSafe } from './ai.js';
 import { FX } from './fx.js';
 import { statsFor, save, kindOf } from './data.js';
 import { Peds } from './peds.js';
@@ -14,7 +14,7 @@ import { Combat, WEAPONS } from './combat.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-const trackCache = {};
+const trackCache = {}, tipShown = {};
 export const getTrack = id => trackCache[id] || (trackCache[id] = buildTrackData(TRACKS.find(t => t.id === id)));
 const ELIM_FIRST = 35, ELIM_EVERY = 20, ORB_TIME = 90, KD_TIME = 120, TOXIC_MAX = 150, CATCH_TIME = 110, CLEAN_TIME = 20, SCORE_RULES = ['orbs', 'knockdown', 'gates'];
 
@@ -44,7 +44,7 @@ export class Race {
       if (e.type === 'cop') { v.ai = makeAI(1.0, 0); v.block = !!e.block; v.started = true; if (cfg.rule !== 'pursuit') v.inactive = true; if (e.block) { v.inactive = true; v.place(T, 0, 0); } else { v.place(T, T.N - 40 - copK * 6, (copK % 2 ? -1 : 1) * 3); copK++; } }
       else if (e.type === 'traffic') { const lanes = [-0.55, 0.5, -0.18, 0.2]; v.ai = makeAI(0.5, 0); v.ai.fixed = lanes[trafK % 4] * T.half; v.ai.cap = 17 + (trafK % 3) * 3; v.started = true; v.place(T, Math.floor((trafK + 1) * T.N / (nTraffic + 1.5)) + 30, v.ai.fixed); trafK++; }
       else v.place(T, T.N - 5 - Math.floor(k / 2) * 5, (k % 2 ? -1 : 1) * 3.3);
-      v.track = T; v.useElev = this.mode === 'road'; v.ramDamage = this.mode === 'road' ? (cfg.rule === 'knockdown' ? 3 : cfg.rule === 'toxic' ? 0 : 0.8) : 0;
+      if (v.isBike && !npc) v.crashVn = 16; v.track = T; v.useElev = this.mode === 'road'; v.noWet = !!cfg.relay || cfg.rule === 'relay'; v.ramDamage = this.mode === 'road' ? (cfg.rule === 'knockdown' ? 3 : cfg.rule === 'toxic' ? 0 : 0.8) : 0;
       if (cfg.weather === 'rain') v.st.grip *= 0.9; else if (cfg.weather === 'snow') v.st.grip *= 0.82;
       if (e.type === 'runner') { v.npc = true; v.ai = makeAI(0.92, 0); v.st.top *= 0.97; v.started = true; v.place(T, 55, 0); }
       this.vehicles.push(v); this.byId[e.id] = v;
@@ -127,7 +127,7 @@ export class Race {
       if (!this.net || this.netGo) this.count -= dt;
       const c = Math.ceil(this.count);
       if (c < this.lastBeep && c > 0 && c <= 3 && !this.cfg.demo) { this.lastBeep = c; audio.sfx('beep'); }
-      if (this.count <= 0) { this.state = 'racing'; for (const v of vs) { v.frozen = false; v.lapStart = 0; if (v.type === 'traffic' && !v.remote) { v.vx = Math.sin(v.h) * 16; v.vz = Math.cos(v.h) * 16; } } if (!this.cfg.demo) audio.sfx('go'); }
+      if (this.count <= 0) { this.state = 'racing'; for (const v of vs) { v.frozen = false; v.lapStart = 0; if (v.type === 'traffic' && !v.remote) { v.vx = Math.sin(v.h) * 16; v.vz = Math.cos(v.h) * 16; } } if (!this.cfg.demo) { audio.sfx('go'); if (this.locals.some(v => v.isBike) && !tipShown.bike) { tipShown.bike = 1; ui.toast('BIKE TIP: hold DRIFT on a straight to pull a wheelie for nitro'); } else if (this.routes().length > 1 && !tipShown.routes) { tipShown.routes = 1; ui.toast(`${this.routes().length} SHORTCUTS on this track – watch the minimap`); } } }
     } else if (!this.over) this.time += dt;
 
     // --- controls
@@ -135,9 +135,13 @@ export class Race {
       if (v.remote || v.inactive) continue;
       if (v.block) { v.input.gas = 0; v.input.steer = 0; v.input.brake = 0; v.input.hand = true; continue; }
       if (v.type === 'local' && !v.finished && !v.eliminated) this.readPlayer(v, dt);
-      else if (v.ai || v.auto) { const ai = v.ai || v.auto; if (v.type === 'ai') this.aggro(v, ai); if (v.finished) ai.band = 0.8; if (this.orbs) this.aimOrb(v, ai); if (this.gates) this.flyTo(v, ai, true); aiDrive(v, ai, T, vs, dt); }
+      else if (v.ai || v.auto) { const ai = v.ai || v.auto; if (v.type === 'ai') this.aggro(v, ai); if (v.finished) ai.band = 0.8; if (this.orbs) this.aimOrb(v, ai); if (this.gates) this.flyTo(v, ai, true); aiDrive(v, ai, T, vs, dt);
+        if (v.isBike && v.type === 'ai' && this.state === 'racing') { if (v.awT > 0) { v.awT -= dt; if (Math.abs(v.input.steer) < 0.3 && !v.input.brake) v.input.hand = true; } else if (Math.random() < 0.004 && v.vf > 20 && Math.abs(T.curv[(v.idx + 12) % T.N]) < 0.003 && !v.onCut) v.awT = 1.2 + Math.random() * 2; } }
     }
-    for (const v of vs) if (v.ai && !v.remote && v.ai.cutGo) { const C = T.cut, cp = cutPos(T, v.x, v.z, v.idx), j = cp && cp.d < C.half + 4 ? Math.min(C.n, cp.j + 6) : 4; let a = Math.atan2(C.x[j] - v.x, C.z[j] - v.z) - v.h; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; v.input.steer = clamp(a * 2.4, -1, 1); v.input.gas = 1; v.input.brake = 0; }
+    for (const v of vs) if (v.ai && !v.remote && v.ai.cutGo) { const C = v.ai.cutGo;
+      if (v.idx < C.a - 6) { const q = Math.round(C.n * 0.3), side = Math.sign((C.x[q] - C.x[0]) * T.tz[C.a] - (C.z[q] - C.z[0]) * T.tx[C.a]) || 1; v.ai.fixed = side * T.half * 0.45; v.ai.routeFix = true; const allow = routeSafe(v, C, 0, 0.95, Math.max(0, (C.a - v.idx) * T.step)); if (v.vf > allow + 1) { v.input.gas = 0; v.input.brake = 0.4; } continue; }   // move over to the side the route leaves from
+      if (v.ai.routeFix) { v.ai.fixed = null; v.ai.routeFix = false; } const cp = cutPos(T, v.x, v.z, v.idx, C), j = cp && cp.d < C.half + 4 ? Math.min(C.n, cp.j + 7) : 6; let a = Math.atan2(C.x[j] - v.x, C.z[j] - v.z) - v.h; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI;
+      v.input.steer = clamp(a * 2.4, -1, 1); const allow = Math.min(routeSafe(v, C, cp ? cp.j : 0, 0.95), safeSpeed(v, T, 0.95) + (cp && cp.j < C.n * 0.7 ? 999 : 0)), slow = v.vf > allow + 1 || (Math.abs(a) > 0.32 && v.vf > 28); v.input.gas = slow ? 0 : 1; v.input.brake = slow ? 0.45 : 0; }
     if (this.rule === 'gates') for (const v of vs) if (v.ai && v.type === 'ai' && !v.remote && Math.max(Math.abs(T.curv[v.idx]), Math.abs(T.curv[(v.idx + 8) % T.N])) > 0.006 && v.vf > 16) v.input.hand = Math.random() < 0.75;
     if (this.runner && !this.runner.remote) { const r = this.runner; let gap = 1e9; for (const v of this.racers) if (!v.eliminated) gap = Math.min(gap, Math.hypot(v.x - r.x, v.z - r.z)); r.ai.cap = gap > 70 ? r.st.top * 0.62 : gap > 35 ? r.st.top * 0.8 : null; }
     if (this.cops.length) this.copLogic(dt);
@@ -265,6 +269,8 @@ export class Race {
     if (ai && ai.orbOff == null && ai.cap == null) { const di = (g.i - v.idx + this.T.N) % this.T.N; ai.fixed = di < 70 ? g.off * 0.9 + ai.lane : null; }
   }
 
+  routes() { return this._routes || (this._routes = this.mode === 'road' && this.T.cuts ? this.T.cuts.filter(c => !(c.wet && (this.cfg.relay || this.rule === 'relay'))) : []); }
+
   // ---- reward chain: everything stylish tops up nitro; quick successions build a ×2..×5 chain worth more credits
   reward(v, label, nitro, o = {}) {
     if (!v || v.remote || v.eliminated) return;
@@ -288,6 +294,9 @@ export class Race {
     else if (Math.abs(v.vf) > 12) { v.cleanT = (v.cleanT || 0) + dt;
       if (v.cleanT >= CLEAN_TIME) { v.cleanT = 0; v.cleanN = (v.cleanN || 0) + 1; this.reward(v, v.cleanN > 1 ? `CLEAN DRIVING ×${v.cleanN}` : 'CLEAN DRIVING', 0.4, { surge: 2.5, speed: 10, cr: 150 * v.cleanN, tag: '+NITRO +TOP SPEED', hot: 1 }); } }
     if (this.rule !== 'gates' && !v.air) { if (v.drift && v.crashT <= 0) v.driftT = (v.driftT || 0) + dt; else { if ((v.driftT || 0) > 1.8) this.reward(v, `DRIFT ${v.driftT.toFixed(1)}s`, Math.min(0.25, v.driftT * 0.05), { cr: Math.round(v.driftT * 20) }); v.driftT = 0; } }
+    if (v.wheelieDone) { const t = v.wheelieDone; v.wheelieDone = 0; if (t >= 1.2) this.reward(v, `WHEELIE ${t.toFixed(1)}s`, Math.min(0.3, t * 0.05), { cr: Math.round(t * 25) }); }
+    if (v.cutRef) { if (v.routeC !== v.cutRef) { v.routeC = v.cutRef; v.routeOk = v.idx < v.cutRef.a + (v.cutRef.b - v.cutRef.a) * 0.5; } }
+    else if (v.routeC) { const C = v.routeC; if (v.routeOk && v.idx >= C.a + (C.b - C.a) * 0.6 && v.idx <= C.b + 14) this.reward(v, { build: 'SHORTCUT!', stunt: 'STUNT ROUTE', dirt: 'DIRT TRAIL' }[C.type] || 'SHORTCUT!', C.type === 'dirt' && v.isBike ? 0.2 : 0.1, { cr: Math.round(30 + C.gain) }); v.routeC = null; }
     if (this.lapRule && this.order) { const p = this.order.indexOf(v); if (v.lastPos != null && p >= 0 && p < v.lastPos && this.time > 6 && (v.otT ?? -9) < this.time - 1.5) { v.otT = this.time; this.reward(v, p === 0 ? 'TOOK THE LEAD!' : 'OVERTAKE', p === 0 ? 0.1 : 0.05, { cr: p === 0 ? 50 : 20 }); } if (p >= 0) v.lastPos = p; }
   }
 
@@ -305,7 +314,7 @@ export class Race {
     // near misses: skim past traffic or a rival at speed for nitro (and a moment of slow motion)
     for (const v of this.locals) { if (v.eliminated || v.crashT > 0) continue; const fx = Math.sin(v.h), fz = Math.cos(v.h);
       for (const o of this.vehicles) { if (o === v || o.inactive || o.eliminated || o.air) continue; const dx = o.x - v.x, dz = o.z - v.z; if (dx * dx + dz * dz > 20) continue; const al = dx * fx + dz * fz, sd = Math.abs(dx * fz - dz * fx);
-        if (Math.abs(al) < 1.2 && sd > 1.9 && sd < 3.6 && v.vf - o.vf > 8 && v.lastHit !== o && (o.nm || -9) < this.time - 2) { o.nm = this.time; this.reward(v, o.type === 'traffic' ? 'NEAR MISS' : o.cop ? 'COP DODGED' : 'CLOSE CALL', 0.15, { cr: 30 }); if (o.type === 'traffic' && !this.net && this.slow <= 0) this.slow = 0.4; } } }
+        if (Math.abs(al) < 1.2 && sd > 1.9 && sd < 3.6 && v.vf - o.vf > 8 && v.lastHit !== o && (o.nm || -9) < this.time - 2) { o.nm = this.time; const split = v.isBike && o.type === 'traffic' && sd < 2.7; this.reward(v, split ? 'LANE SPLIT' : o.type === 'traffic' ? 'NEAR MISS' : o.cop ? 'COP DODGED' : 'CLOSE CALL', split ? 0.22 : 0.15, { cr: split ? 45 : 30 }); if (o.type === 'traffic' && !this.net && this.slow <= 0) this.slow = 0.4; } } }
     // toxic tag
     if (this.rule === 'toxic' && this.state === 'racing') {
       if (!this.toxicStarted) { this.toxicStarted = true; const pool = this.racers.filter(v => !v.eliminated); this.infect(pool[Math.floor(Math.random() * pool.length)], null); }
@@ -325,8 +334,14 @@ export class Race {
   }
   // computer racers: ram rivals in Knockdown, chase/avoid in Toxic Tag, maybe take the shortcut
   aggro(v, ai) {
-    const T = this.T, C = T.cut;
-    if (C && this.mode === 'road') { if (v.idx > C.a - 40 && v.idx < C.a - 18 && ai.cutRoll == null) ai.cutRoll = Math.random() < 0.45; if (v.idx < C.a - 45 || v.idx > C.b + 8) ai.cutRoll = null; ai.cutGo = !!ai.cutRoll && v.idx >= C.a - 12 && v.idx < C.b - 3; }
+    const T = this.T, R = this.routes();
+    if (ai.routeFix && !ai.cutGo) { ai.fixed = null; ai.routeFix = false; }
+    if (R.length && this.mode === 'road') { ai.cutGo = null; const rolls = ai.rolls || (ai.rolls = new Map());
+      for (const C of R) { let r = rolls.get(C);
+        if (v.idx > C.a - 40 && v.idx < C.a - 18 && r == null) { r = Math.random() < (C.type === 'dirt' ? (v.isBike ? 0.75 : 0.3) : C.type === 'stunt' ? 0.55 : 0.45); rolls.set(C, r); }
+        if (v.idx < C.a - 45 || v.idx > C.b + 8) { rolls.delete(C); r = null; }
+        if (r && v.idx > C.a + 6 && v.idx < C.b && !v.onCut) { const cp = cutPos(T, v.x, v.z, v.idx, C); if (!cp || cp.d > C.half + 3) { rolls.set(C, false); r = false; } }   // missed the entrance: stay on the main road
+        if (r && !ai.cutGo && v.idx >= C.a - 40 && v.idx <= C.b) ai.cutGo = C; } }
     if (this.rule === 'catch' && this.runner) { const r = this.runner, d = Math.hypot(r.x - v.x, r.z - v.z); ai.fixed = d < 45 ? clamp(lateral(T, r.idx, r.x, r.z), -T.half + 2, T.half - 2) : null; if (d < 60) ai.band = 1.08; return; }
     if (this.rule !== 'knockdown' && this.rule !== 'toxic') return; ai.fixed = null; if (this.state !== 'racing') return;
     let tgt = null, bd = 30; for (const o of this.racers) { if (o === v || o.eliminated || o.crashT > 0) continue; if (this.rule === 'toxic' && !(v.toxic > 0) && !(o.toxic > 0)) continue; if (this.rule === 'toxic' && v.toxic > 0 && o.toxic > 0) continue; const d = Math.hypot(o.x - v.x, o.z - v.z); if (d < bd) { bd = d; tgt = o; } }
@@ -367,9 +382,10 @@ export class Race {
 
   readPlayer(v, dt) {
     const c = input.read(v.device), T = this.T, a = save.settings.assist, inp = v.input;
-    let steer = c.steer, gas = c.gas, brake = c.brake;
+    let steer = c.steer, gas = c.gas, brake = c.brake; v.crashVn = a === 'easy' ? 19 : a === 'normal' ? 15 : 13;   // bikes: how hard a wall hit has to be to throw the rider
     if (save.settings.autoGas && !brake) gas = 1;
-    const C = T.cut, nearCut = C && this.mode === 'road' && v.idx > C.a - 10 && v.idx < C.b && (v.onCut || ((cutPos(T, v.x, v.z, v.idx) || {}).d ?? 99) < C.half + 3);
+    const nc = this.mode === 'road' ? nearCutOf(T, v.x, v.z, v.idx) : null, nearCut = !!nc && !(v.noWet && nc.C.wet) && v.idx > nc.C.a - 10 && v.idx < nc.C.b && (v.onCut || nc.d < nc.C.half + 3);
+    if (a === 'easy' && nearCut && v.vf > 8) { const allow = routeSafe(v, nc.C, nc.j, 1.0); if (v.vf > allow + 2) { brake = Math.max(brake, 0.7); gas = 0; } }   // easy help also slows you for a shortcut's bends
     if (a !== 'pro' && v.vf > 6 && !nearCut) {
       const d = lateral(T, v.idx, v.x, v.z), lim = T.half - v.halfW, edge = Math.abs(d) / lim;
       const guide = steerTo(v, T, clamp(d, -lim * 0.55, lim * 0.55));
@@ -381,7 +397,7 @@ export class Race {
     if (this.gates) { inp.climb = c.climb; if (Math.abs(c.climb) < 0.12 && a !== 'pro') this.flyTo(v, null, false); }
     if (c.punch) this.melee(v);
     if (v.landed) { if (v.landed === 'bad') { v.trickMsg = 'BAD LANDING!'; v.trickT = 1.8; audio.sfx('out'); } else this.reward(v, `${v.landed}× TRICK`, 0, { cr: 60 * v.landed, tag: '+NITRO' }); v.landed = null; }
-    if (v.bigAir) { this.reward(v, `BIG AIR ${v.bigAir.toFixed(1)}s`, 0.12, { cr: 40 }); v.bigAir = 0; }
+    if (v.bigAir) { this.reward(v, `${v.bigAirKick ? 'STUNT JUMP' : 'BIG AIR'} ${v.bigAir.toFixed(1)}s`, v.bigAirKick ? 0.2 : 0.12, { cr: v.bigAirKick ? 80 : 40, hot: v.bigAirKick }); v.bigAir = 0; v.bigAirKick = false; }
     if (v.formChanged) { v.trickMsg = v.formChanged === 'boat' ? 'WATER! ALL ABOARD' : 'BACK ON THE ROAD'; v.trickT = 1.8; audio.sfx('nitro'); v.formChanged = null; }
     if (v.trickT > 0) v.trickT -= dt;
     if (c.nitro && v.nitro > 0.05 && !v.wasBoost) audio.sfx('nitro'); v.wasBoost = c.nitro && v.nitro > 0.05;
@@ -434,7 +450,7 @@ export class Race {
       cam.lookAt(v.x + Math.sin(v.h) * 30, 1.0 + ay, v.z + Math.cos(v.h) * 30); if (bike) cam.rotation.z += v.tilt.rotation.z * 0.5;
     } else {
       let tx = v.x - Math.sin(vw.camH) * dist, tz = v.z - Math.cos(vw.camH) * dist;
-      { // keep the camera inside the barriers so walls and trees never block the view
+      if (!v.onCut) { // keep the camera inside the barriers so walls and trees never block the view (not on a shortcut)
         const T = this.T, ci = nearestIdx(T, tx, tz, (v.idx - 5 + T.N) % T.N), d = lateral(T, ci, tx, tz), lim = T.half - 0.7;
         if (Math.abs(d) > lim) { const e = d - Math.sign(d) * lim; tx -= T.tz[ci] * e; tz += T.tx[ci] * e; }
       }
@@ -442,6 +458,7 @@ export class Race {
       vw.pos.x += (tx - vw.pos.x) * kp; vw.pos.z += (tz - vw.pos.z) * kp; vw.pos.y += (hgt - vw.pos.y) * kp;
       cam.position.set(vw.pos.x + (Math.random() - 0.5) * sh * 0.5, vw.pos.y + ay + (Math.random() - 0.5) * sh * 0.4, vw.pos.z);
       cam.lookAt(v.x + Math.sin(v.h) * 5, (bike ? 1.3 : 1.15) + ay, v.z + Math.cos(v.h) * 5);
+      if (bike && !v.finished) { vw.roll = (vw.roll || 0) + ((v.tilt.rotation.z || 0) * 0.22 - (vw.roll || 0)) * (snap ? 1 : 1 - Math.exp(-5 * dt)); cam.rotation.z += vw.roll; }   // the horizon tilts a little as the bike leans
     }
     const fov = (hood ? 74 : 62) + Math.min(1, sp / 85) * 15 + (v.boosting ? 7 : 0);
     vw.fov += (fov - vw.fov) * (snap ? 1 : 1 - Math.exp(-4 * dt)); cam.fov = vw.fov;
